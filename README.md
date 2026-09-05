@@ -1,6 +1,8 @@
-# Cải thiện khả năng suy luận của LLM trong sinh mã nguồn bằng MCTS với phản hồi từ kiểm thử tự động
+# RethinkMCTS: Tối ưu hoá Suy Luận và Tự Chỉnh Sửa Mã Nguồn bằng Monte Carlo Tree Search cho Mô Hình Nhỏ (7B–14B)
 
-Dự án nghiên cứu Tiểu luận Chuyên ngành / Luận văn Tốt nghiệp: Kết hợp tìm kiếm cây tư duy (RethinkMCTS), Học hành trình (Journey Learning) và Học tăng cường từ phản hồi kiểm chứng (GRPO) trên mô hình phân khúc $\le$ 14B.
+Dự án nghiên cứu Tiểu luận Chuyên ngành / Luận văn Tốt nghiệp: Triển khai thuật toán **RethinkMCTS** (*arXiv:2409.09584v2*) với kiến trúc **Modular Monolith + Ports & Adapters**, tối ưu hóa và tinh chỉnh cho phân khúc mô hình nhỏ ($\le$ 14B như `Qwen2.5-Coder-7B/14B-Instruct`).
+
+Tài liệu đặc tả kỹ thuật chi tiết: [docs/rethinkmcts_small_model_spec.md](docs/rethinkmcts_small_model_spec.md).
 
 ---
 
@@ -8,101 +10,120 @@ Dự án nghiên cứu Tiểu luận Chuyên ngành / Luận văn Tốt nghiệp
 
 ```text
 TLCN/
-├── Proposal.md                     # Đề cương nghiên cứu chi tiết đã thống nhất
-├── Agentic_AI.md                   # Cơ sở lý thuyết Agentic AI & RL (Ch. 7, 12, 13)
-├── RAP.pdf                         # Paper tham khảo: Reasoning via Planning (MCTS + World Model)
-├── Rethink.pdf                     # Paper tham khảo: RethinkMCTS (Thought search + Rethink)
-│
+├── docs/
+│   └── rethinkmcts_small_model_spec.md   # Bản đặc tả kỹ thuật chuẩn và kế hoạch di trú
 ├── configs/
-│   └── config.yaml                 # Cấu hình MCTS (rollouts, c_base, c, timeout, rewards)
+│   ├── smoke_mock.yaml                   # Cấu hình kiểm thử nhanh không phụ thuộc GPU
+│   ├── ollama_7b.yaml                    # Cấu hình phục vụ Ollama Qwen2.5-Coder-7B cục bộ
+│   ├── remote_14b.yaml                   # Cấu hình phục vụ Remote Endpoint 14B (vLLM/Modal)
+│   └── paper_reference.yaml              # Cấu hình đối chiếu bài báo gốc (APPS/HumanEval)
 │
-├── data/
-│   ├── schemas.py                  # Pydantic models (Problem, TestCase, ExecutionResult)
-│   └── loader.py                   # Data loader hỗ trợ deepmind/code_contests & bài mẫu offline
+├── src/rethink_mcts/                     # Kiến trúc Core mới (Modular Monolith + Ports/Adapters)
+│   ├── domain/                           # Thực thể bất biến: Problem, Candidate, Tree, Feedback, Budget
+│   ├── ports/                            # Abstractions: Models, Execution, Datasets, Storage
+│   ├── application/                      # Use Cases: SearchEngine, CandidateEvaluator, FeedbackService, Judge, Baselines
+│   ├── policies/                         # Thuật toán: PUCBSelector, MaxBackup, PriorPolicy, DualReward, FinalSelection
+│   ├── adapters/                         # Implementations:
+│   │   ├── llm/                          # HttpModelGateway, SemanticPromptedLLM, ScenarioMockLLM, Parsing
+│   │   ├── execution/                    # TrustedFixtureExecutor, DockerExecutor, Bytecode CFG, Tracing
+│   │   ├── datasets/                     # CodeContests, APPS, HumanEval, JSONL
+│   │   └── storage/                      # FileSystemRunStore, EvaluationCache
+│   ├── config.py                         # Pydantic v2 strict configuration & validation
+│   ├── bootstrap.py                      # Factory kết nối toàn bộ dependency injection
+│   └── cli.py                            # Giao diện dòng lệnh chính thức: `rethink <subcommand>`
 │
-├── sandbox/
-│   ├── executor.py                 # Subprocess runner an toàn (stdin/stdout, timeout=2.0s, AC/WA/TLE/RE)
-│   └── analyzer.py                 # Trích xuất verbal feedback chẩn đoán lỗi cho Rethink
+├── prompts/
+│   └── compact_v1/                       # Jinja2 prompt templates tối ưu cho mô hình 7B-14B
 │
-├── models/
-│   ├── modal_vllm.py               # Kịch bản triển khai vLLM Server trên GPU bằng Modal Labs
-│   └── client.py                   # OpenAI-compatible API client & Mock client cho kiểm thử
+├── tests/
+│   ├── unit/                             # U01–U18: Kiểm tra toán P-UCB, Q=max, Dual Reward, Parsers
+│   ├── contracts/                        # I01–I24: Kiểm tra CFG, Tracing, Leaf Revision, Anti-Leakage
+│   ├── acceptance/                       # Scenarios A, B, C, D (Watermelon, Anti-Oracle, Swap, Resume)
+│   └── fixtures/                         # Fixtures tách biệt public và hidden
 │
-├── mcts/
-│   ├── node.py                     # Cấu trúc MCTSNode & công thức tính điểm P-UCB
-│   ├── rethink.py                  # Cơ chế Rethink tinh chỉnh nút tư duy lỗi tại nút lá
-│   └── search.py                   # Động cơ RethinkMCTSEngine (Selection, Expansion, Evaluation, Backprop)
-│
-├── scripts/
-│   ├── test_sandbox.py             # Unit tests kiểm tra toàn bộ tính năng của sandbox
-│   └── run_mvp.py                  # Kịch bản chạy thử nghiệm end-to-end MVP
-│
-├── requirements.txt
+├── deploy/
+│   └── sandbox/Dockerfile                # Docker worker cô lập (rethink-worker:py311)
+├── pyproject.toml                        # Cấu hình đóng gói Python chuẩn
 └── README.md
 ```
 
 ---
 
-## 2. Hướng dẫn Cài đặt & Chạy Thử nghiệm (Quickstart)
+## 2. Cài đặt & Chuẩn bị Môi trường
 
-### Bước 1: Cài đặt thư viện
+Cài đặt package ở chế độ phát triển (editable mode):
 ```bash
-pip install -r requirements.txt
-```
-
-### Bước 2: Chạy kiểm thử đơn vị cho Sandbox
-Xác nhận bộ thực thi Python an toàn bắt đúng các mã lỗi `AC`, `WA`, `TLE`, `RE`:
-```bash
-python3 scripts/test_sandbox.py
-```
-
-### Bước 3: Chạy thử nghiệm MVP ngoại tuyến (Offline Demonstration)
-Chạy thuật toán RethinkMCTS trên bài toán mẫu Competitive Programming (Codeforces 4A - Watermelon) với `MockLLMClient` để quan sát cơ chế tự sửa sai:
-```bash
-python3 scripts/run_mvp.py
-```
-*Bạn sẽ quan sát thấy:*
-1. Lượt 1: Mô hình đưa ra tư duy ngây thơ (`w % 2 == 0`) $\to$ Thất bại ở test case $w=2$.
-2. Cơ chế **Rethink** được kích hoạt: phân tích lỗi và thay thế nút tư duy tại chỗ (`w % 2 == 0 and w > 2`).
-3. Sinh lại mã mới $\to$ Vượt qua 100% test công khai và 100% test ẩn (*Private Tests*).
-
----
-
-## 3. Triển khai Mô hình trên Cloud GPU bằng Modal Labs
-
-Hệ thống được thiết kế sẵn kịch bản phục vụ mô hình `Qwen/Qwen2.5-Coder-7B-Instruct` qua vLLM Server trên Modal:
-
-### 1. Đăng nhập Modal (nếu chưa cấu hình)
-```bash
-modal setup
-```
-
-### 2. Triển khai vLLM Server
-```bash
-# Chạy ở chế độ tạm thời để kiểm thử
-modal serve models/modal_vllm.py
-
-# Hoặc triển khai cố định (Production endpoint)
-modal deploy models/modal_vllm.py
-```
-
-Sau khi deploy thành công, Modal sẽ cấp cho bạn một đường dẫn URL HTTPS (ví dụ: `https://<workspace>--qwen-coder-vllm-serve.modal.run`).
-
-### 3. Chạy MCTS với vLLM trên Modal
-```bash
-python3 scripts/run_mvp.py \
-    --use-modal \
-    --api-base "https://<workspace>--qwen-coder-vllm-serve.modal.run/v1" \
-    --model-name "Qwen/Qwen2.5-Coder-7B-Instruct" \
-    --rollouts 4
+pip install -e .
 ```
 
 ---
 
-## 4. Sử dụng Dataset `deepmind/code_contests`
+## 3. Chạy Kiểm Thử Tự Động (Test Suite)
 
-Để tải và chạy thử nghiệm trực tiếp trên bài toán từ bộ dữ liệu `deepmind/code_contests` (Google DeepMind):
+Chạy toàn bộ 34 bài kiểm thử đơn vị, hợp đồng và kịch bản nghiệm thu:
 ```bash
-python3 scripts/run_mvp.py --from-dataset
+pytest -v
 ```
-*Lưu ý:* Hệ thống sử dụng chế độ `streaming=True` qua HuggingFace Datasets để nạp nhanh bài toán mà không cần tải trước toàn bộ 13,328 bài tập.
+
+Hoặc chạy theo từng nhóm kiểm thử:
+```bash
+# Kiểm tra công thức toán học P-UCB, Q=max, Dual Reward (U01-U18)
+pytest tests/unit -v
+
+# Kiểm tra hợp đồng CFG, Tracing và chống rò rỉ dữ liệu (I01-I24)
+pytest tests/contracts -v
+
+# Kiểm tra các kịch bản nghiệm thu end-to-end (Scenario A-D)
+pytest tests/acceptance -v
+```
+
+---
+
+## 4. Hướng dẫn Sử dụng CLI (`rethink`)
+
+Hệ thống cung cấp công cụ dòng lệnh `rethink` với các lệnh sau:
+
+### 1. Kiểm tra cấu hình và môi trường (`doctor`)
+Kiểm tra tính hợp lệ của file cấu hình YAML, kết nối endpoint và trình thực thi sandbox:
+```bash
+rethink doctor --config configs/smoke_mock.yaml
+rethink doctor --config configs/ollama_7b.yaml
+```
+
+### 2. Tìm kiếm lời giải cho bài toán (`solve`)
+Chạy thuật toán RethinkMCTS trên bài toán công khai:
+```bash
+# Chạy demo ngoại tuyến với Scenario Mock
+rethink solve \
+  --config configs/smoke_mock.yaml \
+  --problem tests/fixtures/watermelon_public.json \
+  --output-dir runs/demo_watermelon
+
+# Chạy với Ollama Qwen2.5-Coder-7B cục bộ
+rethink solve \
+  --config configs/ollama_7b.yaml \
+  --problem tests/fixtures/watermelon_public.json \
+  --output-dir runs/ollama_run
+
+# Chạy với Endpoint Remote (vLLM / Modal / Cloud GPU)
+rethink solve \
+  --config configs/remote_14b.yaml \
+  --endpoint "https://<your-remote-endpoint>/v1" \
+  --model "Qwen/Qwen2.5-Coder-14B-Instruct" \
+  --problem tests/fixtures/watermelon_public.json \
+  --output-dir runs/remote_run
+```
+
+### 3. Đánh giá lời giải độc lập trên tập test ẩn (`judge`)
+Chấm điểm lời giải đã được đóng băng sau quá trình tìm kiếm với tập test ẩn:
+```bash
+rethink judge \
+  --run runs/demo_watermelon \
+  --hidden tests/fixtures/watermelon_hidden.json
+```
+
+### 4. Xuất báo cáo thực nghiệm (`report`)
+Tổng hợp kết quả Pass@1, pass rate, lượng token tiêu thụ và thời gian chạy thành `summary.json` và `summary.md`:
+```bash
+rethink report --run runs/demo_watermelon
+```

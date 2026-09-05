@@ -1,0 +1,110 @@
+schema_version: 1
+profile: smoke_mock
+algorithm_spec_version: "1.0"
+
+model:
+  transport: mock
+  base_url: "mock://localhost"
+  model: mock-scenario-model
+  api_key_env: null
+  request_timeout_seconds: 30
+  max_transport_retries: 1
+  max_format_retries: 1
+  concurrency: 1
+  context_window_tokens: 4096
+  context_safety_margin_tokens: 128
+  structured_output: auto
+  require_exact_token_count: false
+
+prompts:
+  bundle: compact_v1
+  language: en
+
+sampling:
+  expansion: {temperature: 0.0, top_p: 1.0, max_output_tokens: 256}
+  code: {temperature: 0.0, top_p: 1.0, max_output_tokens: 512}
+  rethink: {temperature: 0.0, top_p: 1.0, max_output_tokens: 128}
+  critic: {temperature: 0.0, top_p: 1.0, max_output_tokens: 64}
+  block_analysis: {temperature: 0.0, top_p: 1.0, max_output_tokens: 256}
+
+search:
+  algorithm: rethink_mcts
+  width: 3
+  max_depth: 3
+  max_rethinks_per_node: 1
+  selection: p_ucb
+  c_base: 10.0
+  c: 4.0
+  prior: llm_reasonableness
+  prior_fallback: uniform_after_retry
+  backup: max
+  leaf_revision_policy: reset_leaf_keep_ancestor_history
+  early_stop: none
+  final_selection: max_reward
+
+reward:
+  policy: dual
+  test_weight: 0.8
+  llm_weight: 0.2
+  critic_score_min: 0.0
+  critic_score_max: 1.0
+  invalid_critic_policy: zero_after_retry
+
+feedback:
+  mode: block
+  max_failed_tests: 1
+  max_feedback_tokens: 1024
+  max_trace_visits: 64
+  max_prompt_blocks: 16
+  max_variables_per_frame: 10
+  max_value_chars: 80
+  max_snapshot_depth: 2
+  max_container_items: 5
+  trace_timeout_seconds: 3.0
+  on_trace_failure: execution_facts
+
+budget:
+  max_code_generations: 4
+  max_search_iterations: 16
+  max_model_calls: 32
+  max_total_tokens: 16384
+  max_wall_seconds: 60.0
+  max_sandbox_runs: 100
+
+execution:
+  backend: trusted_fixture
+  image: rethink-worker:py311
+  require_pinned_digest_for_benchmark: false
+  per_test_timeout_seconds: 2.0
+  memory_mb: 256
+  pids_limit: 16
+  cpus: 1.0
+  stdout_limit_bytes: 1048576
+  stderr_limit_bytes: 262144
+  network: none
+  python_time_multiplier: 2.5
+
+data:
+  adapter: synthetic
+  prepared_public_path: null
+  split: validation
+  require_python3_solution: true
+  min_rating: null
+  max_rating: null
+  missing_public_policy: exclude
+
+storage:
+  output_dir: runs
+  save_raw_model_responses: true
+  save_trace: true
+  execution_cache: true
+  generation_cache_mode: off
+  checkpoint: after_evaluation_transaction
+
+experiment:
+  seed: 42
+  role_models: same_as_generator
+  allow_mock: true
+  deviations:
+    - deterministic_scenario_mock
+    - trusted_fixture_host_execution

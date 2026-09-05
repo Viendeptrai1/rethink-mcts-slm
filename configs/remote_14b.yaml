@@ -1,0 +1,113 @@
+schema_version: 1
+profile: small_model
+algorithm_spec_version: "1.0"
+
+model:
+  transport: openai_compatible
+  base_url: http://localhost:8000/v1
+  model: Qwen/Qwen2.5-Coder-14B-Instruct
+  api_key_env: MODEL_API_KEY
+  request_timeout_seconds: 180
+  max_transport_retries: 3
+  max_format_retries: 1
+  concurrency: 1
+  context_window_tokens: 16384
+  context_safety_margin_tokens: 512
+  structured_output: auto
+  require_exact_token_count: false
+
+prompts:
+  bundle: compact_v1
+  language: en
+
+sampling:
+  expansion: {temperature: 0.6, top_p: 0.95, max_output_tokens: 384}
+  code: {temperature: 0.2, top_p: 0.95, max_output_tokens: 2048}
+  rethink: {temperature: 0.3, top_p: 0.95, max_output_tokens: 256}
+  critic: {temperature: 0.0, top_p: 1.0, max_output_tokens: 160}
+  block_analysis: {temperature: 0.0, top_p: 1.0, max_output_tokens: 768}
+
+search:
+  algorithm: rethink_mcts
+  width: 3
+  max_depth: 6
+  max_rethinks_per_node: 1
+  selection: p_ucb
+  c_base: 10.0
+  c: 4.0
+  prior: llm_reasonableness
+  prior_fallback: uniform_after_retry
+  backup: max
+  leaf_revision_policy: reset_leaf_keep_ancestor_history
+  early_stop: none
+  final_selection: max_reward
+
+reward:
+  policy: dual
+  test_weight: 0.8
+  llm_weight: 0.2
+  critic_score_min: 0.0
+  critic_score_max: 1.0
+  invalid_critic_policy: zero_after_retry
+
+feedback:
+  mode: block
+  max_failed_tests: 1
+  max_feedback_tokens: 2048
+  max_trace_visits: 256
+  max_prompt_blocks: 32
+  max_variables_per_frame: 20
+  max_value_chars: 160
+  max_snapshot_depth: 2
+  max_container_items: 10
+  trace_timeout_seconds: 5.0
+  on_trace_failure: execution_facts
+
+budget:
+  max_code_generations: 16
+  max_search_iterations: 128
+  max_model_calls: 128
+  max_total_tokens: 131072
+  max_wall_seconds: 1800.0
+  max_sandbox_runs: 2000
+
+execution:
+  backend: trusted_fixture
+  image: rethink-worker:py311
+  require_pinned_digest_for_benchmark: false
+  per_test_timeout_seconds: 2.0
+  memory_mb: 512
+  pids_limit: 32
+  cpus: 1.0
+  stdout_limit_bytes: 1048576
+  stderr_limit_bytes: 262144
+  network: none
+  python_time_multiplier: 2.5
+
+data:
+  adapter: code_contests
+  prepared_public_path: prepared/code_contests/public/problems.jsonl
+  split: validation
+  require_python3_solution: true
+  min_rating: 800
+  max_rating: 1500
+  missing_public_policy: exclude
+
+storage:
+  output_dir: runs
+  save_raw_model_responses: true
+  save_trace: true
+  execution_cache: true
+  generation_cache_mode: off
+  checkpoint: after_evaluation_transaction
+
+experiment:
+  seed: 42
+  role_models: same_as_generator
+  allow_mock: false
+  deviations:
+    - compact_prompts
+    - critic_score_zero_to_one
+    - nonzero_sampling_temperatures
+    - bounded_trace_context
+    - explicit_lifecycle_and_revision_accounting
