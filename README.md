@@ -1,10 +1,5 @@
 # RethinkMCTS: Tối ưu hoá Suy Luận và Tự Chỉnh Sửa Mã Nguồn bằng Monte Carlo Tree Search cho Mô Hình Nhỏ (7B–14B)
 
-[![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/downloads/)
-[![Tests Passing](https://img.shields.io/badge/tests-36%2F36%20passed-brightgreen.svg)]()
-[![Architecture](https://img.shields.io/badge/architecture-Ports%20%26%20Adapters-orange.svg)]()
-[![Paper](https://img.shields.io/badge/paper-arXiv%3A2409.09584v2-red.svg)](https://arxiv.org/abs/2409.09584)
-
 Dự án nghiên cứu Tiểu luận Chuyên ngành / Luận văn Tốt nghiệp: Triển khai hoàn chỉnh thuật toán **RethinkMCTS** (*"RethinkMCTS: Refining Erroneous Thoughts in Monte Carlo Tree Search for Code Generation"*, arXiv:2409.09584v2) với kiến trúc **Modular Monolith + Ports & Adapters**, được tối ưu hóa đặc biệt cho phân khúc **mô hình nhỏ ($\le$ 14B)** như `Qwen2.5-Coder-7B` (chạy trên Ollama cục bộ) và `Qwen2.5-Coder-14B` (chạy trên Remote vLLM/Modal).
 
 Tài liệu đặc tả kỹ thuật chi tiết: [docs/rethinkmcts_small_model_spec.md](docs/rethinkmcts_small_model_spec.md).
@@ -13,27 +8,29 @@ Tài liệu đặc tả kỹ thuật chi tiết: [docs/rethinkmcts_small_model_s
 
 ## Mục lục
 
-1. [Tổng quan & Động lực Nghiên cứu](#1-tổng-quan--động-lực-nghiên-cứu)
-2. [Kiến trúc Hệ thống (Ports & Adapters)](#2-kiến-trúc-hệ-thống-ports--adapters)
-3. [Nguyên lý Toán học & Cơ chế Thuật toán](#3-nguyên-lý-toán-học--cơ-chế-thuật-toán)
+1. [Tổng quan &amp; Động lực Nghiên cứu](#1-tổng-quan--động-lực-nghiên-cứu)
+2. [Kiến trúc Hệ thống (Ports &amp; Adapters)](#2-kiến-trúc-hệ-thống-ports--adapters)
+3. [Nguyên lý Toán học &amp; Cơ chế Thuật toán](#3-nguyên-lý-toán-học--cơ-chế-thuật-toán)
 4. [Cài đặt Môi trường](#4-cài-đặt-môi-trường)
-5. [Bộ Dữ liệu Chuẩn (HumanEval & APPS)](#5-bộ-dữ-liệu-chuẩn-humaneval--apps)
+5. [Bộ Dữ liệu Chuẩn (HumanEval &amp; APPS)](#5-bộ-dữ-liệu-chuẩn-humaneval--apps)
 6. [Hướng dẫn Sử dụng CLI (`rethink`)](#6-hướng-dẫn-sử-dụng-cli-rethink)
 7. [Kịch bản Chạy Mẫu (Quickstarts)](#7-kịch-bản-chạy-mẫu-quickstarts)
 8. [Cấu hình Hệ thống (YAML Configs)](#8-cấu-hình-hệ-thống-yaml-configs)
 9. [Kiểm thử Tự động (36/36 Tests Passed)](#9-kiểm-thử-tự-động-3636-tests-passed)
-10. [Xử lý Sự cố & FAQs](#10-xử-lý-sự-cố--faqs)
+10. [Xử lý Sự cố &amp; FAQs](#10-xử-lý-sự-cố--faqs)
 
 ---
 
 ## 1. Tổng quan & Động lực Nghiên cứu
 
 Trong sinh mã nguồn tự động, các phương pháp truyền thống như **Direct Sampling**, **Best-of-N**, hay **Self-Refine** thường gặp phải các hạn chế nghiêm trọng khi chạy trên mô hình nhỏ ($\le$ 14B):
+
 - **Sửa mù quáng (Blind refinement):** Gửi toàn bộ mã lỗi và thông báo lỗi chung chung vào prompt khiến mô hình bị ảo giác (hallucination) và lặp lại lỗi cũ.
 - **Tốn kém tài nguyên:** Sinh lại toàn bộ chương trình từ đầu làm tiêu tốn lượng token khổng lồ.
 - **Thiếu kiểm chứng khách quan:** Không có cơ chế cô lập giữa tập kiểm thử đề bài (public tests) và tập kiểm thử ẩn (hidden tests), dẫn đến nguy cơ gian lận kiểm thử (test leakage/overfitting).
 
 **RethinkMCTS** giải quyết triệt để các vấn đề này bằng cách:
+
 1. **Tìm kiếm ở mức tư duy (Thought-Level MCTS):** Chia nhỏ bài toán thành các bước tư duy thuật toán (như tiền xử lý, cấu trúc dữ liệu, điều kiện biên) thay vì tìm kiếm trên từng token hoặc từng dòng code.
 2. **Truy vết lỗi sâu (Execution-Guided CFG & Variable Tracing):** Khi chương trình thực thi thất bại trên Sandbox, hệ thống dùng phân tích Bytecode để tái dựng đồ thị luồng điều khiển (Basic-Block CFG) và chụp ảnh trạng thái biến runtime.
 3. **Cơ chế "Quay đầu đúng chỗ" (Leaf Revision):** Thay vì vứt bỏ toàn bộ cây tìm kiếm, hệ thống xác định bước suy luận sai lầm cuối cùng (leaf node) và thay thế nó bằng một suy luận đã hiệu chỉnh (revised thought) dựa trên phản hồi lỗi thực tế, bảo tồn toàn bộ chuỗi tư duy đúng đắn trước đó.
@@ -140,41 +137,56 @@ TLCN/
 ## 3. Nguyên lý Toán học & Cơ chế Thuật toán
 
 ### 3.1. Thuật toán Chọn Nhánh P-UCB (Selection - Eq. 1 & 2)
+
 Trong giai đoạn Selection, hệ thống chọn node con $u$ từ node cha $p$ để duyệt sâu xuống cây dựa trên điểm P-UCB:
 
-$$\text{Score}(u) = Q(u) + c \cdot P(u) \cdot \frac{\sqrt{N(p)}}{1 + N(u)} \cdot \left[c_{base} + \log\left(\frac{N(p) + c_{base} + 1}{c_{base}}\right)\right]$$
+$$
+\text{Score}(u) = Q(u) + c \cdot P(u) \cdot \frac{\sqrt{N(p)}}{1 + N(u)} \cdot \left[c_{base} + \log\left(\frac{N(p) + c_{base} + 1}{c_{base}}\right)\right]
+$$
 
 Trong đó:
+
 - $Q(u)$: Giá trị chất lượng của node $u$ (với node chưa duyệt, $Q$ khởi tạo từ giá trị nhỏ nhất của các node anh em đã duyệt, mặc định $0.0$).
 - $P(u)$: Xác suất tiên nghiệm (Prior reasonableness) do LLM chấm cho thought $u$, đã được chuẩn hóa $\sum P(u) = 1$.
 - $N(p), N(u)$: Số lượt truy cập của node cha và node con.
 - $c, c_{base}$: Các hằng số điều chỉnh mức độ cân bằng giữa Khai phá (Exploitation) và Khám phá (Exploration) (mặc định $c = 4.0, c_{base} = 10.0$).
 
 ### 3.2. Lan truyền Ngược $Q = \max$ (Max Backup)
+
 Khác với MCTS truyền thống dùng trung bình cộng (Mean Backup), RethinkMCTS sử dụng **Max Backup**:
 
-$$Q(p) = \max_{u \in \text{Children}(p)} Q(u)$$
+$$
+Q(p) = \max_{u \in \text{Children}(p)} Q(u)
+$$
 
 *Lý do:* Trong bài toán lập trình, ta chỉ cần tìm ra **ít nhất một lời giải đúng 100%**. Việc dùng Mean Backup sẽ vô tình phạt một hướng đi xuất sắc chỉ vì các lần thử sai lầm trước đó của nhánh này.
 
 ### 3.3. Hàm Thưởng Kép (Paper Dual Reward)
+
 Hàm thưởng kết hợp giữa kết quả thực thi kiểm thử khách quan và đánh giá của mô hình (Critic):
 
-$$R = w_{\text{test}} \cdot V_{\text{test}} + w_{\text{llm}} \cdot V_{\text{llm}}$$
+$$
+R = w_{\text{test}} \cdot V_{\text{test}} + w_{\text{llm}} \cdot V_{\text{llm}}
+$$
 
 Trong đó:
+
 - $V_{\text{test}} = \frac{\text{Passed Public Tests}}{\text{Total Public Tests}}$.
 - $V_{\text{llm}} \in [0.0, 1.0]$: Điểm tự đánh giá của mô hình (Self-Evaluation).
 - **Quy tắc điều kiện bắt buộc (§4 của paper):** Critic $V_{\text{llm}}$ **chỉ được gọi khi và chỉ khi** chương trình đã vượt qua 100% các public tests ($V_{\text{test}} = 1.0$). Nếu chương trình chưa pass hết public test, $V_{\text{llm}} = 0.0$ nhằm tránh lãng phí token vào các lời giải còn lỗi cú pháp hoặc sai logic cơ bản.
 
 ### 3.4. Vòng đời Hiệu chỉnh Tư duy (ThoughtRevision Lifecycle)
+
 Khi một node lá (leaf node) sinh mã thất bại trên public tests:
+
 1. Node lá không bị xóa, và đường đi từ root đến cha của nó (`parent_path`) được giữ nguyên bất biến.
 2. Hệ thống sinh ra một `ThoughtRevision` mới thay thế thought cũ tại lá.
 3. Node lá được cấp số lần rethink tối đa (`max_rethinks_per_node = 1`). Khi sinh lại mã thành công, reward mới sẽ được backup ngược lên tổ tiên, ghi đè $Q$ cũ nếu đạt điểm cao hơn.
 
 ### 3.5. Chống Rò rỉ Dữ liệu Kiểm thử (Test Leakage Prevention)
+
 Để đảm bảo tính trung thực khoa học, hệ thống tách rời hoàn toàn:
+
 - **`PublicProblem`**: Chỉ chứa đề bài và các ca kiểm thử công khai (doctest/ví dụ mẫu). Quá trình tìm kiếm MCTS chỉ được tiếp cận đối tượng này.
 - **`HiddenProblem`**: Chứa toàn bộ test ẩn (hidden suite) và official test harness của benchmark. Chỉ được mở bởi tiến trình độc lập `HiddenJudge` sau khi MCTS đã đóng băng và lưu cố định lời giải duy nhất (`selected.py`).
 
@@ -183,11 +195,13 @@ Khi một node lá (leaf node) sinh mã thất bại trên public tests:
 ## 4. Cài đặt Môi trường
 
 ### 4.1. Yêu cầu Hệ thống
+
 - Hệ điều hành: macOS, Linux, hoặc Windows (WSL2).
 - Python: **Phiên bản >= 3.10** (khuyến nghị Python 3.11).
 - Ollama (nếu chạy mô hình 7B cục bộ): Đã cài đặt [Ollama](https://ollama.com/) và tải model `qwen2.5-coder:7b`.
 
 ### 4.2. Khởi tạo Môi trường Ảo
+
 ```bash
 # Clone repository
 git clone <repo-url> TLCN
@@ -211,17 +225,21 @@ Sau khi cài đặt, lệnh CLI `rethink` sẽ có sẵn trên toàn hệ thốn
 Hệ thống hỗ trợ 2 bộ dữ liệu chuẩn chính thức của bài báo gốc:
 
 ### 5.1. HumanEval (164 bài toán hàm Python của OpenAI)
+
 - **Cấu trúc:** Mỗi bài toán gồm docstring mô tả, chữ ký hàm (`entry_point`), các doctests công khai (`given_tests`) và bộ kiểm thử ẩn chính thức (`check(candidate)`).
 - **Public Tests:** Tự động trích xuất từ doctest trong docstring (ví dụ: `assert has_close_elements([1.0, 2.0, 3.0], 0.5) == False`).
 - **Hidden Tests:** Hàm `check(candidate)` chứa từ 5 đến 20 ca kiểm thử biên khắc nghiệt.
 
 ### 5.2. APPS (Automated Programming Progress Standard)
+
 - **Cấu trúc:** Gồm 3 phân tầng độ khó: *Introductory* (nhập môn), *Interview* (phỏng vấn), *Competition* (thi đấu Olympic/Codeforces).
 - Hỗ trợ cả 2 phương thức thực thi: Standard I/O (`stdin`/`stdout`) và Call-based (`fn_name`).
 - Tự động tách 2 test cases đầu làm Public Examples, toàn bộ test cases còn lại được đưa vào Hidden Suite.
 
 ### 5.3. Chuẩn bị Dữ liệu Tự động qua CLI (`rethink prepare`)
+
 Hệ thống cung cấp lệnh `rethink prepare` để tự động tải, chuẩn hóa và xuất dữ liệu thành 2 kho riêng biệt:
+
 ```bash
 # Chuẩn bị toàn bộ 164 bài toán HumanEval:
 rethink prepare --dataset humaneval
@@ -231,6 +249,7 @@ rethink prepare --dataset apps --limit 50
 ```
 
 Dữ liệu được lưu tại thư mục `prepared/<dataset>/`:
+
 ```text
 prepared/humaneval/
 ├── manifest.json                  # Hash dữ liệu, số lượng bài, metadata
@@ -249,11 +268,15 @@ usage: rethink [-h] {prepare,doctor,solve,judge,report} ...
 ```
 
 ### 6.1. `rethink doctor` (Kiểm tra sức khỏe hệ thống)
+
 Kiểm tra cú pháp cấu hình YAML, độ trễ/kết nối đến mô hình (Ollama hoặc Remote URL), danh sách model và kiểm thử khả năng chạy code của Sandbox:
+
 ```bash
 rethink doctor --config configs/humaneval_7b.yaml
 ```
+
 *Kết quả mẫu:*
+
 ```text
 RethinkMCTS Doctor Check
 Config: configs/humaneval_7b.yaml
@@ -269,27 +292,35 @@ System check completed successfully.
 ```
 
 ### 6.2. `rethink prepare` (Chuẩn hóa Dataset)
+
 Phân tách dữ liệu thô thành kho `public/` và `judge/`:
+
 ```bash
 rethink prepare --dataset humaneval --output prepared/humaneval
 rethink prepare --dataset apps --limit 50 --output prepared/apps
 ```
 
 ### 6.3. `rethink solve` (Thực thi Tìm kiếm Lời giải)
+
 Chạy thuật toán Thought-Level MCTS trên một bài toán công khai:
+
 ```bash
 rethink solve \
   --config configs/humaneval_7b.yaml \
   --problem tests/fixtures/humaneval_0_public.json \
   --output-dir runs/my_run
 ```
+
 *Các tùy chọn hữu ích:*
+
 - `--endpoint <url>`: Ghi đè URL endpoint của model (ví dụ: `http://localhost:8000/v1`).
 - `--model <name>`: Ghi đè tên model (ví dụ: `Qwen/Qwen2.5-Coder-14B-Instruct`).
 - `--output-dir <dir>`: Thư mục lưu vết tìm kiếm và chương trình hoàn chỉnh (`selected.py`).
 
 ### 6.4. `rethink judge` (Chấm điểm Độc lập trên Test Ẩn)
+
 Chấm điểm chương trình `selected.py` đã đóng băng sau tìm kiếm với tập test ẩn:
+
 ```bash
 rethink judge \
   --run runs/my_run \
@@ -297,10 +328,13 @@ rethink judge \
 ```
 
 ### 6.5. `rethink report` (Tổng hợp Báo cáo Thực nghiệm)
+
 Tạo bảng tổng kết số liệu tài nguyên (model calls, code attempts, rethink attempts, runtime) và tính toán chỉ số Pass@1:
+
 ```bash
 rethink report --run runs/my_run
 ```
+
 Kết quả được xuất ra file Markdown [`summary.md`](file://runs/my_run/reports/summary.md) và JSON [`summary.json`](file://runs/my_run/reports/summary.json).
 
 ---
@@ -308,6 +342,7 @@ Kết quả được xuất ra file Markdown [`summary.md`](file://runs/my_run/r
 ## 7. Kịch bản Chạy Mẫu (Quickstarts)
 
 ### Kịch bản 1: Chạy Thử Nghiệm Nhanh Ngoại Tuyến (Offline Mock - 0 Chi phí)
+
 Kịch bản này sử dụng `ScenarioMockLLM` giả lập hành vi của bài báo, cho phép bạn kiểm tra toàn bộ luồng MCTS, Rethink Loop và Sandbox trong 2 giây mà không cần GPU hay mạng Internet:
 
 ```bash
@@ -330,6 +365,7 @@ rethink report --run runs/smoke_demo
 ---
 
 ### Kịch bản 2: Chạy Thực Tế với Ollama 7B Cục Bộ (`HumanEval/0`)
+
 Sử dụng mô hình mã nguồn mở `qwen2.5-coder:7b` chạy trực tiếp trên máy của bạn qua Ollama:
 
 ```bash
@@ -359,6 +395,7 @@ cat runs/ollama_humaneval_demo/reports/summary.md
 ---
 
 ### Kịch bản 3: Chạy Thực Tế với Remote Endpoint 14B (vLLM / Modal / Cloud GPU)
+
 Khi triển khai trên máy chủ GPU từ xa (chạy vLLM hoặc Modal):
 
 ```bash
@@ -376,22 +413,22 @@ rethink solve \
 
 Các file cấu hình trong thư mục [`configs/`](configs/) tuân thủ schema nghiêm ngặt được định nghĩa trong [`src/rethink_mcts/config.py`](src/rethink_mcts/config.py):
 
-| Nhóm Tham Số | Tham Số Chính | Ý Nghĩa & Khuyến Nghị |
-| :--- | :--- | :--- |
-| **`model`** | `transport` | `openai_compatible` (cho Ollama, vLLM, OpenAI) hoặc `mock`. |
-| | `base_url` | URL của endpoint (ví dụ: `http://localhost:11434/v1`). |
-| | `model` | Tên model định danh (ví dụ: `qwen2.5-coder:7b`). |
-| **`search`** | `width` | Độ rộng cây (số lượng thought đề xuất tại mỗi bước, khuyến nghị: 2–3). |
-| | `max_depth` | Độ sâu tối đa của cây suy luận (khuyến nghị: 3–4 bước). |
-| | `c`, `c_base` | Tham số P-UCB ($c=4.0, c_{base}=10.0$ theo bài báo). |
-| | `max_rethinks_per_node` | Số lần tối đa cho phép node lá tự sửa lỗi (mặc định: 1). |
-| **`reward`** | `test_weight` | Trọng số kiểm thử public ($w_{\text{test}} = 0.8$). |
-| | `llm_weight` | Trọng số điểm mô hình tự đánh giá ($w_{\text{llm}} = 0.2$). |
-| **`budget`** | `max_code_generations` | Giới hạn tối đa số lần sinh code trong 1 lượt tìm kiếm (ví dụ: 4–8). |
-| | `max_model_calls` | Giới hạn tối đa số lần gọi API (ví dụ: 20–30). |
-| | `max_wall_seconds` | Timeout toàn bộ phiên tìm kiếm (ví dụ: 300s). |
-| **`execution`** | `backend` | `trusted_fixture` (chạy subprocess an toàn) hoặc `docker` (container cô lập). |
-| | `per_test_timeout_seconds` | Giới hạn thời gian chạy cho mỗi test case (2.0s – 4.0s). |
+| Nhóm Tham Số          | Tham Số Chính              | Ý Nghĩa & Khuyến Nghị                                                               |
+| :---------------------- | :--------------------------- | :-------------------------------------------------------------------------------------- |
+| **`model`**     | `transport`                | `openai_compatible` (cho Ollama, vLLM, OpenAI) hoặc `mock`.                        |
+|                         | `base_url`                 | URL của endpoint (ví dụ:`http://localhost:11434/v1`).                              |
+|                         | `model`                    | Tên model định danh (ví dụ:`qwen2.5-coder:7b`).                                  |
+| **`search`**    | `width`                    | Độ rộng cây (số lượng thought đề xuất tại mỗi bước, khuyến nghị: 2–3). |
+|                         | `max_depth`                | Độ sâu tối đa của cây suy luận (khuyến nghị: 3–4 bước).                    |
+|                         | `c`, `c_base`            | Tham số P-UCB ($c=4.0, c_{base}=10.0$ theo bài báo).                               |
+|                         | `max_rethinks_per_node`    | Số lần tối đa cho phép node lá tự sửa lỗi (mặc định: 1).                    |
+| **`reward`**    | `test_weight`              | Trọng số kiểm thử public ($w_{\text{test}} = 0.8$).                               |
+|                         | `llm_weight`               | Trọng số điểm mô hình tự đánh giá ($w_{\text{llm}} = 0.2$).                 |
+| **`budget`**    | `max_code_generations`     | Giới hạn tối đa số lần sinh code trong 1 lượt tìm kiếm (ví dụ: 4–8).       |
+|                         | `max_model_calls`          | Giới hạn tối đa số lần gọi API (ví dụ: 20–30).                                |
+|                         | `max_wall_seconds`         | Timeout toàn bộ phiên tìm kiếm (ví dụ: 300s).                                    |
+| **`execution`** | `backend`                  | `trusted_fixture` (chạy subprocess an toàn) hoặc `docker` (container cô lập).  |
+|                         | `per_test_timeout_seconds` | Giới hạn thời gian chạy cho mỗi test case (2.0s – 4.0s).                          |
 
 ---
 
@@ -456,17 +493,21 @@ tests/unit/test_policies.py::test_u13_max_reward_vs_public_first PASSED  [100%]
 ## 10. Xử lý Sự cố & FAQs
 
 **1. Lỗi: `ConnectionRefusedError: [Errno 61] Connection refused` khi chạy `rethink doctor` hoặc `solve`:**
+
 - *Nguyên nhân:* Endpoint mô hình cục bộ chưa được khởi động.
 - *Khắc phục:* Nếu dùng Ollama, hãy mở ứng dụng Ollama hoặc chạy lệnh `ollama serve` trên terminal. Đảm bảo cổng `11434` đang lắng nghe.
 
 **2. Lỗi: `Model 'qwen2.5-coder:7b' not listed in /models`:**
+
 - *Nguyên nhân:* Model chưa được tải về máy.
 - *Khắc phục:* Chạy lệnh `ollama pull qwen2.5-coder:7b`.
 
 **3. Tại sao khi giải bài toán, MCTS chỉ chạy 1-2 lần rồi dừng?**
+
 - *Giải thích:* Kiểm tra tham số `budget.max_code_generations` và `budget.max_search_iterations` trong file cấu hình YAML. Đối với demo nhanh, các giá trị này được đặt nhỏ (4–8 lượt) để tiết kiệm thời gian. Khi chạy benchmark chính thức, bạn có thể tăng lên `max_code_generations: 16`.
 
 **4. Mã nguồn có hỗ trợ chạy trên Docker container để đảm bảo an toàn tuyệt đối không?**
+
 - *Có:* Bạn chỉ cần chuyển `execution.backend: docker` trong cấu hình YAML và build image worker từ [`deploy/sandbox/Dockerfile`](deploy/sandbox/Dockerfile) bằng lệnh:
   ```bash
   docker build -t rethink-worker:py311 deploy/sandbox/
