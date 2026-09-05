@@ -1,4 +1,4 @@
-# RethinkMCTS: Tối ưu hoá Suy Luận và Tự Chỉnh Sửa Mã Nguồn bằng Monte Carlo Tree Search cho Mô Hình Nhỏ (7B–14B)
+# RethinkMCTS: Cải thiện khả năng suy luận của LLM trong sinh mã nguồn bằng Monte Carlo Tree Search với phản hồi từ kiểm thử tự động (7B–14B)
 
 Dự án nghiên cứu Tiểu luận Chuyên ngành / Luận văn Tốt nghiệp: Triển khai hoàn chỉnh thuật toán **RethinkMCTS** (*"RethinkMCTS: Refining Erroneous Thoughts in Monte Carlo Tree Search for Code Generation"*, arXiv:2409.09584v2) với kiến trúc **Modular Monolith + Ports & Adapters**, được tối ưu hóa đặc biệt cho phân khúc **mô hình nhỏ ($\le$ 14B)** như `Qwen2.5-Coder-7B` (chạy trên Ollama cục bộ) và `Qwen2.5-Coder-14B` (chạy trên Remote vLLM/Modal).
 
