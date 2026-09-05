@@ -87,7 +87,9 @@ class SearchEngine:
             width=self.width,
             feedback=None
         )
+        logger.info("Bootstrap: Root expanded with %d initial thought proposals", len(root_proposals.proposals))
         for p in root_proposals.proposals:
+            logger.info("  -> Proposal [prior=%.2f]: %s", p.normalized_prior, p.text)
             tree.create_child_node(tree.root_id, p, parent_path_hash="root")
 
         stop_reason = "normal"
@@ -108,6 +110,7 @@ class SearchEngine:
                 curr = next_child
 
             node = curr
+            logger.info("Selected node %s (depth=%d, status=%s)", node.node_id, node.depth, node.status.value)
 
             # If node is READY and can expand children
             if node.status == NodeStatus.READY:
@@ -140,6 +143,7 @@ class SearchEngine:
                 # Generate code
                 budget.record_code_generation_attempt()
                 budget.record_model_call("code")
+                logger.info("Generating candidate code for node %s with thoughts: %s", node.node_id, active_thoughts)
                 code = self.generator.generate(
                     statement=problem.statement,
                     execution_spec=problem.execution_spec,
@@ -162,6 +166,13 @@ class SearchEngine:
                 # Evaluate on public suite
                 evaluation = self.evaluator.evaluate_public(candidate, problem, budget=budget)
                 archive.add(candidate, evaluation)
+                logger.info(
+                    "Candidate %s evaluated: %d/%d passed, reward=%.3f",
+                    candidate.candidate_id,
+                    evaluation.execution_summary.passed,
+                    evaluation.execution_summary.total,
+                    evaluation.reward or 0.0
+                )
 
                 if evaluation.reward is not None:
                     self.backup_policy.backup(
@@ -178,6 +189,8 @@ class SearchEngine:
                             break
                         if not budget.can_reserve_refinement_and_regeneration():
                             break
+
+                        logger.info("Public tests failed on candidate %s! Triggering Rethink on leaf %s...", candidate.candidate_id, node.node_id)
 
                         # Build structured feedback
                         feedback = self.feedback_service.build_feedback(candidate, evaluation, problem)
@@ -196,6 +209,7 @@ class SearchEngine:
                             candidate_code=candidate.code,
                             feedback=feedback
                         )
+                        logger.info("Rethink produced revised thought: %s", new_thought)
 
                         # Create leaf revision
                         tree.begin_leaf_revision(node.node_id, new_thought, feedback.feedback_id)
@@ -227,6 +241,13 @@ class SearchEngine:
                         # Evaluate regenerated candidate
                         evaluation = self.evaluator.evaluate_public(candidate, problem, budget=budget)
                         archive.add(candidate, evaluation)
+                        logger.info(
+                            "Regenerated candidate %s evaluated: %d/%d passed, reward=%.3f",
+                            candidate.candidate_id,
+                            evaluation.execution_summary.passed,
+                            evaluation.execution_summary.total,
+                            evaluation.reward or 0.0
+                        )
 
                         if evaluation.reward is not None:
                             self.backup_policy.backup(

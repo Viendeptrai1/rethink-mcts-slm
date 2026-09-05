@@ -105,7 +105,7 @@ class SemanticPromptedLLM(
         prompt = template.render(
             statement=statement,
             active_thoughts=list(active_thoughts),
-            mode=execution_spec.mode.value,
+            mode=execution_spec.mode.value if hasattr(execution_spec.mode, "value") else str(execution_spec.mode),
             entry_point=execution_spec.entry_point or "solution",
             public_examples=public_examples_str
         )
