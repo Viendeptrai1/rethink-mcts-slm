@@ -34,32 +34,14 @@ console = Console()
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 
 
+from rethink_mcts.adapters.datasets.jsonl import parse_case_dict
+
+
 def load_public_problem_from_file(path: str) -> PublicProblem:
     with open(path, "r", encoding="utf-8") as f:
         data = json.load(f)
 
-    public_tests = []
-    for c in data.get("public_tests", []):
-        if "stdin" in c:
-            public_tests.append(
-                StdinCase(
-                    stdin=c["stdin"],
-                    expected_stdout=c.get("expected_stdout", ""),
-                    case_id=c.get("case_id", ""),
-                    comparator_id=c.get("comparator_id", "token_text")
-                )
-            )
-        elif "entry_point" in c:
-            public_tests.append(
-                FunctionCase(
-                    entry_point=c["entry_point"],
-                    args=tuple(c.get("args", ())),
-                    kwargs=tuple(c.get("kwargs", {}).items()),
-                    expected=c.get("expected"),
-                    case_id=c.get("case_id", "")
-                )
-            )
-
+    public_tests = [parse_case_dict(c) for c in data.get("public_tests", [])]
     spec_data = data.get("execution_spec", {})
     return PublicProblem(
         problem_id=data["problem_id"],
@@ -79,19 +61,15 @@ def load_hidden_problem_from_file(path: str) -> HiddenProblem:
         data = json.load(f)
 
     suite_data = data.get("hidden_suite", {})
-    cases = []
-    for c in suite_data.get("cases", []):
-        cases.append(
-            StdinCase(
-                stdin=c["stdin"],
-                expected_stdout=c.get("expected_stdout", ""),
-                case_id=c.get("case_id", ""),
-                comparator_id=c.get("comparator_id", "token_text")
-            )
-        )
+    cases = [parse_case_dict(c) for c in suite_data.get("cases", [])]
+    gen_cases = [parse_case_dict(c) for c in suite_data.get("generated_cases", [])]
     return HiddenProblem(
         problem_id=data["problem_id"],
-        hidden_suite=HiddenSuite(cases=tuple(cases), suite_id=suite_data.get("suite_id", "hidden")),
+        hidden_suite=HiddenSuite(
+            cases=tuple(cases),
+            suite_id=suite_data.get("suite_id", "hidden"),
+            generated_cases=tuple(gen_cases)
+        ),
         judge_spec=JudgeSpec(**data.get("judge_spec", {}))
     )
 
@@ -255,9 +233,30 @@ def cmd_report(args):
     console.print(f"  Report written to: [green]{args.run}/reports/summary.md[/green]")
 
 
+def cmd_prepare(args):
+    console.print(f"[bold cyan]Preparing Dataset: {args.dataset}[/bold cyan]")
+    from rethink_mcts.application.prepare import prepare_dataset
+    manifest = prepare_dataset(
+        dataset_name=args.dataset,
+        raw_path=args.raw_path,
+        output_dir=args.output,
+        limit=args.limit
+    )
+    console.print(f"[bold green]✓ Prepared {manifest['total_problems']} problems[/bold green]")
+    console.print(f"  Public problems: [cyan]{manifest['public_problems_path']}[/cyan]")
+    console.print(f"  Judge suites dir: [cyan]{manifest['judge_suites_dir']}[/cyan]")
+
+
 def main():
     parser = argparse.ArgumentParser(description="RethinkMCTS CLI acceptance interface")
     subparsers = parser.add_subparsers(dest="subcommand", required=True)
+
+    # prepare
+    p_prep = subparsers.add_parser("prepare", help="Prepare dataset into separated public and judge stores")
+    p_prep.add_argument("--dataset", type=str, required=True, choices=["humaneval", "apps", "code_contests"], help="Dataset name")
+    p_prep.add_argument("--raw-path", type=str, default=None, help="Path to raw source file (optional)")
+    p_prep.add_argument("--output", type=str, default=None, help="Output directory (default: prepared/<dataset>)")
+    p_prep.add_argument("--limit", type=int, default=None, help="Maximum problems to prepare")
 
     # doctor
     p_doc = subparsers.add_parser("doctor", help="Check config, model connectivity, and sandbox")
@@ -282,7 +281,9 @@ def main():
 
     args = parser.parse_args()
 
-    if args.subcommand == "doctor":
+    if args.subcommand == "prepare":
+        cmd_prepare(args)
+    elif args.subcommand == "doctor":
         cmd_doctor(args)
     elif args.subcommand == "solve":
         cmd_solve(args)

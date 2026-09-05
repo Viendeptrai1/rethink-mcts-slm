@@ -1,5 +1,6 @@
 """
 JSONL Dataset Source adapter implementing PublicProblemSource and HiddenSuiteSource ports.
+Supports StdinCase, FunctionCase, and AssertionSuite cases polymorphically.
 """
 
 import json
@@ -11,12 +12,40 @@ from rethink_mcts.domain.problem import (
     TestCase,
     StdinCase,
     FunctionCase,
+    AssertionSuite,
     ExecutionSpec,
     ProblemLimits,
     PublicMetadata,
     JudgeSpec
 )
 from rethink_mcts.ports.datasets import PublicProblemSource, HiddenSuiteSource
+
+
+def parse_case_dict(c: dict) -> TestCase:
+    if "stdin" in c:
+        return StdinCase(
+            stdin=c["stdin"],
+            expected_stdout=c.get("expected_stdout", ""),
+            case_id=c.get("case_id", ""),
+            comparator_id=c.get("comparator_id", "token_text")
+        )
+    elif "test_code" in c:
+        return AssertionSuite(
+            test_code=c["test_code"],
+            entry_point=c.get("entry_point", ""),
+            case_id=c.get("case_id", "")
+        )
+    elif "entry_point" in c:
+        args = c.get("args", ())
+        kwargs = c.get("kwargs", {})
+        return FunctionCase(
+            entry_point=c["entry_point"],
+            args=tuple(args) if isinstance(args, (list, tuple)) else (args,),
+            kwargs=tuple(kwargs.items()) if isinstance(kwargs, dict) else tuple(kwargs),
+            expected=c.get("expected"),
+            case_id=c.get("case_id", "")
+        )
+    raise ValueError(f"Unknown test case format: {c}")
 
 
 class JSONLProblemSource(PublicProblemSource, HiddenSuiteSource):
@@ -34,16 +63,7 @@ class JSONLProblemSource(PublicProblemSource, HiddenSuiteSource):
                 if not line.strip():
                     continue
                 d = json.loads(line.strip())
-                pub_tests = []
-                for c in d.get("public_tests", []):
-                    pub_tests.append(
-                        StdinCase(
-                            stdin=c["stdin"],
-                            expected_stdout=c["expected_stdout"],
-                            case_id=c.get("case_id", ""),
-                            comparator_id=c.get("comparator_id", "token_text")
-                        )
-                    )
+                pub_tests = [parse_case_dict(c) for c in d.get("public_tests", [])]
                 prob = PublicProblem(
                     problem_id=d["problem_id"],
                     statement=d["statement"],
@@ -61,16 +81,7 @@ class JSONLProblemSource(PublicProblemSource, HiddenSuiteSource):
                     if not line.strip():
                         continue
                     d = json.loads(line.strip())
-                    hid_cases = []
-                    for c in d.get("hidden_cases", []):
-                        hid_cases.append(
-                            StdinCase(
-                                stdin=c["stdin"],
-                                expected_stdout=c["expected_stdout"],
-                                case_id=c.get("case_id", ""),
-                                comparator_id=c.get("comparator_id", "token_text")
-                            )
-                        )
+                    hid_cases = [parse_case_dict(c) for c in d.get("hidden_cases", [])]
                     hid = HiddenProblem(
                         problem_id=d["problem_id"],
                         hidden_suite=HiddenSuite(cases=tuple(hid_cases)),
