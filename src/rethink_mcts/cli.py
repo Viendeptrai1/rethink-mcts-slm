@@ -110,15 +110,52 @@ def cmd_doctor(args):
         console.print(f"[bold red]✗ Config validation failed:[/bold red] {e}")
         sys.exit(2)
 
+    # Check model connectivity
+    if cfg.model.transport == "openai_compatible":
+        try:
+            import requests
+            resp = requests.get(f"{cfg.model.base_url}/models", timeout=1.5)
+            if resp.status_code == 200:
+                console.print(f"[green]✓ Endpoint {cfg.model.base_url} reachable (status 200)[/green]")
+                models_data = resp.json().get("data", [])
+                model_ids = [m.get("id") for m in models_data if isinstance(m, dict)]
+                if cfg.model.model in model_ids:
+                    console.print(f"[green]✓ Model '{cfg.model.model}' confirmed available on endpoint[/green]")
+                else:
+                    console.print(f"[yellow]! Model '{cfg.model.model}' not listed in /models (direct completion may still work)[/yellow]")
+            else:
+                console.print(f"[yellow]! Endpoint returned HTTP {resp.status_code} on /models[/yellow]")
+        except Exception as e:
+            console.print(f"[yellow]! Model endpoint offline or unreachable at {cfg.model.base_url} ({e.__class__.__name__})[/yellow]")
+    elif cfg.model.transport == "mock":
+        console.print("[green]✓ Mock scenario gateway ready[/green]")
+
     # Check executor
     if cfg.execution.backend == "docker":
         import shutil
         if shutil.which("docker"):
             console.print("[green]✓ Docker binary detected in PATH[/green]")
         else:
-            console.print("[yellow]! Docker binary not found (host fallback will be used if configured)[/yellow]")
+            console.print("[yellow]! Docker binary not found in PATH[/yellow]")
     else:
-        console.print("[green]✓ Trusted fixture executor ready[/green]")
+        executor = TrustedFixtureExecutor()
+        tc = StdinCase(stdin="42\n", expected_stdout="42\n", case_id="doctor_probe")
+        candidate = ProgramCandidate(
+            candidate_id="probe",
+            problem_id="doctor",
+            code="print(input())",
+            code_hash=ProgramCandidate.compute_hash("print(input())")
+        )
+        summary = executor.evaluate(
+            candidate,
+            tests=(tc,),
+            spec=ExecutionSpec(mode="stdin"),
+            limits=ProblemLimits(timeout_seconds=2.0)
+        )
+        if summary.all_passed:
+            console.print("[green]✓ Trusted fixture executor verified (worker probe passed)[/green]")
+        else:
+            console.print(f"[red]✗ Worker probe failed[/red]")
 
     console.print("[bold green]System check completed successfully.[/bold green]")
 
