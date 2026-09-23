@@ -40,3 +40,19 @@ class MaxBackupPolicy:
 
         self._committed_evaluations.add(evaluation_id)
         return True
+
+
+class MeanBackupPolicy(MaxBackupPolicy):
+    """Mean backup ablation; q_max holds the selected policy's Q estimate."""
+    def backup(self, tree, leaf_node_id, reward, evaluation_id):
+        if evaluation_id in self._committed_evaluations:
+            return False
+        curr_id = leaf_node_id
+        while curr_id is not None:
+            node = tree.nodes[curr_id]
+            node.q_max = (node.q_max * node.visits + reward) / (node.visits + 1)
+            node.visits += 1
+            node.latest_evaluation_id = evaluation_id
+            curr_id = node.parent_id
+        self._committed_evaluations.add(evaluation_id)
+        return True

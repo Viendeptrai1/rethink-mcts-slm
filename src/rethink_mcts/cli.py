@@ -268,7 +268,7 @@ def main():
     p_solve = subparsers.add_parser("solve", help="Run solver (MCTS or Baseline) on public problem")
     p_solve.add_argument("--config", type=str, required=True, help="Path to config YAML")
     p_solve.add_argument("--problem", type=str, required=True, help="Path to public problem JSON")
-    p_solve.add_argument("--solver", type=str, default="mcts", choices=["mcts", "direct", "best_of_n", "graph"], help="Solver method: mcts (default), direct, best_of_n, or graph")
+    p_solve.add_argument("--solver", type=str, default="mcts", choices=["mcts", "direct", "best_of_n", "iterative_repair", "graph"], help="Solver method: mcts (default), direct, best_of_n, or graph")
     p_solve.add_argument("--samples-n", type=int, default=4, help="Number of candidate samples for best_of_n solver (default: 4)")
     p_solve.add_argument("--output-dir", type=str, default=None, help="Output directory for run artifacts")
     p_solve.add_argument("--endpoint", type=str, default=None, help="Override endpoint URL")
@@ -283,9 +283,29 @@ def main():
     p_rep = subparsers.add_parser("report", help="Generate summary report for a run")
     p_rep.add_argument("--run", type=str, required=True, help="Path to run directory")
 
+    p_bench = subparsers.add_parser("benchmark", help="Validate or run a frozen experiment")
+    p_bench.add_argument("--config", required=True)
+    p_bench.add_argument("--output-dir", required=True)
+    p_bench.add_argument("--solver", default="mcts", choices=["mcts", "direct", "best_of_n", "iterative_repair", "graph"])
+    p_bench.add_argument("--samples-n", type=int, default=3)
+    p_bench.add_argument("--dry-run", action="store_true", help="Local validation only; no model calls or writes")
+    p_bench.add_argument("--set", dest="overrides", action="append", default=[], metavar="SECTION.FIELD=VALUE")
+
     args = parser.parse_args()
 
-    if args.subcommand == "prepare":
+    if args.subcommand == "benchmark":
+        from rethink_mcts.application.benchmark import load_config, run_benchmark
+        config = load_config(args.config, args.overrides)
+        result = run_benchmark(config, args.output_dir, args.solver, args.samples_n, args.dry_run)
+        if args.dry_run:
+            console.print(f"Validated {len(result['manifest']['problem_ids'])} problems; no model calls or writes")
+            console.print(f"Protocol fingerprint: {result['manifest']['manifest_id']}")
+        else:
+            console.print(f"Processed {result['processed_problems']}/{result['requested_problems']}; "
+                          f"passed {result['passed_problems']}; errors {result['error_problems']}")
+            if result['error_problems']:
+                sys.exit(1)
+    elif args.subcommand == "prepare":
         cmd_prepare(args)
     elif args.subcommand == "doctor":
         cmd_doctor(args)

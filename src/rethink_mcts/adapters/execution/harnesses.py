@@ -29,6 +29,8 @@ if __name__ == '__main__':
         args = json.loads({repr(args_json)})
         kwargs = json.loads({repr(kwargs_json)})
         fn = globals().get({repr(entry_point)})
+        if fn is None and 'Solution' in globals():
+            fn = getattr(Solution(), {repr(entry_point)}, None)
         if fn is None:
             sys.stderr.write(f"Entry point '{entry_point}' not found in candidate code.\\n")
             sys.exit(1)

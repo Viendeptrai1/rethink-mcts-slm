@@ -20,6 +20,7 @@ class JudgeResult:
     hidden_passed: int
     hidden_total: int
     execution_summary: ExecutionSummary
+    generated_execution_summary: Optional[ExecutionSummary] = None
 
 
 class HiddenJudge:
@@ -53,6 +54,10 @@ class HiddenJudge:
 
         pass_rate = summary.pass_rate if summary.pass_rate is not None else 0.0
 
+        generated = None
+        if hidden_problem.hidden_suite.generated_cases:
+            generated = self.executor.evaluate(candidate, hidden_problem.hidden_suite.generated_cases, spec, exec_limits)
+
         return JudgeResult(
             problem_id=hidden_problem.problem_id,
             candidate_id=candidate.candidate_id,
@@ -61,5 +66,6 @@ class HiddenJudge:
             hidden_pass_rate=pass_rate,
             hidden_passed=summary.passed,
             hidden_total=summary.total,
-            execution_summary=summary
+            execution_summary=summary,
+            generated_execution_summary=generated
         )

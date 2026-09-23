@@ -11,6 +11,9 @@ Decomposes reasoning into an explicit Directed Acyclic Graph (DAG) with feedback
 import os
 import re
 import uuid
+from rethink_mcts.application.model_calls import complete_request
+from rethink_mcts.domain.errors import ModelError
+from rethink_mcts.config import SamplingConfig
 from typing import Optional, Tuple
 from jinja2 import Environment, FileSystemLoader
 
@@ -58,9 +61,13 @@ class GraphSolver:
         evaluator: CandidateEvaluator,
         budget_limits: BudgetLimits,
         prompts_dir: str = "prompts/compact_v1",
-        max_patches: int = 2
+        max_patches: int = 2, sampling=None, seed=None, require_exact_token_count=False
     ):
         self.gateway = gateway
+        self.sampling = sampling or SamplingConfig()
+        self.seed = seed
+        self.require_exact_token_count = require_exact_token_count
+        self.budget = None
         self.evaluator = evaluator
         self.budget_limits = budget_limits
         self.prompts_dir = prompts_dir
@@ -73,14 +80,18 @@ class GraphSolver:
         self.env = Environment(loader=FileSystemLoader(self.prompts_dir))
 
     def _call_llm(self, prompt: str, role: str, temperature: float = 0.2, max_tokens: int = 1536) -> str:
+        settings = getattr(self.sampling, {"analysis": "block_analysis", "drafts": "expansion"}.get(role, role))
         req = GenerationRequest(
             request_id=f"req_graph_{uuid.uuid4().hex[:8]}",
             role=role,
             prompt=prompt,
-            temperature=temperature,
-            max_output_tokens=max_tokens
+            temperature=settings.temperature,
+            top_p=settings.top_p, seed=(self.seed + self.budget.usage.total_model_calls if self.seed is not None and self.budget else self.seed),
+            max_output_tokens=settings.max_output_tokens
         )
-        resp = self.gateway.complete(req)
+        resp = complete_request(self.gateway, req, self.budget)
+        if self.require_exact_token_count and (resp.prompt_tokens is None or resp.completion_tokens is None):
+            raise ModelError("Provider did not return required token usage")
         return resp.content
 
     def _format_public_examples(self, problem: PublicProblem) -> str:
@@ -88,8 +99,8 @@ class GraphSolver:
             return ""
         ex_lines = []
         for idx, tc in enumerate(problem.public_tests[:3], start=1):
-            if hasattr(tc, "assertion") and tc.assertion:
-                ex_lines.append(f"Example {idx}: {tc.assertion}")
+            if hasattr(tc, "test_code") and tc.test_code:
+                ex_lines.append(f"Example {idx}: {tc.test_code}")
             elif hasattr(tc, "stdin") and tc.stdin:
                 ex_lines.append(f"Example {idx} Input: {tc.stdin.strip()} -> Expected Output: {tc.expected_stdout.strip() if tc.expected_stdout else ''}")
         return "\n".join(ex_lines)
@@ -98,6 +109,8 @@ class GraphSolver:
         tree = Tree.create_root(problem.problem_id)
         archive = CandidateArchive()
         budget = BudgetManager(self.budget_limits)
+        self.last_budget = budget
+        self.budget = budget
 
         public_examples_str = self._format_public_examples(problem)
         mode = problem.execution_spec.mode.value if hasattr(problem.execution_spec.mode, "value") else str(problem.execution_spec.mode)
@@ -106,7 +119,6 @@ class GraphSolver:
         # -------------------------------------------------------------
         # Node 1: Analyze Node (Problem Spec, Constraints, Edge Cases)
         # -------------------------------------------------------------
-        budget.record_model_call("analysis")
         t_analyze = self.env.get_template("graph_analyze.jinja")
         prompt_analyze = t_analyze.render(
             statement=problem.statement,
@@ -117,7 +129,6 @@ class GraphSolver:
         # -------------------------------------------------------------
         # Node 2: Multi-Draft Node (Branching: Strategy A & B)
         # -------------------------------------------------------------
-        budget.record_model_call("drafts")
         t_drafts = self.env.get_template("graph_drafts.jinja")
         prompt_drafts = t_drafts.render(
             statement=problem.statement,
@@ -133,7 +144,6 @@ class GraphSolver:
         # Node 3: Aggregate Node (GoT Merge Operator)
         # -------------------------------------------------------------
         budget.record_code_generation_attempt()
-        budget.record_model_call("code")
         t_aggregate = self.env.get_template("graph_aggregate.jinja")
         prompt_aggregate = t_aggregate.render(
             statement=problem.statement,
@@ -190,7 +200,6 @@ class GraphSolver:
                 feedback_text = "\n".join(feedback_lines) if feedback_lines else "Code failed some public assertions."
 
                 budget.record_code_generation_attempt()
-                budget.record_model_call("code")
                 prompt_patch = t_patch.render(
                     statement=problem.statement,
                     analysis=analysis_text,
@@ -236,5 +245,6 @@ class GraphSolver:
             tree=tree,
             archive=archive,
             usage=budget.usage,
+            request_records=tuple(budget.requests),
             stop_reason=stop_reason
         )

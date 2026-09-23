@@ -155,6 +155,9 @@ class ScenarioMockLLM(
             summary_explanation="Identified edge-case logical fault in condition check."
         )
 
+    def repair(self, statement, execution_spec, candidate_code, feedback):
+        return self.generate(statement, execution_spec, ("each part must be a positive even",))
+
     def complete(self, request: GenerationRequest) -> GenerationResponse:
         content = "def solution(*args, **kwargs):\n    return True\n"
         if "analyze" in request.role or "analysis" in request.role:

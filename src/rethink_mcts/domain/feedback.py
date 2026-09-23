@@ -68,9 +68,15 @@ class VerbalFeedback:
     facts: ExecutionFacts
     trace: Optional[TraceResult] = None
     analysis: Optional[BlockAnalysis] = None
+    level: str = "block"
+    decision_reason: str = "legacy"
+    max_prompt_blocks: int = 32
+    max_text_chars: int = 8192
 
     def format_as_text(self) -> str:
         """Render structured verbal feedback to text for inclusion in prompts."""
+        if self.level == "none":
+            return ""
         parts = [
             f"[EXECUTION REPORT]",
             f"Result: {self.facts.failure_kind} ({self.facts.public_passed}/{self.facts.public_total} passed)",
@@ -83,7 +89,7 @@ class VerbalFeedback:
 
         if self.trace and self.trace.block_visits:
             trace_parts = ["[EXECUTION TRACE (BASIC BLOCKS)]"]
-            for v in self.trace.block_visits[:16]:  # Bounded presentation
+            for v in self.trace.block_visits[:self.max_prompt_blocks]:  # Bounded presentation
                 delta = []
                 for k, val in v.locals_after.items():
                     if v.locals_before.get(k) != val:
@@ -104,4 +110,5 @@ class VerbalFeedback:
                 analysis_parts.append(f"Summary: {self.analysis.summary_explanation}")
             parts.append("\n".join(analysis_parts))
 
-        return "\n\n".join(parts)
+        text = "\n\n".join(parts)
+        return text if len(text) <= self.max_text_chars else text[:self.max_text_chars] + "\n[feedback truncated]"

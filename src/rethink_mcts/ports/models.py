@@ -33,6 +33,7 @@ class GenerationResponse:
     completion_tokens: Optional[int] = None
     elapsed_seconds: float = 0.0
     raw_response_ref: Optional[str] = None
+    transport_attempts: int = 1
 
 
 @runtime_checkable

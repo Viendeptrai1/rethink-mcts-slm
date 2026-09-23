@@ -5,6 +5,7 @@ holds official evaluation assertion harness strictly in HiddenProblem.
 """
 
 import doctest
+from rethink_mcts.domain.errors import ConfigurationError
 from typing import Tuple, List
 from rethink_mcts.domain.problem import (
     PublicProblem,
@@ -77,13 +78,7 @@ def parse_humaneval_record(item: dict) -> Tuple[PublicProblem, HiddenProblem]:
         pub_cases = extract_doctests_from_prompt(prompt, entry_point)
 
     if not pub_cases:
-        pub_cases = [
-            AssertionSuite(
-                test_code=f"assert callable({entry_point})",
-                entry_point=entry_point,
-                case_id="callable_check"
-            )
-        ]
+        raise ConfigurationError(f"{clean_id}: no behavioral public tests; provide examples or exclude explicitly")
 
     public_problem = PublicProblem(
         problem_id=clean_id,

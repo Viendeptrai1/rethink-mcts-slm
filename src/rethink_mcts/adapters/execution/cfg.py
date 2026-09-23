@@ -23,7 +23,7 @@ class BytecodeBlock:
 @dataclass
 class CodeCFG:
     blocks: Dict[str, BytecodeBlock] = field(default_factory=dict)
-    offset_to_block_id: Dict[int, str] = field(default_factory=dict)
+    offset_to_block_id: Dict[tuple[str, int, int], str] = field(default_factory=dict)
     line_to_block_ids: Dict[int, List[str]] = field(default_factory=dict)
 
 
@@ -60,9 +60,9 @@ def build_cfg_for_code(source_code: str) -> CodeCFG:
         for inst in instructions:
             if inst.is_jump_target:
                 jump_targets.add(inst.offset)
-            if "JUMP" in inst.opname or inst.opname in ("RETURN_VALUE", "RAISE_VARARGS", "RERAISE"):
+            if inst.opcode in dis.hasjrel or inst.opcode in dis.hasjabs or inst.opname in ("RETURN_VALUE", "RETURN_CONST", "RAISE_VARARGS", "RERAISE"):
                 terminators.add(inst.offset)
-                if inst.argval is not None and isinstance(inst.argval, int):
+                if (inst.opcode in dis.hasjrel or inst.opcode in dis.hasjabs) and isinstance(inst.argval, int):
                     jump_targets.add(inst.argval)
 
         boundary_offsets = {0}
@@ -82,7 +82,7 @@ def build_cfg_for_code(source_code: str) -> CodeCFG:
             global_block_counter += 1
             block_id = f"bb_{global_block_counter}"
 
-            min_line = min((inst.starts_line for inst in block_insts if inst.starts_line is not None), default=1)
+            min_line = min((inst.positions.lineno for inst in block_insts if inst.positions and inst.positions.lineno), default=code_obj.co_firstlineno)
             max_line = min_line
             for inst in block_insts:
                 if hasattr(inst, "positions") and inst.positions and inst.positions.lineno:
@@ -95,11 +95,14 @@ def build_cfg_for_code(source_code: str) -> CodeCFG:
             targets = []
             is_term = False
             last_inst = block_insts[-1]
-            if last_inst.opname in ("RETURN_VALUE", "RAISE_VARARGS"):
+            if last_inst.opname in ("RETURN_VALUE", "RETURN_CONST", "RAISE_VARARGS", "RERAISE"):
                 is_term = True
-            elif "JUMP" in last_inst.opname and isinstance(last_inst.argval, int):
+            elif (last_inst.opcode in dis.hasjrel or last_inst.opcode in dis.hasjabs) and isinstance(last_inst.argval, int):
                 targets.append(last_inst.argval)
 
+            if not is_term and last_inst.opname not in ("JUMP_FORWARD", "JUMP_BACKWARD", "JUMP_ABSOLUTE", "JUMP_BACKWARD_NO_INTERRUPT"):
+                if b_idx + 1 < len(sorted_boundaries):
+                    targets.append(sorted_boundaries[b_idx + 1])
             block = BytecodeBlock(
                 block_id=block_id,
                 code_object_name=code_obj.co_name,
@@ -113,7 +116,7 @@ def build_cfg_for_code(source_code: str) -> CodeCFG:
             cfg.blocks[block_id] = block
 
             for inst in block_insts:
-                cfg.offset_to_block_id[inst.offset] = block_id
+                cfg.offset_to_block_id[(code_obj.co_qualname, code_obj.co_firstlineno, inst.offset)] = block_id
 
             for line_no in range(min_line, max(min_line, max_line) + 1):
                 if line_no not in cfg.line_to_block_ids:

@@ -8,6 +8,7 @@ import time
 import subprocess
 import tempfile
 import os
+import signal
 from typing import List, Optional
 from rethink_mcts.domain.candidate import (
     ProgramCandidate,
@@ -58,17 +59,6 @@ class TrustedFixtureExecutor(PublicExecutor):
             case_id = getattr(test, "case_id", f"case_{len(case_results)}")
             res = self._run_single_case(candidate.code, test, spec, limits, case_id)
             case_results.append(res)
-            if res.status == CandidateVerdict.TLE:
-                # Fast fail on TLE: remaining test cases for an infinite loop or hung process will also TLE
-                for remaining_test in tests[len(case_results):]:
-                    rem_id = getattr(remaining_test, "case_id", f"case_{len(case_results)}")
-                    case_results.append(SingleCaseResult(
-                        case_id=rem_id,
-                        status=CandidateVerdict.TLE,
-                        error_message="Skipped after previous test case timed out (TLE)",
-                        execution_time=0.0
-                    ))
-                break
 
         elapsed = time.time() - start_all
         return ExecutionSummary.create(
@@ -110,11 +100,12 @@ class TrustedFixtureExecutor(PublicExecutor):
 
         try:
             process = subprocess.Popen(
-                [self.python_executable, tmp_path],
+                self._command(tmp_path, wrapped_code, limits),
                 stdin=subprocess.PIPE,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
-                text=True
+                text=True,
+                start_new_session=True
             )
 
             try:
@@ -123,7 +114,7 @@ class TrustedFixtureExecutor(PublicExecutor):
                     timeout=timeout
                 )
             except subprocess.TimeoutExpired:
-                process.kill()
+                os.killpg(process.pid, signal.SIGKILL)
                 stdout_data, stderr_data = process.communicate()
                 return SingleCaseResult(
                     case_id=case_id,
@@ -209,5 +200,12 @@ class TrustedFixtureExecutor(PublicExecutor):
                 execution_time=time.time() - start_time
             )
         finally:
+            self._cleanup()
             if os.path.exists(tmp_path):
                 os.remove(tmp_path)
+
+    def _command(self, path, code, limits):
+        return [self.python_executable, path]
+
+    def _cleanup(self):
+        pass

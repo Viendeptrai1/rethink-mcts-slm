@@ -4,6 +4,9 @@ SemanticPromptedLLM implementing semantic model ports using Jinja2 templates and
 
 import os
 import uuid
+from dataclasses import replace
+from rethink_mcts.config import SamplingConfig
+from rethink_mcts.application.model_calls import complete_request
 from typing import Optional
 from jinja2 import Environment, FileSystemLoader
 
@@ -48,9 +51,17 @@ class SemanticPromptedLLM(
         self,
         gateway: ModelGateway,
         prompts_dir: str = "prompts/compact_v1",
-        prior_policy: Optional[PriorPolicy] = None
+        prior_policy: Optional[PriorPolicy] = None,
+        sampling=None, seed=None, critic_min=0.0, critic_max=1.0, max_prompt_blocks=32, require_exact_token_count=False
     ):
         self.gateway = gateway
+        self.sampling = sampling or SamplingConfig()
+        self.seed = seed
+        self.critic_min, self.critic_max = critic_min, critic_max
+        self.max_prompt_blocks = max_prompt_blocks
+        self.meters_requests = True
+        self.budget = None
+        self.require_exact_token_count = require_exact_token_count
         self.prompts_dir = prompts_dir
         self.prior_policy = prior_policy or PriorPolicy()
 
@@ -72,7 +83,8 @@ class SemanticPromptedLLM(
         prompt = template.render(
             statement=statement,
             active_thoughts=list(active_thoughts),
-            width=width
+            width=width,
+            feedback_text=feedback.format_as_text() if feedback else ""
         )
 
         req = GenerationRequest(
@@ -83,10 +95,10 @@ class SemanticPromptedLLM(
             max_output_tokens=384,
             response_contract="json"
         )
-        resp = self.gateway.complete(req)
+        resp = self._complete(req)
 
         raw_proposals = parse_thoughts_json(resp.content)
-        processed = self.prior_policy.process_raw_proposals(raw_proposals)
+        processed = self.prior_policy.process_raw_proposals(raw_proposals[:width])
 
         return ProposalBatch(
             batch_id=str(uuid.uuid4()),
@@ -117,7 +129,7 @@ class SemanticPromptedLLM(
             temperature=0.2,
             max_output_tokens=1536
         )
-        resp = self.gateway.complete(req)
+        resp = self._complete(req)
         return extract_python_code(resp.content)
 
     def refine(
@@ -145,7 +157,7 @@ class SemanticPromptedLLM(
             temperature=0.3,
             max_output_tokens=256
         )
-        resp = self.gateway.complete(req)
+        resp = self._complete(req)
         return resp.content.strip()
 
     def assess(
@@ -157,8 +169,8 @@ class SemanticPromptedLLM(
         prompt = template.render(
             statement=statement,
             candidate_code=candidate_code,
-            score_min=0.0,
-            score_max=1.0
+            score_min=self.critic_min,
+            score_max=self.critic_max
         )
 
         req = GenerationRequest(
@@ -169,8 +181,8 @@ class SemanticPromptedLLM(
             max_output_tokens=64,
             response_contract="json"
         )
-        resp = self.gateway.complete(req)
-        return parse_critic_score(resp.content, score_min=0.0, score_max=1.0)
+        resp = self._complete(req)
+        return parse_critic_score(resp.content, score_min=self.critic_min, score_max=self.critic_max)
 
     def analyze(
         self,
@@ -181,8 +193,8 @@ class SemanticPromptedLLM(
     ) -> BlockAnalysis:
         template = self.env.get_template("analyze_block.jinja")
         trace_snippets = []
-        for v in trace.block_visits[:16]:
-            trace_snippets.append(f"Block {v.block_id}: {v.source_snippet.strip()}")
+        for v in trace.block_visits[:self.max_prompt_blocks]:
+            trace_snippets.append(f"Block {v.block_id} frame={v.frame_id}: {v.source_snippet.strip()}\nBefore: {v.locals_before}\nAfter: {v.locals_after}\nExit: {v.exit_kind}")
 
         prompt = template.render(
             statement=statement,
@@ -199,7 +211,7 @@ class SemanticPromptedLLM(
             max_output_tokens=512,
             response_contract="json"
         )
-        resp = self.gateway.complete(req)
+        resp = self._complete(req)
         # Parse JSON structure
         try:
             import json
@@ -230,3 +242,22 @@ class SemanticPromptedLLM(
                 assessments=(),
                 summary_explanation="Failed to parse block analysis output"
             )
+
+    def _complete(self, request):
+        role = getattr(self.sampling, request.role)
+        request = replace(request, temperature=role.temperature, top_p=role.top_p,
+                          max_output_tokens=role.max_output_tokens,
+                          seed=(self.seed + self.budget.usage.total_model_calls if self.seed is not None and self.budget else self.seed))
+        response = complete_request(self.gateway, request, self.budget)
+        if self.require_exact_token_count and (response.prompt_tokens is None or response.completion_tokens is None):
+            from rethink_mcts.domain.errors import ModelError
+            raise ModelError("Provider did not supply required token usage")
+        return response
+
+    def repair(self, statement, execution_spec, candidate_code, feedback):
+        prompt = self.env.get_template("repair_code.jinja").render(
+            statement=statement, candidate_code=candidate_code,
+            feedback_text=feedback.format_as_text(), entry_point=execution_spec.entry_point)
+        response = self._complete(GenerationRequest(
+            request_id=f"req_repair_{uuid.uuid4().hex[:8]}", role="code", prompt=prompt))
+        return extract_python_code(response.content)

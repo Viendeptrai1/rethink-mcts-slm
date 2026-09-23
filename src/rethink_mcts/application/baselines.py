@@ -4,6 +4,8 @@ All baselines adhere to the same PublicProblem contract and budget accounting.
 """
 
 import uuid
+from rethink_mcts.application.model_calls import invoke_model
+from rethink_mcts.domain.errors import BudgetExceededError
 from typing import Optional
 from rethink_mcts.domain.problem import PublicProblem
 from rethink_mcts.domain.candidate import ProgramCandidate, CandidateOrigin
@@ -32,10 +34,10 @@ class DirectBaseline:
         tree = Tree.create_root(problem.problem_id)
         archive = CandidateArchive()
         budget = BudgetManager(self.budget_limits)
+        self.last_budget = budget
 
         budget.record_code_generation_attempt()
-        budget.record_model_call("code")
-        code = self.generator.generate(
+        code = invoke_model(budget, self.generator, "generate", "code",
             statement=problem.statement,
             execution_spec=problem.execution_spec,
             active_thoughts=()
@@ -61,6 +63,7 @@ class DirectBaseline:
             tree=tree,
             archive=archive,
             usage=budget.usage,
+            request_records=tuple(budget.requests),
             stop_reason="direct_completed"
         )
 
@@ -83,14 +86,14 @@ class BestOfNPublicBaseline:
         tree = Tree.create_root(problem.problem_id)
         archive = CandidateArchive()
         budget = BudgetManager(self.budget_limits)
+        self.last_budget = budget
 
         for i in range(self.n):
             if not budget.can_start_code_generation():
                 break
 
             budget.record_code_generation_attempt()
-            budget.record_model_call("code")
-            code = self.generator.generate(
+            code = invoke_model(budget, self.generator, "generate", "code",
                 statement=problem.statement,
                 execution_spec=problem.execution_spec,
                 active_thoughts=()
@@ -120,5 +123,51 @@ class BestOfNPublicBaseline:
             tree=tree,
             archive=archive,
             usage=budget.usage,
+            request_records=tuple(budget.requests),
             stop_reason="best_of_n_completed"
         )
+
+
+class IterativeRepairBaseline:
+    """Generate once, then repair code directly with public feedback; no tree search."""
+    def __init__(self, generator, evaluator, budget_limits, feedback_service):
+        self.generator, self.evaluator = generator, evaluator
+        self.budget_limits, self.feedback_service = budget_limits, feedback_service
+
+    def solve(self, problem):
+        tree, archive = Tree.create_root(problem.problem_id), CandidateArchive()
+        budget = BudgetManager(self.budget_limits)
+        self.last_budget = budget
+        self.feedback_service.reset()
+        candidate = evaluation = None
+        stop_reason = "budget_exhausted"
+        try:
+            while budget.can_start_code_generation():
+                if candidate is None:
+                    budget.record_code_generation_attempt()
+                    code = invoke_model(budget, self.generator, "generate", "code",
+                        statement=problem.statement, execution_spec=problem.execution_spec, active_thoughts=())
+                else:
+                    feedback = self.feedback_service.build_feedback(candidate, evaluation, problem,
+                                                                   budget, reserved_model_calls=1)
+                    budget.record_code_generation_attempt()
+                    code = invoke_model(budget, self.generator, "repair", "code",
+                        statement=problem.statement, execution_spec=problem.execution_spec,
+                        candidate_code=candidate.code, feedback=feedback)
+                candidate = ProgramCandidate(
+                    candidate_id=f"cand_repair_{uuid.uuid4().hex[:8]}", problem_id=problem.problem_id,
+                    code=code, code_hash=ProgramCandidate.compute_hash(code),
+                    origin=CandidateOrigin.BASELINE, created_sequence=budget.usage.code_generation_attempts)
+                evaluation = self.evaluator.evaluate_public(candidate, problem, budget)
+                archive.add(candidate, evaluation)
+                if evaluation.execution_summary.all_passed:
+                    stop_reason = "public_all_passed"
+                    break
+        except BudgetExceededError as exc:
+            stop_reason = str(exc)
+        selected = FinalSelectionPolicy().select(archive.entries)
+        best = archive.get_best()
+        budget.update_wall_time()
+        return SearchResult(problem.problem_id, selected, best[1].reward if best else 0.0,
+                            tree, archive, budget.usage, stop_reason,
+                            tuple(budget.requests), tuple(self.feedback_service.records))

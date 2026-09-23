@@ -72,6 +72,8 @@ class JSONLProblemSource(PublicProblemSource, HiddenSuiteSource):
                     limits=ProblemLimits(**d.get("limits", {})),
                     metadata=PublicMetadata(**d.get("metadata", {}))
                 )
+                if prob.problem_id in self._public_problems:
+                    raise ValueError(f"Duplicate problem ID: {prob.problem_id}")
                 self._public_problems[prob.problem_id] = prob
 
         # Load hidden problems if provided

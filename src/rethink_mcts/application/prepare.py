@@ -10,6 +10,9 @@ prepared/<dataset>/
 import os
 import json
 import logging
+import hashlib
+from pathlib import Path
+import inspect
 from dataclasses import asdict
 from typing import Optional, List, Dict, Any
 
@@ -153,6 +156,7 @@ def prepare_dataset(
         records = records[:limit]
 
     prepared_count = 0
+    public_count = hidden_count = 0
     with open(public_jsonl_path, "w", encoding="utf-8") as pub_out:
         for item in records:
             pub_prob, hid_prob = parser_fn(item)
@@ -164,13 +168,22 @@ def prepare_dataset(
                 json.dump(serialize_hidden_problem(hid_prob), hid_out, indent=2)
 
             prepared_count += 1
+            public_count += len(pub_prob.public_tests)
+            hidden_count += len(hid_prob.hidden_suite.cases)
 
     manifest = {
         "dataset": dataset_name,
         "total_problems": prepared_count,
         "public_problems_path": public_jsonl_path,
         "judge_suites_dir": judge_suites_dir,
-        "provenance": f"Official paper dataset ({dataset_name})"
+        "schema_version": 2,
+        "source_path": src,
+        "source_sha256": hashlib.sha256(Path(src).read_bytes()).hexdigest(),
+        "adapter_sha256": hashlib.sha256(Path(inspect.getfile(parser_fn)).read_bytes()).hexdigest(),
+        "public_case_count": public_count,
+        "hidden_case_count": hidden_count,
+        "protocol": "first_two_public_remove_cross_split_duplicates" if dataset_name == "apps" else "adapter_public_hidden",
+        "provenance": "Locally prepared source; protocol equivalence to paper is not asserted"
     }
 
     with open(os.path.join(out_base, "manifest.json"), "w", encoding="utf-8") as f:

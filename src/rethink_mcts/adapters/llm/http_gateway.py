@@ -6,6 +6,7 @@ Handles URL normalization, retries, timeouts, and error mappings.
 import time
 import json
 import logging
+from rethink_mcts.domain.errors import BudgetExceededError
 from typing import Optional
 import requests
 
@@ -70,6 +71,9 @@ class HttpModelGateway(ModelGateway):
             "max_tokens": request.max_output_tokens
         }
 
+        if request.seed is not None:
+            payload["seed"] = request.seed
+
         if request.stop_sequences:
             payload["stop"] = list(request.stop_sequences)
 
@@ -78,14 +82,21 @@ class HttpModelGateway(ModelGateway):
 
         last_err: Optional[Exception] = None
         start_time = time.time()
+        transport_attempts = 0
 
         for attempt in range(self.max_retries + 1):
             try:
+                timeout = self.timeout_seconds
+                if request.deadline is not None:
+                    timeout = min(timeout, request.deadline - time.monotonic())
+                    if timeout <= 0:
+                        raise BudgetExceededError("Request deadline exhausted")
+                transport_attempts += 1
                 resp = requests.post(
                     self.endpoint,
                     headers=headers,
                     json=payload,
-                    timeout=self.timeout_seconds
+                    timeout=timeout
                 )
 
                 if resp.status_code == 200:
@@ -106,6 +117,7 @@ class HttpModelGateway(ModelGateway):
                         model_id=data.get("model", self.model_name),
                         prompt_tokens=p_tokens,
                         completion_tokens=c_tokens,
+                        transport_attempts=attempt + 1,
                         elapsed_seconds=elapsed
                     )
 
@@ -139,6 +151,12 @@ class HttpModelGateway(ModelGateway):
                 if attempt < self.max_retries:
                     time.sleep(1.0 * (attempt + 1))
                     continue
-                raise ProviderUnavailableError(f"Connection failed to endpoint '{self.endpoint}': {e}") from e
+                error = ProviderUnavailableError(f"Connection failed to endpoint '{self.endpoint}': {e}")
+                error.transport_attempts = attempt + 1
+                raise error from e
+            except Exception as exc:
+                # Include HTTP errors and malformed provider responses after retries.
+                exc.transport_attempts = transport_attempts
+                raise
 
         raise ProviderUnavailableError(f"Request failed after {self.max_retries} attempts: {last_err}")

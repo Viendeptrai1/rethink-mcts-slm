@@ -43,6 +43,12 @@ def compare_structured(actual: Any, expected: Any) -> bool:
     """
     Compares structured return values (lists, dicts, primitives).
     """
+    import json
+    if isinstance(actual, str) and isinstance(expected, str):
+        try:
+            actual, expected = json.loads(actual), json.loads(expected)
+        except (ValueError, TypeError):
+            return False
     return actual == expected
 
 

@@ -4,7 +4,9 @@ Supports introductory, interview, and competition splits with call-based and std
 """
 
 import json
+from rethink_mcts.domain.errors import ConfigurationError
 from typing import Tuple, List, Union
+from dataclasses import asdict
 from rethink_mcts.domain.problem import (
     PublicProblem,
     HiddenProblem,
@@ -48,6 +50,11 @@ def parse_apps_record(item: dict) -> Tuple[PublicProblem, HiddenProblem]:
     inputs = io_data.get("inputs", [])
     outputs = io_data.get("outputs", [])
 
+    if len(inputs) != len(outputs):
+        raise ConfigurationError(f"{prob_id}: input/output counts differ")
+    if len(inputs) < 3:
+        raise ConfigurationError(f"{prob_id}: need at least 3 tests for disjoint public/hidden split")
+
     all_cases: List[Union[StdinCase, FunctionCase]] = []
 
     if fn_name:
@@ -79,7 +86,12 @@ def parse_apps_record(item: dict) -> Tuple[PublicProblem, HiddenProblem]:
 
     # First 2 cases are public examples for MCTS search; remainder are hidden tests for judge
     pub_cases = tuple(all_cases[:2])
-    hid_cases = tuple(all_cases[2:]) if len(all_cases) > 2 else tuple(all_cases)
+    def case_key(case):
+        return json.dumps({k: v for k, v in asdict(case).items() if k != "case_id"}, sort_keys=True)
+    public_keys = {case_key(c) for c in pub_cases}
+    hid_cases = tuple(c for c in all_cases[2:] if case_key(c) not in public_keys)
+    if not hid_cases:
+        raise ConfigurationError(f"{prob_id}: no hidden cases remain after removing public duplicates")
 
     public_problem = PublicProblem(
         problem_id=prob_id,

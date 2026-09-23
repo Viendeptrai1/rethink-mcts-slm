@@ -74,6 +74,8 @@ def parse_code_contests_record(
     gen_dict = item.get("generated_tests", {}) or {}
     gen_inputs = gen_dict.get("input", [])
     gen_outputs = gen_dict.get("output", [])
+    if len(gen_inputs) != len(gen_outputs):
+        raise ConfigurationError(f"Mismatched generated test lengths for {prob_id}")
     for i, (inp, out) in enumerate(zip(gen_inputs, gen_outputs)):
         gen_cases.append(
             StdinCase(

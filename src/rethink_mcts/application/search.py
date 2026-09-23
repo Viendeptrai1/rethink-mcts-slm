@@ -4,14 +4,15 @@ SearchEngine orchestrating Thought-Level MCTS with Leaf Revision lifecycle match
 
 import uuid
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Optional
 
 from rethink_mcts.domain.problem import PublicProblem
 from rethink_mcts.domain.tree import Tree, NodeStatus, CloseReason
 from rethink_mcts.domain.candidate import ProgramCandidate, CandidateOrigin
 from rethink_mcts.domain.budget import BudgetLimits, BudgetManager, Usage
-from rethink_mcts.domain.errors import NoTestsError
+from rethink_mcts.domain.errors import NoTestsError, BudgetExceededError
+from rethink_mcts.application.model_calls import invoke_model
 from rethink_mcts.ports.models import ThoughtProposer, CodeGenerator, ThoughtRefiner
 from rethink_mcts.policies.selection import PUCBSelector
 from rethink_mcts.policies.prior import PriorPolicy
@@ -34,6 +35,8 @@ class SearchResult:
     archive: CandidateArchive
     usage: Usage
     stop_reason: str
+    request_records: tuple = ()
+    feedback_records: tuple = ()
 
 
 class SearchEngine:
@@ -77,203 +80,223 @@ class SearchEngine:
         tree = Tree.create_root(problem.problem_id)
         archive = CandidateArchive()
         budget = BudgetManager(self.budget_limits)
+        self.last_budget = budget
         seq_counter = 0
+        self.feedback_service.reset()
+        feedback_by_node = {}
+        latest_by_node = {}
 
-        # 1. Expand root once to bootstrap initial thoughts (§7.2 step 1)
-        budget.record_model_call("expansion")
-        root_proposals = self.proposer.propose(
-            statement=problem.statement,
-            active_thoughts=(),
-            width=self.width,
-            feedback=None
-        )
-        logger.info("Bootstrap: Root expanded with %d initial thought proposals", len(root_proposals.proposals))
-        for p in root_proposals.proposals:
-            logger.info("  -> Proposal [prior=%.2f]: %s", p.normalized_prior, p.text)
-            tree.create_child_node(tree.root_id, p, parent_path_hash="root")
+        stop_reason = "budget_exhausted"
+        try:
+            # 1. Expand root once to bootstrap initial thoughts (§7.2 step 1)
+            root_proposals = invoke_model(budget, self.proposer, "propose", "expansion",
+                statement=problem.statement,
+                active_thoughts=(),
+                width=self.width,
+                feedback=None
+            )
+            logger.info("Bootstrap: Root expanded with %d initial thought proposals", len(root_proposals.proposals))
+            for p in root_proposals.proposals:
+                logger.info("  -> Proposal [prior=%.2f]: %s", p.normalized_prior, p.text)
+                tree.create_child_node(tree.root_id, p, parent_path_hash="root")
 
-        stop_reason = "normal"
-        # 2. Main MCTS search loop
-        while budget.can_start_code_generation():
-            best_all_passed = any(eval_rec.execution_summary.all_passed for _, eval_rec in archive.entries)
-            should_stop, reason = self.stopping_policy.should_stop(tree, budget, best_public_all_passed=best_all_passed)
-            if should_stop:
-                stop_reason = reason
-                break
-
-            # Selection: traverse from root down to frontier
-            curr = tree.get_node(tree.root_id)
-            while curr.child_ids and curr.status == NodeStatus.READY:
-                next_child = self.selector.select_best_child(tree, curr)
-                if next_child is None:
+            stop_reason = "budget_exhausted"
+            # 2. Main MCTS search loop
+            while budget.can_start_code_generation():
+                best_all_passed = any(eval_rec.execution_summary.all_passed for _, eval_rec in archive.entries)
+                should_stop, reason = self.stopping_policy.should_stop(tree, budget, best_public_all_passed=best_all_passed)
+                if should_stop:
+                    stop_reason = reason
                     break
-                curr = next_child
 
-            node = curr
-            logger.info("Selected node %s (depth=%d, status=%s)", node.node_id, node.depth, node.status.value)
+                budget.usage.search_iterations += 1
 
-            # If node is READY and can expand children
-            if node.status == NodeStatus.READY:
-                if node.depth >= self.max_depth:
-                    node.mark_closed(CloseReason.DEPTH_LIMIT)
+                # Selection: traverse from root down to frontier
+                curr = tree.get_node(tree.root_id)
+                while curr.child_ids and curr.status == NodeStatus.READY:
+                    next_child = self.selector.select_best_child(tree, curr)
+                    if next_child is None:
+                        curr.mark_closed(CloseReason.EXHAUSTED)
+                        break
+                    curr = next_child
+
+                node = curr
+                logger.info("Selected node %s (depth=%d, status=%s)", node.node_id, node.depth, node.status.value)
+
+                if node.status == NodeStatus.CLOSED:
                     continue
 
-                active_thoughts = tree.get_active_thought_path(node.node_id)
-                budget.record_model_call("expansion")
-                proposals = self.proposer.propose(
-                    statement=problem.statement,
-                    active_thoughts=active_thoughts,
-                    width=self.width,
-                    feedback=None
-                )
-                if not proposals.proposals:
-                    node.mark_closed(CloseReason.NO_VALID_PROPOSALS)
+                # If node is READY and can expand children
+                if node.status == NodeStatus.READY:
+                    if node.depth >= self.max_depth:
+                        node.mark_closed(CloseReason.DEPTH_LIMIT)
+                        continue
+
+                    active_thoughts = tree.get_active_thought_path(node.node_id)
+                    latest = latest_by_node.get(node.node_id)
+                    if latest and not latest[1].execution_summary.all_passed:
+                        feedback_by_node[node.node_id] = self.feedback_service.build_feedback(
+                            latest[0], latest[1], problem, budget, reserved_model_calls=2)
+                    elif latest:
+                        feedback_by_node.pop(node.node_id, None)
+                    proposals = invoke_model(budget, self.proposer, "propose", "expansion",
+                        statement=problem.statement,
+                        active_thoughts=active_thoughts,
+                        width=self.width,
+                        feedback=feedback_by_node.get(node.node_id)
+                    )
+                    if not proposals.proposals:
+                        node.mark_closed(CloseReason.NO_VALID_PROPOSALS)
+                        continue
+
+                    parent_hash = str(hash(active_thoughts))
+                    for p in proposals.proposals:
+                        child = tree.create_child_node(node.node_id, p, parent_path_hash=parent_hash)
+                        self.feedback_service.inherit(node.node_id, child.node_id)
                     continue
 
-                parent_hash = str(hash(active_thoughts))
-                for p in proposals.proposals:
-                    tree.create_child_node(node.node_id, p, parent_path_hash=parent_hash)
-                continue
+                # If node is UNEVALUATED, evaluate candidate program
+                if node.status == NodeStatus.UNEVALUATED:
+                    node.status = NodeStatus.EVALUATING
+                    active_thoughts = tree.get_active_thought_path(node.node_id)
 
-            # If node is UNEVALUATED, evaluate candidate program
-            if node.status == NodeStatus.UNEVALUATED:
-                node.status = NodeStatus.EVALUATING
-                active_thoughts = tree.get_active_thought_path(node.node_id)
-
-                # Generate code
-                budget.record_code_generation_attempt()
-                budget.record_model_call("code")
-                logger.info("Generating candidate code for node %s with thoughts: %s", node.node_id, active_thoughts)
-                code = self.generator.generate(
-                    statement=problem.statement,
-                    execution_spec=problem.execution_spec,
-                    active_thoughts=active_thoughts
-                )
-
-                seq_counter += 1
-                candidate = ProgramCandidate(
-                    candidate_id=f"cand_{uuid.uuid4().hex[:10]}",
-                    problem_id=problem.problem_id,
-                    code=code,
-                    code_hash=ProgramCandidate.compute_hash(code),
-                    node_id=node.node_id,
-                    revision_id=node.active_revision_id,
-                    thought_path_snapshot=active_thoughts,
-                    origin=CandidateOrigin.INITIAL,
-                    created_sequence=seq_counter
-                )
-
-                # Evaluate on public suite
-                evaluation = self.evaluator.evaluate_public(candidate, problem, budget=budget)
-                archive.add(candidate, evaluation)
-                logger.info(
-                    "Candidate %s evaluated: %d/%d passed, reward=%.3f",
-                    candidate.candidate_id,
-                    evaluation.execution_summary.passed,
-                    evaluation.execution_summary.total,
-                    evaluation.reward or 0.0
-                )
-
-                if evaluation.reward is not None:
-                    self.backup_policy.backup(
-                        tree=tree,
-                        leaf_node_id=node.node_id,
-                        reward=evaluation.reward,
-                        evaluation_id=evaluation.evaluation_id
+                    # Generate code
+                    budget.record_code_generation_attempt()
+                    logger.info("Generating candidate code for node %s with thoughts: %s", node.node_id, active_thoughts)
+                    code = invoke_model(budget, self.generator, "generate", "code",
+                        statement=problem.statement,
+                        execution_spec=problem.execution_spec,
+                        active_thoughts=active_thoughts
                     )
 
-                # Early stop if candidate passed all public tests
-                if self.stopping_policy.early_stop_mode == "public_all_passed" and evaluation.execution_summary.all_passed:
-                    stop_reason = "optional_public_early_stop"
-                    break
+                    seq_counter += 1
+                    candidate = ProgramCandidate(
+                        candidate_id=f"cand_{uuid.uuid4().hex[:10]}",
+                        problem_id=problem.problem_id,
+                        code=code,
+                        code_hash=ProgramCandidate.compute_hash(code),
+                        node_id=node.node_id,
+                        revision_id=node.active_revision_id,
+                        thought_path_snapshot=active_thoughts,
+                        origin=CandidateOrigin.INITIAL,
+                        created_sequence=seq_counter
+                    )
 
-                # Rethink Loop if public tests failed (§7.2 step 5-6)
-                if not evaluation.execution_summary.all_passed:
-                    for _ in range(self.max_rethinks_per_node):
-                        if evaluation.execution_summary.all_passed:
-                            break
-                        if not budget.can_reserve_refinement_and_regeneration():
-                            break
+                    # Evaluate on public suite
+                    evaluation = self.evaluator.evaluate_public(candidate, problem, budget=budget)
+                    archive.add(candidate, evaluation)
+                    latest_by_node[node.node_id] = (candidate, evaluation)
+                    logger.info(
+                        "Candidate %s evaluated: %d/%d passed, reward=%.3f",
+                        candidate.candidate_id,
+                        evaluation.execution_summary.passed,
+                        evaluation.execution_summary.total,
+                        evaluation.reward or 0.0
+                    )
 
-                        logger.info("Public tests failed on candidate %s! Triggering Rethink on leaf %s...", candidate.candidate_id, node.node_id)
-
-                        # Build structured feedback
-                        feedback = self.feedback_service.build_feedback(candidate, evaluation, problem)
-                        node.active_feedback_id = feedback.feedback_id
-
-                        # Refine thought
-                        parent_thoughts = tree.get_active_thought_path_to_parent(node.node_id)
-                        curr_rev = tree.get_revision(node.active_revision_id)
-
-                        budget.record_model_call("rethink")
-                        new_thought = self.refiner.refine(
-                            statement=problem.statement,
-                            execution_spec=problem.execution_spec,
-                            parent_thoughts=parent_thoughts,
-                            erroneous_thought=curr_rev.thought_text,
-                            candidate_code=candidate.code,
-                            feedback=feedback
-                        )
-                        logger.info("Rethink produced revised thought: %s", new_thought)
-
-                        # Create leaf revision
-                        tree.begin_leaf_revision(node.node_id, new_thought, feedback.feedback_id)
-
-                        # Regenerate complete program
-                        budget.record_code_generation_attempt()
-                        budget.record_rethink_attempt()
-                        budget.record_model_call("code")
-                        revised_thoughts = tree.get_active_thought_path(node.node_id)
-                        new_code = self.generator.generate(
-                            statement=problem.statement,
-                            execution_spec=problem.execution_spec,
-                            active_thoughts=revised_thoughts
+                    if evaluation.reward is not None:
+                        self.backup_policy.backup(
+                            tree=tree,
+                            leaf_node_id=node.node_id,
+                            reward=evaluation.reward,
+                            evaluation_id=evaluation.evaluation_id
                         )
 
-                        seq_counter += 1
-                        candidate = ProgramCandidate(
-                            candidate_id=f"cand_{uuid.uuid4().hex[:10]}",
-                            problem_id=problem.problem_id,
-                            code=new_code,
-                            code_hash=ProgramCandidate.compute_hash(new_code),
-                            node_id=node.node_id,
-                            revision_id=node.active_revision_id,
-                            thought_path_snapshot=revised_thoughts,
-                            origin=CandidateOrigin.RETHINK,
-                            created_sequence=seq_counter
-                        )
+                    # Early stop if candidate passed all public tests
+                    if self.stopping_policy.early_stop_mode == "public_all_passed" and evaluation.execution_summary.all_passed:
+                        stop_reason = "optional_public_early_stop"
+                        break
 
-                        # Evaluate regenerated candidate
-                        evaluation = self.evaluator.evaluate_public(candidate, problem, budget=budget)
-                        archive.add(candidate, evaluation)
-                        logger.info(
-                            "Regenerated candidate %s evaluated: %d/%d passed, reward=%.3f",
-                            candidate.candidate_id,
-                            evaluation.execution_summary.passed,
-                            evaluation.execution_summary.total,
-                            evaluation.reward or 0.0
-                        )
+                    # Rethink Loop if public tests failed (§7.2 step 5-6)
+                    if not evaluation.execution_summary.all_passed:
+                        for _ in range(self.max_rethinks_per_node):
+                            if evaluation.execution_summary.all_passed:
+                                break
+                            if not budget.can_reserve_refinement_and_regeneration():
+                                break
 
-                        if evaluation.reward is not None:
-                            self.backup_policy.backup(
-                                tree=tree,
-                                leaf_node_id=node.node_id,
-                                reward=evaluation.reward,
-                                evaluation_id=evaluation.evaluation_id
+                            logger.info("Public tests failed on candidate %s! Triggering Rethink on leaf %s...", candidate.candidate_id, node.node_id)
+
+                            # Build structured feedback
+                            feedback = self.feedback_service.build_feedback(candidate, evaluation, problem, budget=budget, reserved_model_calls=2)
+                            feedback_by_node[node.node_id] = feedback
+                            node.active_feedback_id = feedback.feedback_id
+
+                            # Refine thought
+                            parent_thoughts = tree.get_active_thought_path_to_parent(node.node_id)
+                            curr_rev = tree.get_revision(node.active_revision_id)
+
+                            new_thought = invoke_model(budget, self.refiner, "refine", "rethink",
+                                statement=problem.statement,
+                                execution_spec=problem.execution_spec,
+                                parent_thoughts=parent_thoughts,
+                                erroneous_thought=curr_rev.thought_text,
+                                candidate_code=candidate.code,
+                                feedback=feedback
+                            )
+                            logger.info("Rethink produced revised thought: %s", new_thought)
+
+                            # Create leaf revision
+                            tree.begin_leaf_revision(node.node_id, new_thought, feedback.feedback_id)
+
+                            # Regenerate complete program
+                            budget.record_code_generation_attempt()
+                            budget.record_rethink_attempt()
+                            revised_thoughts = tree.get_active_thought_path(node.node_id)
+                            new_code = invoke_model(budget, self.generator, "generate", "code",
+                                statement=problem.statement,
+                                execution_spec=problem.execution_spec,
+                                active_thoughts=revised_thoughts
                             )
 
-                        if self.stopping_policy.early_stop_mode == "public_all_passed" and evaluation.execution_summary.all_passed:
-                            stop_reason = "optional_public_early_stop"
-                            break
+                            seq_counter += 1
+                            candidate = ProgramCandidate(
+                                candidate_id=f"cand_{uuid.uuid4().hex[:10]}",
+                                problem_id=problem.problem_id,
+                                code=new_code,
+                                code_hash=ProgramCandidate.compute_hash(new_code),
+                                node_id=node.node_id,
+                                revision_id=node.active_revision_id,
+                                thought_path_snapshot=revised_thoughts,
+                                origin=CandidateOrigin.RETHINK,
+                                created_sequence=seq_counter
+                            )
 
-                if stop_reason == "optional_public_early_stop":
-                    break
+                            # Evaluate regenerated candidate
+                            evaluation = self.evaluator.evaluate_public(candidate, problem, budget=budget)
+                            archive.add(candidate, evaluation)
+                            latest_by_node[node.node_id] = (candidate, evaluation)
+                            logger.info(
+                                "Regenerated candidate %s evaluated: %d/%d passed, reward=%.3f",
+                                candidate.candidate_id,
+                                evaluation.execution_summary.passed,
+                                evaluation.execution_summary.total,
+                                evaluation.reward or 0.0
+                            )
 
-                # Finalize node status
-                if node.depth >= self.max_depth:
-                    node.mark_closed(CloseReason.DEPTH_LIMIT)
-                else:
-                    node.status = NodeStatus.READY
+                            if evaluation.reward is not None:
+                                self.backup_policy.backup(
+                                    tree=tree,
+                                    leaf_node_id=node.node_id,
+                                    reward=evaluation.reward,
+                                    evaluation_id=evaluation.evaluation_id
+                                )
+
+                            if self.stopping_policy.early_stop_mode == "public_all_passed" and evaluation.execution_summary.all_passed:
+                                stop_reason = "optional_public_early_stop"
+                                break
+
+                    if stop_reason == "optional_public_early_stop":
+                        break
+
+                    # Finalize node status
+                    if node.depth >= self.max_depth:
+                        node.mark_closed(CloseReason.DEPTH_LIMIT)
+                    else:
+                        node.status = NodeStatus.READY
+
+        except BudgetExceededError as exc:
+            stop_reason = str(exc)
 
         # 3. Final selection from candidate archive
         selected = self.final_selector.select(archive.entries)
@@ -289,5 +312,7 @@ class SearchEngine:
             tree=tree,
             archive=archive,
             usage=budget.usage,
-            stop_reason=stop_reason
+            stop_reason=stop_reason,
+            request_records=tuple(budget.requests),
+            feedback_records=tuple(self.feedback_service.records)
         )

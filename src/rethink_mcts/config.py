@@ -2,7 +2,7 @@
 Pydantic v2 strict configuration schema matching §12 of RethinkMCTS specification.
 """
 
-from typing import Any, List, Optional
+from typing import Any, List, Optional, Literal
 import yaml
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 from rethink_mcts.domain.errors import ConfigurationError
@@ -25,6 +25,7 @@ class ModelConfig(StrictBaseModel):
     context_safety_margin_tokens: int = 256
     structured_output: str = "auto"
     require_exact_token_count: bool = False
+    revision: Optional[str] = None
 
 
 class PromptConfig(StrictBaseModel):
@@ -56,14 +57,14 @@ class SearchConfig(StrictBaseModel):
     c: float = 4.0
     prior: str = "llm_reasonableness"
     prior_fallback: str = "uniform_after_retry"
-    backup: str = "max"
+    backup: Literal["max", "mean"] = "max"
     leaf_revision_policy: str = "reset_leaf_keep_ancestor_history"
     early_stop: str = "none"
     final_selection: str = "max_reward"
 
 
 class RewardConfig(StrictBaseModel):
-    policy: str = "dual"
+    policy: Literal["dual", "test_only"] = "dual"
     test_weight: float = 0.8
     llm_weight: float = 0.2
     critic_score_min: float = 0.0
@@ -72,7 +73,8 @@ class RewardConfig(StrictBaseModel):
 
 
 class FeedbackConfig(StrictBaseModel):
-    mode: str = "block"  # "block" | "facts_only" | "none"
+    mode: Literal["block", "facts_only", "trace", "adaptive", "none"] = "block"
+    escalate_after: int = Field(default=1, ge=1)
     max_failed_tests: int = 1
     max_feedback_tokens: int = 1536
     max_trace_visits: int = 256
@@ -111,6 +113,8 @@ class ExecutionConfig(StrictBaseModel):
 class DataConfig(StrictBaseModel):
     adapter: str = "synthetic"
     prepared_public_path: Optional[str] = None
+    judge_suites_dir: Optional[str] = None
+    cohort_path: Optional[str] = None
     split: str = "validation"
     require_python3_solution: bool = True
     min_rating: Optional[int] = None
@@ -140,6 +144,8 @@ class StorageConfig(StrictBaseModel):
 
 class ExperimentConfig(StrictBaseModel):
     seed: int = 42
+    stage: Literal["smoke", "development", "test", "exploratory"] = "exploratory"
+    protocol_id: str = "unregistered"
     role_models: str = "same_as_generator"
     allow_mock: bool = False
     deviations: List[str] = Field(default_factory=list)
@@ -174,6 +180,25 @@ class AppConfig(StrictBaseModel):
             raise ConfigurationError("budget.max_code_generations must be positive")
         if self.search.width <= 0:
             raise ConfigurationError("search.width must be positive")
+        for name in ("max_search_iterations", "max_model_calls", "max_total_tokens", "max_wall_seconds", "max_sandbox_runs"):
+            if getattr(self.budget, name) <= 0:
+                raise ConfigurationError(f"budget.{name} must be positive")
+        if self.search.max_depth < 1 or self.search.max_rethinks_per_node < 0:
+            raise ConfigurationError("Search depth must be positive; rethink count cannot be negative")
+        if self.execution.backend not in ("trusted_fixture", "docker"):
+            raise ConfigurationError("Unsupported execution backend")
+        if self.model.transport not in ("mock", "openai_compatible"):
+            raise ConfigurationError("Unsupported model transport")
+        if self.experiment.allow_mock and self.model.transport != "mock":
+            raise ConfigurationError("allow_mock cannot silently replace a real transport; select transport=mock")
+        if self.experiment.stage == "test" and (not self.data.cohort_path or self.experiment.protocol_id == "unregistered"):
+            raise ConfigurationError("Final test requires an explicit cohort_path and protocol_id")
+        for role in type(self.sampling).model_fields:
+            sampling = getattr(self.sampling, role)
+            if not 0 <= sampling.temperature <= 2 or not 0 < sampling.top_p <= 1 or sampling.max_output_tokens <= 0:
+                raise ConfigurationError(f"Invalid sampling for {role}")
+        if self.feedback.trace_timeout_seconds <= 0 or self.feedback.max_prompt_blocks <= 0:
+            raise ConfigurationError("Feedback limits must be positive")
         return self
 
     @classmethod

@@ -3,6 +3,10 @@ Candidate evaluation coordinator implementing conditional self-evaluation and du
 """
 
 import uuid
+import hashlib
+import json
+from dataclasses import asdict
+from rethink_mcts.application.model_calls import invoke_model
 from typing import Optional
 from rethink_mcts.domain.candidate import ProgramCandidate, EvaluationRecord, SelfEvalStatus
 from rethink_mcts.domain.problem import PublicProblem
@@ -31,6 +35,8 @@ class CandidateEvaluator:
     ) -> EvaluationRecord:
         eval_id = f"eval_{uuid.uuid4().hex[:10]}"
 
+        if budget is not None:
+            budget.reserve_sandbox_runs(len(problem.public_tests))
         # 1. Execute public test suite
         exec_summary = self.executor.evaluate(
             candidate=candidate,
@@ -40,7 +46,9 @@ class CandidateEvaluator:
         )
         if budget is not None:
             budget.record_evaluation_event()
-            budget.record_sandbox_run(len(problem.public_tests))
+            budget.usage.valid_candidates += 1
+            budget.program_hashes.add(candidate.code_hash)
+            budget.usage.unique_programs = len(budget.program_hashes)
 
         # 2. Check conditional LLM critic call
         v_test = exec_summary.pass_rate
@@ -50,11 +58,10 @@ class CandidateEvaluator:
         if self.reward_policy.should_call_critic(exec_summary) and self.critic is not None:
             try:
                 if budget is not None:
-                    budget.record_model_call("critic")
-                raw_score = self.critic.assess(
-                    statement=problem.statement,
-                    candidate_code=candidate.code
-                )
+                    raw_score = invoke_model(budget, self.critic, "assess", "critic",
+                                             statement=problem.statement, candidate_code=candidate.code)
+                else:
+                    raw_score = self.critic.assess(statement=problem.statement, candidate_code=candidate.code)
                 v_llm = max(self.reward_policy.critic_min, min(self.reward_policy.critic_max, float(raw_score)))
                 self_eval_status = SelfEvalStatus.EVALUATED
             except Exception:
@@ -68,7 +75,7 @@ class CandidateEvaluator:
             evaluation_id=eval_id,
             candidate_id=candidate.candidate_id,
             suite_visibility="public",
-            suite_hash=str(hash(problem.public_tests)),
+            suite_hash=hashlib.sha256(json.dumps([asdict(c) for c in problem.public_tests], sort_keys=True).encode()).hexdigest(),
             execution_summary=exec_summary,
             v_test=v_test,
             self_eval_raw=v_llm,

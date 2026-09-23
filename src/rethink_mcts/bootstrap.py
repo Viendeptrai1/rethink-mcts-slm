@@ -1,14 +1,11 @@
-"""
-Bootstrap dependency injection factory (§3.1, §3.2).
-Single entry point connecting configuration with ports and concrete adapters.
-"""
-
+"""Shared, configuration-driven construction for all solvers."""
 import os
+from pathlib import Path
 from rethink_mcts.config import AppConfig
 from rethink_mcts.domain.budget import BudgetLimits
 from rethink_mcts.policies.selection import PUCBSelector
 from rethink_mcts.policies.prior import PriorPolicy
-from rethink_mcts.policies.backup import MaxBackupPolicy
+from rethink_mcts.policies.backup import MaxBackupPolicy, MeanBackupPolicy
 from rethink_mcts.policies.reward import PaperDualRewardPolicy
 from rethink_mcts.policies.stopping import StoppingPolicy
 from rethink_mcts.policies.final_selection import FinalSelectionPolicy
@@ -22,198 +19,72 @@ from rethink_mcts.adapters.storage.filesystem import FileSystemRunStore
 from rethink_mcts.application.evaluate import CandidateEvaluator
 from rethink_mcts.application.feedback import FeedbackService
 from rethink_mcts.application.search import SearchEngine
-from rethink_mcts.application.baselines import DirectBaseline, BestOfNPublicBaseline
+from rethink_mcts.application.baselines import DirectBaseline, BestOfNPublicBaseline, IterativeRepairBaseline
 from rethink_mcts.application.graph_solver import GraphSolver
 
 
-def create_search_engine(config: AppConfig, run_dir: str = "runs/default") -> tuple[SearchEngine, FileSystemRunStore]:
-    """
-    Creates and wires all ports and adapters based on AppConfig.
-    """
-    # 1. Model Gateway & Semantic Ports
-    if config.model.transport == "mock" or config.experiment.allow_mock:
-        model_adapter = ScenarioMockLLM()
-    else:
-        api_key = os.environ.get(config.model.api_key_env, "ollama") if config.model.api_key_env else "ollama"
-        gateway = HttpModelGateway(
-            base_url=config.model.base_url,
-            model_name=config.model.model,
-            api_key=api_key,
-            timeout_seconds=config.model.request_timeout_seconds,
-            max_retries=config.model.max_transport_retries
-        )
-        prior_policy = PriorPolicy(fallback_mode=config.search.prior_fallback)
-        prompts_dir = f"prompts/{config.prompts.bundle}"
-        model_adapter = SemanticPromptedLLM(
-            gateway=gateway,
-            prompts_dir=prompts_dir,
-            prior_policy=prior_policy
-        )
-
-    # 2. Execution Backend
+def create_executor(config):
     if config.execution.backend == "docker":
-        executor = DockerExecutor(image=config.execution.image, allow_host_fallback=True)
+        return DockerExecutor(image=config.execution.image, allow_host_fallback=False,
+                              cpus=config.execution.cpus, pids_limit=config.execution.pids_limit)
+    return TrustedFixtureExecutor()
+
+
+def create_solver(config: AppConfig, solver_type="mcts", run_dir="runs/default", n=4):
+    # Revalidate mutations made via CLI/model_copy before constructing anything.
+    config = AppConfig.model_validate(config.model_dump())
+    prompts_dir = str(Path(__file__).resolve().parents[2] / "prompts" / config.prompts.bundle)
+    if config.model.transport == "mock":
+        model = ScenarioMockLLM()
+        gateway = model
     else:
-        executor = TrustedFixtureExecutor()
-
-    # 3. Tracing & Feedback
-    if config.feedback.mode == "block":
-        trace_collector = DynamicTraceCollector(
-            max_visits=config.feedback.max_trace_visits,
-            max_variables_per_frame=config.feedback.max_variables_per_frame,
-            max_value_chars=config.feedback.max_value_chars
-        )
-        block_analyzer = model_adapter
+        api_key = os.environ.get(config.model.api_key_env, "") if config.model.api_key_env else "ollama"
+        gateway = HttpModelGateway(config.model.base_url, config.model.model, api_key,
+                                   config.model.request_timeout_seconds, config.model.max_transport_retries)
+        model = SemanticPromptedLLM(gateway=gateway, prompts_dir=prompts_dir,
+            prior_policy=PriorPolicy(config.search.prior_fallback), sampling=config.sampling,
+            seed=config.experiment.seed, critic_min=config.reward.critic_score_min,
+            critic_max=config.reward.critic_score_max, max_prompt_blocks=config.feedback.max_prompt_blocks,
+            require_exact_token_count=config.model.require_exact_token_count)
+    evaluator = CandidateEvaluator(create_executor(config),
+        model if config.reward.policy == "dual" else None,
+        PaperDualRewardPolicy(config.reward.test_weight, config.reward.llm_weight,
+                              config.reward.critic_score_min, config.reward.critic_score_max))
+    feedback = FeedbackService(mode=config.feedback.mode,
+        trace_collector=DynamicTraceCollector(config.feedback.max_trace_visits,
+            config.feedback.max_variables_per_frame, config.feedback.max_value_chars,
+            backend=config.execution.backend, image=config.execution.image,
+            max_container_items=config.feedback.max_container_items),
+        block_analyzer=model, escalate_after=config.feedback.escalate_after,
+        trace_timeout_seconds=config.feedback.trace_timeout_seconds,
+        max_prompt_blocks=config.feedback.max_prompt_blocks,
+        max_text_chars=config.feedback.max_feedback_tokens * 4)
+    limits = BudgetLimits(**config.budget.model_dump())
+    store = FileSystemRunStore(run_dir)
+    kind = solver_type.lower()
+    if kind == "mcts":
+        solver = SearchEngine(model, model, model, evaluator, feedback,
+            PUCBSelector(config.search.c_base, config.search.c),
+            MeanBackupPolicy() if config.search.backup == "mean" else MaxBackupPolicy(),
+            StoppingPolicy(config.search.max_depth, config.search.early_stop),
+            FinalSelectionPolicy(config.search.final_selection), limits,
+            config.search.width, config.search.max_depth, config.search.max_rethinks_per_node)
+    elif kind == "direct":
+        solver = DirectBaseline(model, evaluator, limits)
+    elif kind in ("best_of_n", "bon"):
+        if n < 1:
+            raise ValueError("Best-of-N requires n >= 1")
+        solver = BestOfNPublicBaseline(model, evaluator, limits, n)
+    elif kind == "iterative_repair":
+        solver = IterativeRepairBaseline(model, evaluator, limits, feedback)
+    elif kind == "graph":
+        solver = GraphSolver(gateway, evaluator, limits, prompts_dir=prompts_dir,
+                             sampling=config.sampling, seed=config.experiment.seed,
+                             require_exact_token_count=config.model.require_exact_token_count)
     else:
-        trace_collector = None
-        block_analyzer = None
-
-    feedback_service = FeedbackService(
-        mode=config.feedback.mode,
-        trace_collector=trace_collector,
-        block_analyzer=block_analyzer
-    )
-
-    # 4. Reward & Evaluation
-    reward_policy = PaperDualRewardPolicy(
-        test_weight=config.reward.test_weight,
-        llm_weight=config.reward.llm_weight,
-        critic_min=config.reward.critic_score_min,
-        critic_max=config.reward.critic_score_max
-    )
-    evaluator = CandidateEvaluator(
-        executor=executor,
-        critic=model_adapter,
-        reward_policy=reward_policy
-    )
-
-    # 5. Policies
-    selector = PUCBSelector(c_base=config.search.c_base, c=config.search.c)
-    backup_policy = MaxBackupPolicy()
-    stopping_policy = StoppingPolicy(max_depth=config.search.max_depth, early_stop_mode=config.search.early_stop)
-    final_selector = FinalSelectionPolicy(mode=config.search.final_selection)
-
-    budget_limits = BudgetLimits(
-        max_code_generations=config.budget.max_code_generations,
-        max_search_iterations=config.budget.max_search_iterations,
-        max_model_calls=config.budget.max_model_calls,
-        max_total_tokens=config.budget.max_total_tokens,
-        max_wall_seconds=config.budget.max_wall_seconds,
-        max_sandbox_runs=config.budget.max_sandbox_runs
-    )
-
-    # 6. Storage
-    store = FileSystemRunStore(run_dir=run_dir)
-
-    # 7. Search Engine
-    engine = SearchEngine(
-        proposer=model_adapter,
-        generator=model_adapter,
-        refiner=model_adapter,
-        evaluator=evaluator,
-        feedback_service=feedback_service,
-        selector=selector,
-        backup_policy=backup_policy,
-        stopping_policy=stopping_policy,
-        final_selector=final_selector,
-        budget_limits=budget_limits,
-        width=config.search.width,
-        max_depth=config.search.max_depth,
-        max_rethinks_per_node=config.search.max_rethinks_per_node
-    )
-
-    return engine, store
-
-
-def create_solver(
-    config: AppConfig,
-    solver_type: str = "mcts",
-    run_dir: str = "runs/default",
-    n: int = 4
-) -> tuple[SearchEngine | DirectBaseline | BestOfNPublicBaseline, FileSystemRunStore]:
-    """
-    Factory creating either SearchEngine (MCTS) or Baseline solvers (direct, best_of_n)
-    sharing the same adapters, model gateway, sandbox executor, and budget limits.
-    """
-    solver_type = solver_type.lower()
-    if solver_type == "mcts":
-        return create_search_engine(config, run_dir=run_dir)
-
-    # 1. Model Gateway & Semantic Ports
-    if config.model.transport == "mock" or config.experiment.allow_mock:
-        model_adapter = ScenarioMockLLM()
-        gateway = model_adapter
-    else:
-        api_key = os.environ.get(config.model.api_key_env, "ollama") if config.model.api_key_env else "ollama"
-        gateway = HttpModelGateway(
-            base_url=config.model.base_url,
-            model_name=config.model.model,
-            api_key=api_key,
-            timeout_seconds=config.model.request_timeout_seconds,
-            max_retries=config.model.max_transport_retries
-        )
-        prior_policy = PriorPolicy(fallback_mode=config.search.prior_fallback)
-        prompts_dir = f"prompts/{config.prompts.bundle}"
-        model_adapter = SemanticPromptedLLM(
-            gateway=gateway,
-            prompts_dir=prompts_dir,
-            prior_policy=prior_policy
-        )
-
-    # 2. Execution Backend
-    if config.execution.backend == "docker":
-        executor = DockerExecutor(image=config.execution.image, allow_host_fallback=True)
-    else:
-        executor = TrustedFixtureExecutor()
-
-    # 3. Reward & Evaluation
-    reward_policy = PaperDualRewardPolicy(
-        test_weight=config.reward.test_weight,
-        llm_weight=config.reward.llm_weight,
-        critic_min=config.reward.critic_score_min,
-        critic_max=config.reward.critic_score_max
-    )
-    evaluator = CandidateEvaluator(
-        executor=executor,
-        critic=model_adapter,
-        reward_policy=reward_policy
-    )
-
-    budget_limits = BudgetLimits(
-        max_code_generations=config.budget.max_code_generations,
-        max_search_iterations=config.budget.max_search_iterations,
-        max_model_calls=config.budget.max_model_calls,
-        max_total_tokens=config.budget.max_total_tokens,
-        max_wall_seconds=config.budget.max_wall_seconds,
-        max_sandbox_runs=config.budget.max_sandbox_runs
-    )
-
-    store = FileSystemRunStore(run_dir=run_dir)
-
-    if solver_type == "direct":
-        solver = DirectBaseline(
-            generator=model_adapter,
-            evaluator=evaluator,
-            budget_limits=budget_limits
-        )
-    elif solver_type in ("best_of_n", "bon"):
-        solver = BestOfNPublicBaseline(
-            generator=model_adapter,
-            evaluator=evaluator,
-            budget_limits=budget_limits,
-            n=n
-        )
-    elif solver_type == "graph":
-        prompts_dir = f"prompts/{config.prompts.bundle}"
-        solver = GraphSolver(
-            gateway=gateway,
-            evaluator=evaluator,
-            budget_limits=budget_limits,
-            prompts_dir=prompts_dir,
-            max_patches=2
-        )
-    else:
-        raise ValueError(f"Unknown solver_type: '{solver_type}'. Must be 'mcts', 'direct', 'best_of_n', or 'graph'.")
-
+        raise ValueError(f"Unknown solver: {solver_type}")
     return solver, store
 
+
+def create_search_engine(config, run_dir="runs/default"):
+    return create_solver(config, "mcts", run_dir)

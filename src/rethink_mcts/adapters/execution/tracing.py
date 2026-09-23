@@ -62,155 +62,70 @@ class _TraceLimitExceeded(Exception):
 
 
 class DynamicTraceCollector(TraceCollector):
+    """Trace the same harness in a disposable worker, never in the orchestrator.
+
+    trusted_fixture is a host subprocess, NOT a security sandbox. Docker uses
+    the same worker with read-only package mount and no network.
     """
-    Executes candidate code with tracing to record block visits and variable deltas.
-    """
-    def __init__(
-        self,
-        max_visits: int = 256,
-        max_variables_per_frame: int = 20,
-        max_value_chars: int = 160
-    ):
+    def __init__(self, max_visits=256, max_variables_per_frame=20, max_value_chars=160,
+                 backend="trusted_fixture", image="rethink-worker:py311", max_container_items=10):
         self.max_visits = max_visits
         self.max_variables_per_frame = max_variables_per_frame
         self.max_value_chars = max_value_chars
+        self.backend, self.image = backend, image
+        self.max_container_items = max_container_items
 
-    def collect_trace(
-        self,
-        candidate: ProgramCandidate,
-        failed_case: TestCase,
-        spec: ExecutionSpec,
-        timeout_seconds: float = 5.0
-    ) -> TraceResult:
+    def collect_trace(self, candidate, failed_case, spec, timeout_seconds=5.0):
+        import json
+        import subprocess
+        import os
+        import signal
+        import uuid
+        from pathlib import Path
+        from dataclasses import asdict
+        from rethink_mcts.adapters.execution.harnesses import wrap_code_for_execution
         try:
-            cfg = build_cfg_for_code(candidate.code)
-        except Exception as e:
-            return TraceResult(status="degraded", degraded_reason=f"CFG extraction failed: {e}")
-
-        stdin_content = failed_case.stdin if isinstance(failed_case, StdinCase) else ""
-        visits: List[BlockVisit] = []
-        omitted_count = 0
-        seq_num = 0
-        total_trace_events = 0
-        MAX_TRACE_EVENTS = 5000
-
-        # State tracking during trace
-        current_block_id: Optional[str] = None
-        current_frame_id: Optional[int] = None
-        current_locals_before: Dict[str, str] = {}
-        current_line_span = (1, 1)
-
-        def trace_fn(frame, event, arg):
-            nonlocal seq_num, omitted_count, current_block_id, current_frame_id, current_locals_before, current_line_span, total_trace_events
-            if frame.f_code.co_filename != "<candidate>":
-                return trace_fn
-
-            total_trace_events += 1
-            if total_trace_events > MAX_TRACE_EVENTS or omitted_count > 100:
-                raise _TraceLimitExceeded("Trace exceeded execution step limit")
-
-            line_no = frame.f_lineno
-            matching_blocks = cfg.line_to_block_ids.get(line_no, [])
-            block_id = matching_blocks[0] if matching_blocks else f"line_{line_no}"
-            frame_id = id(frame)
-
-            if event == "line":
-                if block_id != current_block_id or frame_id != current_frame_id:
-                    # Finalize previous block visit
-                    if current_block_id is not None:
-                        locals_after = freeze_snapshot(
-                            frame.f_locals,
-                            max_vars=self.max_variables_per_frame,
-                            max_chars=self.max_value_chars
-                        )
-                        block_info = cfg.blocks.get(current_block_id)
-                        snippet = block_info.source_snippet if block_info else ""
-
-                        if len(visits) < self.max_visits:
-                            visits.append(
-                                BlockVisit(
-                                    visit_id=f"v_{seq_num}",
-                                    block_id=current_block_id,
-                                    frame_id=str(current_frame_id),
-                                    sequence_number=seq_num,
-                                    line_span=current_line_span,
-                                    source_snippet=snippet,
-                                    locals_before=current_locals_before,
-                                    locals_after=locals_after
-                                )
-                            )
-                        else:
-                            omitted_count += 1
-
-                    # Start new block visit
-                    seq_num += 1
-                    current_block_id = block_id
-                    current_frame_id = frame_id
-                    current_locals_before = freeze_snapshot(
-                        frame.f_locals,
-                        max_vars=self.max_variables_per_frame,
-                        max_chars=self.max_value_chars
-                    )
-                    b_info = cfg.blocks.get(block_id)
-                    current_line_span = b_info.line_span if b_info else (line_no, line_no)
-
-            elif event == "return":
-                if current_block_id is not None:
-                    locals_after = freeze_snapshot(
-                        frame.f_locals,
-                        max_vars=self.max_variables_per_frame,
-                        max_chars=self.max_value_chars
-                    )
-                    b_info = cfg.blocks.get(current_block_id)
-                    snippet = b_info.source_snippet if b_info else ""
-                    if len(visits) < self.max_visits:
-                        visits.append(
-                            BlockVisit(
-                                visit_id=f"v_{seq_num}",
-                                block_id=current_block_id,
-                                frame_id=str(id(frame)),
-                                sequence_number=seq_num,
-                                line_span=current_line_span,
-                                source_snippet=snippet,
-                                locals_before=current_locals_before,
-                                locals_after=locals_after,
-                                exit_kind="return"
-                            )
-                        )
-                    else:
-                        omitted_count += 1
-                current_block_id = None
-
-            return trace_fn
-
-        # Run traced execution in controlled namespace
-        orig_stdin = sys.stdin
-        orig_stdout = sys.stdout
-        orig_stderr = sys.stderr
-
-        sys.stdin = io.StringIO(stdin_content)
-        sys.stdout = io.StringIO()
-        sys.stderr = io.StringIO()
-
-        compiled_code = compile(candidate.code, "<candidate>", "exec")
-        sandbox_globals = {"__name__": "__main__"}
-
+            build_cfg_for_code(candidate.code)
+        except (SyntaxError, ValueError) as exc:
+            return TraceResult(status="degraded", degraded_reason=str(exc))
+        payload = dict(code=candidate.code,
+                       harness=wrap_code_for_execution(candidate.code, failed_case, spec),
+                       stdin=failed_case.stdin if isinstance(failed_case, StdinCase) else "",
+                       max_visits=self.max_visits, max_vars=self.max_variables_per_frame,
+                       max_chars=self.max_value_chars, max_items=self.max_container_items)
+        cmd = [sys.executable, "-m", "rethink_mcts.adapters.execution.trace_worker"]
+        container_name = None
+        env = os.environ.copy()
+        package_root = str(Path(__file__).resolve().parents[3])
+        env["PYTHONPATH"] = package_root
+        if self.backend == "docker":
+            container_name = "rethink-trace-" + uuid.uuid4().hex
+            cmd = ["docker", "run", "--rm", "-i", "--name", container_name,
+                   "--network", "none", "--read-only", "--cap-drop", "ALL",
+                   "--security-opt", "no-new-privileges", "--user", "1000:1000",
+                   "--memory", "512m", "--pids-limit", "32", "--cpus", "1",
+                   "--env", "PYTHONPATH=/opt/rethink", "--env", "PYTHONDONTWRITEBYTECODE=1",
+                   "--mount", f"type=bind,source={package_root},target=/opt/rethink,readonly",
+                   self.image, "python3", "-m", "rethink_mcts.adapters.execution.trace_worker"]
+        proc = None
         try:
-            sys.settrace(trace_fn)
-            exec(compiled_code, sandbox_globals)
-        except _TraceLimitExceeded:
-            omitted_count += 1
-        except Exception:
-            # Test cases can raise expected exceptions during tracing
-            pass
+            proc = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                                    stderr=subprocess.PIPE, text=True, env=env, start_new_session=True)
+            stdout, stderr = proc.communicate(json.dumps(payload), timeout=max(0.001, timeout_seconds))
+            if proc.returncode:
+                return TraceResult(status="degraded", degraded_reason=stderr[-1000:] or f"Worker exit {proc.returncode}")
+            data = json.loads(stdout)
+            return TraceResult(status=data["status"],
+                               block_visits=tuple(BlockVisit(**v) for v in data.get("block_visits", [])),
+                               omitted_visits_count=data.get("omitted_visits_count", 0),
+                               degraded_reason=data.get("degraded_reason"))
+        except subprocess.TimeoutExpired:
+            if proc:
+                os.killpg(proc.pid, signal.SIGKILL)
+                proc.communicate()
+            return TraceResult(status="timeout", degraded_reason="Trace worker deadline exceeded")
+        except Exception as exc:
+            return TraceResult(status="degraded", degraded_reason=str(exc))
         finally:
-            sys.settrace(None)
-            sys.stdin = orig_stdin
-            sys.stdout = orig_stdout
-            sys.stderr = orig_stderr
-
-        return TraceResult(
-            status="success",
-            block_visits=tuple(visits),
-            omitted_visits_count=omitted_count
-        )
+            if container_name:
+                subprocess.run(["docker", "rm", "-f", container_name], capture_output=True, timeout=10)
