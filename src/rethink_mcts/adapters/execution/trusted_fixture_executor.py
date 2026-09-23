@@ -15,8 +15,10 @@ from rethink_mcts.domain.candidate import (
     ExecutionSummary,
     CandidateVerdict
 )
-from rethink_mcts.domain.problem import TestCase, StdinCase, FunctionCase, ExecutionSpec, ProblemLimits
+import json
+from rethink_mcts.domain.problem import TestCase, StdinCase, FunctionCase, AssertionSuite, ExecutionSpec, ProblemLimits
 from rethink_mcts.adapters.execution.comparators import get_comparator
+from rethink_mcts.adapters.execution.harnesses import wrap_code_for_execution
 from rethink_mcts.ports.execution import PublicExecutor
 
 
@@ -49,22 +51,24 @@ class TrustedFixtureExecutor(PublicExecutor):
             )
             return ExecutionSummary.create(total=len(tests), case_results=(ce_res,))
 
-        # 2. Write candidate to temporary script
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False) as tmp:
-            tmp.write(candidate.code)
-            tmp_path = tmp.name
-
         case_results: List[SingleCaseResult] = []
         start_all = time.time()
 
-        try:
-            for test in tests:
-                case_id = getattr(test, "case_id", f"case_{len(case_results)}")
-                res = self._run_single_case(tmp_path, test, spec, limits, case_id)
-                case_results.append(res)
-        finally:
-            if os.path.exists(tmp_path):
-                os.remove(tmp_path)
+        for test in tests:
+            case_id = getattr(test, "case_id", f"case_{len(case_results)}")
+            res = self._run_single_case(candidate.code, test, spec, limits, case_id)
+            case_results.append(res)
+            if res.status == CandidateVerdict.TLE:
+                # Fast fail on TLE: remaining test cases for an infinite loop or hung process will also TLE
+                for remaining_test in tests[len(case_results):]:
+                    rem_id = getattr(remaining_test, "case_id", f"case_{len(case_results)}")
+                    case_results.append(SingleCaseResult(
+                        case_id=rem_id,
+                        status=CandidateVerdict.TLE,
+                        error_message="Skipped after previous test case timed out (TLE)",
+                        execution_time=0.0
+                    ))
+                break
 
         elapsed = time.time() - start_all
         return ExecutionSummary.create(
@@ -75,12 +79,13 @@ class TrustedFixtureExecutor(PublicExecutor):
 
     def _run_single_case(
         self,
-        script_path: str,
+        code: str,
         test_case: TestCase,
         spec: ExecutionSpec,
         limits: ProblemLimits,
         case_id: str
     ) -> SingleCaseResult:
+        wrapped_code = wrap_code_for_execution(code, test_case, spec)
         stdin_input = ""
         expected_output = ""
         comparator_id = "token_text"
@@ -90,10 +95,14 @@ class TrustedFixtureExecutor(PublicExecutor):
             expected_output = test_case.expected_stdout
             comparator_id = test_case.comparator_id
         elif isinstance(test_case, FunctionCase):
-            # For function cases in trusted executor, generate a runner wrap
             stdin_input = ""
-            expected_output = str(test_case.expected)
+            expected_output = json.dumps(test_case.expected)
             comparator_id = test_case.comparator_id
+
+        # Write wrapped code to a temporary file
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False) as tmp:
+            tmp.write(wrapped_code)
+            tmp_path = tmp.name
 
         start_time = time.time()
         timeout = limits.timeout_seconds
@@ -101,7 +110,7 @@ class TrustedFixtureExecutor(PublicExecutor):
 
         try:
             process = subprocess.Popen(
-                [self.python_executable, script_path],
+                [self.python_executable, tmp_path],
                 stdin=subprocess.PIPE,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
@@ -137,7 +146,29 @@ class TrustedFixtureExecutor(PublicExecutor):
                     execution_time=elapsed
                 )
 
-            # Check Runtime Error (RE)
+            # Check process exit code
+            if isinstance(test_case, AssertionSuite):
+                if process.returncode == 0:
+                    return SingleCaseResult(
+                        case_id=case_id,
+                        status=CandidateVerdict.AC,
+                        actual_output=stdout_data,
+                        expected_output=expected_output,
+                        execution_time=elapsed
+                    )
+                else:
+                    err_msg = stderr_data.strip()
+                    status = CandidateVerdict.WA if "AssertionError" in err_msg else CandidateVerdict.RE
+                    return SingleCaseResult(
+                        case_id=case_id,
+                        status=status,
+                        actual_output=stdout_data,
+                        expected_output=expected_output,
+                        error_message=err_msg or f"Assertion suite failed with code {process.returncode}",
+                        execution_time=elapsed
+                    )
+
+            # Check Runtime Error (RE) for non-assertion suite
             if process.returncode != 0:
                 return SingleCaseResult(
                     case_id=case_id,
@@ -150,7 +181,8 @@ class TrustedFixtureExecutor(PublicExecutor):
 
             # Check Output Correctness with Comparator
             comparator = get_comparator(comparator_id)
-            if comparator(stdout_data, expected_output):
+            cmp_stdout = stdout_data.strip() if isinstance(test_case, FunctionCase) else stdout_data
+            if comparator(cmp_stdout, expected_output):
                 return SingleCaseResult(
                     case_id=case_id,
                     status=CandidateVerdict.AC,
@@ -176,3 +208,6 @@ class TrustedFixtureExecutor(PublicExecutor):
                 error_message=str(e),
                 execution_time=time.time() - start_time
             )
+        finally:
+            if os.path.exists(tmp_path):
+                os.remove(tmp_path)

@@ -29,7 +29,7 @@ def extract_doctests_from_prompt(prompt: str, entry_point: str) -> List[Assertio
         examples = parser.get_examples(prompt)
         for idx, ex in enumerate(examples):
             src = ex.source.strip()
-            want = ex.want.strip()
+            want = ex.want.split('"""')[0].split("'''")[0].strip()
             if src and want:
                 test_code = f"assert {src} == {want}"
                 cases.append(

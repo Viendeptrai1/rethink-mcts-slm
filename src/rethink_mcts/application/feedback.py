@@ -76,14 +76,20 @@ class FeedbackService:
         analysis: Optional[BlockAnalysis] = None
 
         if self.mode == "block" and self.trace_collector and failed_case:
-            try:
-                trace_result = self.trace_collector.collect_trace(
-                    candidate=candidate,
-                    failed_case=failed_case,
-                    spec=problem.execution_spec
+            if failed_res.status.value == "TLE":
+                trace_result = TraceResult(
+                    status="timeout",
+                    degraded_reason="Candidate execution timed out (TLE); skipping dynamic tracing."
                 )
-            except Exception as e:
-                trace_result = TraceResult(status="degraded", degraded_reason=str(e))
+            else:
+                try:
+                    trace_result = self.trace_collector.collect_trace(
+                        candidate=candidate,
+                        failed_case=failed_case,
+                        spec=problem.execution_spec
+                    )
+                except Exception as e:
+                    trace_result = TraceResult(status="degraded", degraded_reason=str(e))
 
             if self.block_analyzer and trace_result and trace_result.status == "success":
                 try:

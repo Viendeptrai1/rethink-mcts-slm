@@ -9,6 +9,9 @@ from rethink_mcts.domain.tree import ThoughtProposal, ProposalBatch
 from rethink_mcts.domain.problem import ExecutionSpec
 from rethink_mcts.domain.feedback import ExecutionFacts, TraceResult, BlockAnalysis, BlockAssessment, BlockVerdict, VerbalFeedback
 from rethink_mcts.ports.models import (
+    GenerationRequest,
+    GenerationResponse,
+    ModelGateway,
     ThoughtProposer,
     CodeGenerator,
     ThoughtRefiner,
@@ -18,6 +21,7 @@ from rethink_mcts.ports.models import (
 
 
 class ScenarioMockLLM(
+    ModelGateway,
     ThoughtProposer,
     CodeGenerator,
     ThoughtRefiner,
@@ -150,3 +154,14 @@ class ScenarioMockLLM(
             assessments=tuple(assessments),
             summary_explanation="Identified edge-case logical fault in condition check."
         )
+
+    def complete(self, request: GenerationRequest) -> GenerationResponse:
+        content = "def solution(*args, **kwargs):\n    return True\n"
+        if "analyze" in request.role or "analysis" in request.role:
+            content = "1. Constraints: integer inputs\n2. Edge cases: negative, zero\n3. Pitfalls: off-by-one"
+        elif "draft" in request.role:
+            content = "### Strategy A\n```python\nprint('YES')\n```\n\n### Strategy B\n```python\nprint('YES')\n```"
+        elif "code" in request.role:
+            content = "```python\nw = int(input())\nif w % 2 == 0 and w > 2:\n    print('YES')\nelse:\n    print('NO')\n```"
+        return GenerationResponse(content=content, finish_reason="stop")
+

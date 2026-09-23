@@ -93,10 +93,10 @@ class SearchEngine:
             tree.create_child_node(tree.root_id, p, parent_path_hash="root")
 
         stop_reason = "normal"
-
         # 2. Main MCTS search loop
         while budget.can_start_code_generation():
-            should_stop, reason = self.stopping_policy.should_stop(tree, budget)
+            best_all_passed = any(eval_rec.execution_summary.all_passed for _, eval_rec in archive.entries)
+            should_stop, reason = self.stopping_policy.should_stop(tree, budget, best_public_all_passed=best_all_passed)
             if should_stop:
                 stop_reason = reason
                 break
@@ -182,6 +182,11 @@ class SearchEngine:
                         evaluation_id=evaluation.evaluation_id
                     )
 
+                # Early stop if candidate passed all public tests
+                if self.stopping_policy.early_stop_mode == "public_all_passed" and evaluation.execution_summary.all_passed:
+                    stop_reason = "optional_public_early_stop"
+                    break
+
                 # Rethink Loop if public tests failed (§7.2 step 5-6)
                 if not evaluation.execution_summary.all_passed:
                     for _ in range(self.max_rethinks_per_node):
@@ -256,6 +261,13 @@ class SearchEngine:
                                 reward=evaluation.reward,
                                 evaluation_id=evaluation.evaluation_id
                             )
+
+                        if self.stopping_policy.early_stop_mode == "public_all_passed" and evaluation.execution_summary.all_passed:
+                            stop_reason = "optional_public_early_stop"
+                            break
+
+                if stop_reason == "optional_public_early_stop":
+                    break
 
                 # Finalize node status
                 if node.depth >= self.max_depth:

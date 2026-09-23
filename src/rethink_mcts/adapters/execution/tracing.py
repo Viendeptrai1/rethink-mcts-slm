@@ -57,6 +57,10 @@ def freeze_snapshot(
     return snapshot
 
 
+class _TraceLimitExceeded(Exception):
+    pass
+
+
 class DynamicTraceCollector(TraceCollector):
     """
     Executes candidate code with tracing to record block visits and variable deltas.
@@ -87,6 +91,8 @@ class DynamicTraceCollector(TraceCollector):
         visits: List[BlockVisit] = []
         omitted_count = 0
         seq_num = 0
+        total_trace_events = 0
+        MAX_TRACE_EVENTS = 5000
 
         # State tracking during trace
         current_block_id: Optional[str] = None
@@ -95,9 +101,13 @@ class DynamicTraceCollector(TraceCollector):
         current_line_span = (1, 1)
 
         def trace_fn(frame, event, arg):
-            nonlocal seq_num, omitted_count, current_block_id, current_frame_id, current_locals_before, current_line_span
+            nonlocal seq_num, omitted_count, current_block_id, current_frame_id, current_locals_before, current_line_span, total_trace_events
             if frame.f_code.co_filename != "<candidate>":
                 return trace_fn
+
+            total_trace_events += 1
+            if total_trace_events > MAX_TRACE_EVENTS or omitted_count > 100:
+                raise _TraceLimitExceeded("Trace exceeded execution step limit")
 
             line_no = frame.f_lineno
             matching_blocks = cfg.line_to_block_ids.get(line_no, [])
@@ -188,6 +198,8 @@ class DynamicTraceCollector(TraceCollector):
         try:
             sys.settrace(trace_fn)
             exec(compiled_code, sandbox_globals)
+        except _TraceLimitExceeded:
+            omitted_count += 1
         except Exception:
             # Test cases can raise expected exceptions during tracing
             pass

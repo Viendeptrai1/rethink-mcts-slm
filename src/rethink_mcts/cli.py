@@ -12,7 +12,7 @@ from rich.console import Console
 from rich.table import Table
 
 from rethink_mcts.config import AppConfig
-from rethink_mcts.bootstrap import create_search_engine
+from rethink_mcts.bootstrap import create_search_engine, create_solver
 from rethink_mcts.domain.problem import (
     PublicProblem,
     HiddenProblem,
@@ -139,7 +139,9 @@ def cmd_doctor(args):
 
 
 def cmd_solve(args):
-    console.print(f"[bold cyan]Starting RethinkMCTS Solver[/bold cyan]")
+    solver_type = getattr(args, "solver", "mcts").lower()
+    samples_n = getattr(args, "samples_n", 4)
+    console.print(f"[bold cyan]Starting RethinkMCTS Solver [{solver_type.upper()}][/bold cyan]")
     cfg = AppConfig.from_yaml_file(args.config)
 
     # Override CLI options if provided
@@ -152,10 +154,10 @@ def cmd_solve(args):
     run_dir = args.output_dir or os.path.join(cfg.storage.output_dir, problem.problem_id)
     os.makedirs(run_dir, exist_ok=True)
 
-    engine, store = create_search_engine(cfg, run_dir=run_dir)
+    solver, store = create_solver(cfg, solver_type=solver_type, run_dir=run_dir, n=samples_n)
     console.print(f"Problem: [bold]{problem.problem_id}[/bold] ({len(problem.public_tests)} public tests)")
 
-    result = engine.solve(problem)
+    result = solver.solve(problem)
 
     for cand, eval_rec in result.archive.entries:
         store.save_candidate(cand)
@@ -263,9 +265,11 @@ def main():
     p_doc.add_argument("--config", type=str, default="configs/smoke_mock.yaml", help="Path to config YAML")
 
     # solve
-    p_solve = subparsers.add_parser("solve", help="Run MCTS search on public problem")
+    p_solve = subparsers.add_parser("solve", help="Run solver (MCTS or Baseline) on public problem")
     p_solve.add_argument("--config", type=str, required=True, help="Path to config YAML")
     p_solve.add_argument("--problem", type=str, required=True, help="Path to public problem JSON")
+    p_solve.add_argument("--solver", type=str, default="mcts", choices=["mcts", "direct", "best_of_n", "graph"], help="Solver method: mcts (default), direct, best_of_n, or graph")
+    p_solve.add_argument("--samples-n", type=int, default=4, help="Number of candidate samples for best_of_n solver (default: 4)")
     p_solve.add_argument("--output-dir", type=str, default=None, help="Output directory for run artifacts")
     p_solve.add_argument("--endpoint", type=str, default=None, help="Override endpoint URL")
     p_solve.add_argument("--model", type=str, default=None, help="Override model name")

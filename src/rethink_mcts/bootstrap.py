@@ -22,6 +22,8 @@ from rethink_mcts.adapters.storage.filesystem import FileSystemRunStore
 from rethink_mcts.application.evaluate import CandidateEvaluator
 from rethink_mcts.application.feedback import FeedbackService
 from rethink_mcts.application.search import SearchEngine
+from rethink_mcts.application.baselines import DirectBaseline, BestOfNPublicBaseline
+from rethink_mcts.application.graph_solver import GraphSolver
 
 
 def create_search_engine(config: AppConfig, run_dir: str = "runs/default") -> tuple[SearchEngine, FileSystemRunStore]:
@@ -121,3 +123,97 @@ def create_search_engine(config: AppConfig, run_dir: str = "runs/default") -> tu
     )
 
     return engine, store
+
+
+def create_solver(
+    config: AppConfig,
+    solver_type: str = "mcts",
+    run_dir: str = "runs/default",
+    n: int = 4
+) -> tuple[SearchEngine | DirectBaseline | BestOfNPublicBaseline, FileSystemRunStore]:
+    """
+    Factory creating either SearchEngine (MCTS) or Baseline solvers (direct, best_of_n)
+    sharing the same adapters, model gateway, sandbox executor, and budget limits.
+    """
+    solver_type = solver_type.lower()
+    if solver_type == "mcts":
+        return create_search_engine(config, run_dir=run_dir)
+
+    # 1. Model Gateway & Semantic Ports
+    if config.model.transport == "mock" or config.experiment.allow_mock:
+        model_adapter = ScenarioMockLLM()
+        gateway = model_adapter
+    else:
+        api_key = os.environ.get(config.model.api_key_env, "ollama") if config.model.api_key_env else "ollama"
+        gateway = HttpModelGateway(
+            base_url=config.model.base_url,
+            model_name=config.model.model,
+            api_key=api_key,
+            timeout_seconds=config.model.request_timeout_seconds,
+            max_retries=config.model.max_transport_retries
+        )
+        prior_policy = PriorPolicy(fallback_mode=config.search.prior_fallback)
+        prompts_dir = f"prompts/{config.prompts.bundle}"
+        model_adapter = SemanticPromptedLLM(
+            gateway=gateway,
+            prompts_dir=prompts_dir,
+            prior_policy=prior_policy
+        )
+
+    # 2. Execution Backend
+    if config.execution.backend == "docker":
+        executor = DockerExecutor(image=config.execution.image, allow_host_fallback=True)
+    else:
+        executor = TrustedFixtureExecutor()
+
+    # 3. Reward & Evaluation
+    reward_policy = PaperDualRewardPolicy(
+        test_weight=config.reward.test_weight,
+        llm_weight=config.reward.llm_weight,
+        critic_min=config.reward.critic_score_min,
+        critic_max=config.reward.critic_score_max
+    )
+    evaluator = CandidateEvaluator(
+        executor=executor,
+        critic=model_adapter,
+        reward_policy=reward_policy
+    )
+
+    budget_limits = BudgetLimits(
+        max_code_generations=config.budget.max_code_generations,
+        max_search_iterations=config.budget.max_search_iterations,
+        max_model_calls=config.budget.max_model_calls,
+        max_total_tokens=config.budget.max_total_tokens,
+        max_wall_seconds=config.budget.max_wall_seconds,
+        max_sandbox_runs=config.budget.max_sandbox_runs
+    )
+
+    store = FileSystemRunStore(run_dir=run_dir)
+
+    if solver_type == "direct":
+        solver = DirectBaseline(
+            generator=model_adapter,
+            evaluator=evaluator,
+            budget_limits=budget_limits
+        )
+    elif solver_type in ("best_of_n", "bon"):
+        solver = BestOfNPublicBaseline(
+            generator=model_adapter,
+            evaluator=evaluator,
+            budget_limits=budget_limits,
+            n=n
+        )
+    elif solver_type == "graph":
+        prompts_dir = f"prompts/{config.prompts.bundle}"
+        solver = GraphSolver(
+            gateway=gateway,
+            evaluator=evaluator,
+            budget_limits=budget_limits,
+            prompts_dir=prompts_dir,
+            max_patches=2
+        )
+    else:
+        raise ValueError(f"Unknown solver_type: '{solver_type}'. Must be 'mcts', 'direct', 'best_of_n', or 'graph'.")
+
+    return solver, store
+
