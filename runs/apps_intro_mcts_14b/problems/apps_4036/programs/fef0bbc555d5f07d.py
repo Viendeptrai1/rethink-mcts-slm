@@ -1,0 +1,27 @@
+import sys
+
+def main():
+    import sys
+    input = sys.stdin.read
+    data = input().split()
+    
+    n = int(data[0])
+    k = int(data[1])
+    
+    if n < k or n > k * (2 ** (k - 1)):
+        print("NO")
+        return
+    
+    a = [1] * k
+    remaining = n - k
+    
+    for i in range(k - 1):
+        max_possible = min(remaining, 2 * a[i] - a[i])
+        a[i + 1] = a[i] + max_possible
+        remaining -= max_possible
+    
+    print("YES")
+    print(" ".join(map(str, a)))
+
+if __name__ == "__main__":
+    main()

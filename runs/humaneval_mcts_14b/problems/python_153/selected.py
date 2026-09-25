@@ -1,0 +1,11 @@
+def Strongest_Extension(class_name, extensions):
+    def calculate_strength(extension):
+        cap = sum(1 for c in extension if c.isupper())
+        sm = sum(1 for c in extension if c.islower())
+        return cap - sm
+
+    strongest_extension = max(extensions, key=calculate_strength)
+    return f"{class_name}.{strongest_extension}"
+
+# Example usage:
+# print(Strongest_Extension('my_class', ['AA', 'Be', 'CC']))  # Output: 'my_class.AA'
