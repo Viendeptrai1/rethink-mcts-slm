@@ -108,3 +108,51 @@ def test_u17_unsupported_config_field_fail_fast():
             yaml.dump(invalid_range_dict, f)
             f.flush()
             AppConfig.from_yaml_file(f.name)
+
+
+def test_u19_block_analysis_parsing_supports_paper_list_and_dict():
+    from rethink_mcts.adapters.llm.semantic import SemanticPromptedLLM
+    from rethink_mcts.domain.feedback import ExecutionFacts, TraceResult, BlockVerdict
+    from rethink_mcts.ports.models import GenerationResponse
+
+    class MockGateway:
+        def __init__(self, response_text):
+            self.response_text = response_text
+        def complete(self, req):
+            return GenerationResponse(self.response_text, "stop", prompt_tokens=10, completion_tokens=10)
+
+    # 1. Paper Table 14 list format
+    paper_json = """[
+        {"block": "bb_1", "correct": "True", "explanation": "Initializes loop"},
+        {"block": "bb_2", "correct": "False", "explanation": "Off by one error"}
+    ]"""
+    model = SemanticPromptedLLM(MockGateway(paper_json), "prompts/compact_v1")
+    analysis = model.analyze("problem", "code", ExecutionFacts("WA", "", "", ""), TraceResult("success"))
+    assert len(analysis.assessments) == 2
+    assert analysis.assessments[0].block_id == "bb_1"
+    assert analysis.assessments[0].verdict == BlockVerdict.CORRECT
+    assert analysis.assessments[1].block_id == "bb_2"
+    assert analysis.assessments[1].verdict == BlockVerdict.INCORRECT
+
+    # 2. Boolean values and fenced markdown
+    bool_json = """```json
+    [
+        {"block_id": "bb_1", "correct": false, "explanation": "Failed condition"}
+    ]
+    ```"""
+    model.gateway = MockGateway(bool_json)
+    analysis2 = model.analyze("problem", "code", ExecutionFacts("WA", "", "", ""), TraceResult("success"))
+    assert len(analysis2.assessments) == 1
+    assert analysis2.assessments[0].verdict == BlockVerdict.INCORRECT
+
+    # 3. Dict format with assessments
+    dict_json = """{
+        "summary": "Boundary error",
+        "assessments": [
+            {"block_id": "bb_1", "verdict": "correct", "explanation": "Valid"}
+        ]
+    }"""
+    model.gateway = MockGateway(dict_json)
+    analysis3 = model.analyze("problem", "code", ExecutionFacts("WA", "", "", ""), TraceResult("success"))
+    assert len(analysis3.assessments) == 1
+    assert analysis3.summary_explanation == "Boundary error"

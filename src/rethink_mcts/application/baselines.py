@@ -5,7 +5,11 @@ All baselines adhere to the same PublicProblem contract and budget accounting.
 
 import uuid
 from rethink_mcts.application.model_calls import invoke_model
-from rethink_mcts.domain.errors import BudgetExceededError
+from rethink_mcts.domain.errors import (
+    BudgetExceededError,
+    GenerationTruncatedError,
+    InvalidModelOutputError,
+)
 from typing import Optional
 from rethink_mcts.domain.problem import PublicProblem
 from rethink_mcts.domain.candidate import ProgramCandidate, CandidateOrigin
@@ -37,11 +41,14 @@ class DirectBaseline:
         self.last_budget = budget
 
         budget.record_code_generation_attempt()
-        code = invoke_model(budget, self.generator, "generate", "code",
-            statement=problem.statement,
-            execution_spec=problem.execution_spec,
-            active_thoughts=()
-        )
+        try:
+            code = invoke_model(budget, self.generator, "generate", "code",
+                statement=problem.statement,
+                execution_spec=problem.execution_spec,
+                active_thoughts=()
+            )
+        except (InvalidModelOutputError, GenerationTruncatedError) as exc:
+            code = f"# Code generation failed or truncated: {exc}"
 
         candidate = ProgramCandidate(
             candidate_id=f"cand_dir_{uuid.uuid4().hex[:8]}",
@@ -93,11 +100,14 @@ class BestOfNPublicBaseline:
                 break
 
             budget.record_code_generation_attempt()
-            code = invoke_model(budget, self.generator, "generate", "code",
-                statement=problem.statement,
-                execution_spec=problem.execution_spec,
-                active_thoughts=()
-            )
+            try:
+                code = invoke_model(budget, self.generator, "generate", "code",
+                    statement=problem.statement,
+                    execution_spec=problem.execution_spec,
+                    active_thoughts=()
+                )
+            except (InvalidModelOutputError, GenerationTruncatedError) as exc:
+                code = f"# Code generation failed or truncated: {exc}"
 
             candidate = ProgramCandidate(
                 candidate_id=f"cand_bon_{i}_{uuid.uuid4().hex[:6]}",
@@ -143,17 +153,20 @@ class IterativeRepairBaseline:
         stop_reason = "budget_exhausted"
         try:
             while budget.can_start_code_generation():
-                if candidate is None:
-                    budget.record_code_generation_attempt()
-                    code = invoke_model(budget, self.generator, "generate", "code",
-                        statement=problem.statement, execution_spec=problem.execution_spec, active_thoughts=())
-                else:
-                    feedback = self.feedback_service.build_feedback(candidate, evaluation, problem,
-                                                                   budget, reserved_model_calls=1)
-                    budget.record_code_generation_attempt()
-                    code = invoke_model(budget, self.generator, "repair", "code",
-                        statement=problem.statement, execution_spec=problem.execution_spec,
-                        candidate_code=candidate.code, feedback=feedback)
+                try:
+                    if candidate is None:
+                        budget.record_code_generation_attempt()
+                        code = invoke_model(budget, self.generator, "generate", "code",
+                            statement=problem.statement, execution_spec=problem.execution_spec, active_thoughts=())
+                    else:
+                        feedback = self.feedback_service.build_feedback(candidate, evaluation, problem,
+                                                                       budget, reserved_model_calls=1)
+                        budget.record_code_generation_attempt()
+                        code = invoke_model(budget, self.generator, "repair", "code",
+                            statement=problem.statement, execution_spec=problem.execution_spec,
+                            candidate_code=candidate.code, feedback=feedback)
+                except (InvalidModelOutputError, GenerationTruncatedError) as exc:
+                    code = f"# Code generation failed or truncated: {exc}"
                 candidate = ProgramCandidate(
                     candidate_id=f"cand_repair_{uuid.uuid4().hex[:8]}", problem_id=problem.problem_id,
                     code=code, code_hash=ProgramCandidate.compute_hash(code),

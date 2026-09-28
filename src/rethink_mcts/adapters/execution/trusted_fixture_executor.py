@@ -149,6 +149,15 @@ class TrustedFixtureExecutor(PublicExecutor):
                     )
                 else:
                     err_msg = stderr_data.strip()
+                    if self._is_infra_error(err_msg, process.returncode):
+                        return SingleCaseResult(
+                            case_id=case_id,
+                            status=CandidateVerdict.INFRA_ERROR,
+                            actual_output=stdout_data,
+                            expected_output=expected_output,
+                            error_message=err_msg,
+                            execution_time=elapsed
+                        )
                     status = CandidateVerdict.WA if "AssertionError" in err_msg else CandidateVerdict.RE
                     return SingleCaseResult(
                         case_id=case_id,
@@ -161,12 +170,22 @@ class TrustedFixtureExecutor(PublicExecutor):
 
             # Check Runtime Error (RE) for non-assertion suite
             if process.returncode != 0:
+                err_msg = stderr_data.strip()
+                if self._is_infra_error(err_msg, process.returncode):
+                    return SingleCaseResult(
+                        case_id=case_id,
+                        status=CandidateVerdict.INFRA_ERROR,
+                        actual_output=stdout_data,
+                        expected_output=expected_output,
+                        error_message=err_msg,
+                        execution_time=elapsed
+                    )
                 return SingleCaseResult(
                     case_id=case_id,
                     status=CandidateVerdict.RE,
                     actual_output=stdout_data,
                     expected_output=expected_output,
-                    error_message=stderr_data.strip() or f"Process exited with code {process.returncode}",
+                    error_message=err_msg or f"Process exited with code {process.returncode}",
                     execution_time=elapsed
                 )
 
@@ -192,17 +211,34 @@ class TrustedFixtureExecutor(PublicExecutor):
                 )
 
         except Exception as e:
+            err_msg = str(e)
+            status = CandidateVerdict.INFRA_ERROR if self._is_infra_error(err_msg, -1) else CandidateVerdict.RE
             return SingleCaseResult(
                 case_id=case_id,
-                status=CandidateVerdict.RE,
+                status=status,
                 expected_output=expected_output,
-                error_message=str(e),
+                error_message=err_msg,
                 execution_time=time.time() - start_time
             )
         finally:
             self._cleanup()
             if os.path.exists(tmp_path):
                 os.remove(tmp_path)
+
+    @staticmethod
+    def _is_infra_error(err_msg: str, returncode: int) -> bool:
+        low = err_msg.lower()
+        infra_indicators = (
+            "docker.sock",
+            "cannot connect to the docker daemon",
+            "is the docker daemon running",
+            "error during connect",
+            "failed to create task for container",
+            "failed to start container",
+            "dial unix",
+            "error response from daemon",
+        )
+        return any(ind in low for ind in infra_indicators)
 
     def _command(self, path, code, limits):
         return [self.python_executable, path]

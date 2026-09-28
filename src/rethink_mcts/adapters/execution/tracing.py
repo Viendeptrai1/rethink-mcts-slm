@@ -128,4 +128,7 @@ class DynamicTraceCollector(TraceCollector):
             return TraceResult(status="degraded", degraded_reason=str(exc))
         finally:
             if container_name:
-                subprocess.run(["docker", "rm", "-f", container_name], capture_output=True, timeout=10)
+                try:
+                    subprocess.run(["docker", "rm", "-f", container_name], capture_output=True, timeout=5)
+                except Exception:
+                    pass

@@ -1,5 +1,6 @@
 """Compatibility CLI for the versioned, dataset-independent benchmark runner."""
 import argparse
+from pathlib import Path
 from rethink_mcts.application.benchmark import load_config, run_benchmark
 
 
@@ -23,9 +24,28 @@ def main():
                           f'data.prepared_public_path=prepared/{args.dataset}/public/problems.jsonl',
                           f'data.judge_suites_dir=prepared/{args.dataset}/judge/suites'])
     config = load_config(args.config, overrides + args.overrides)
+    problem_ids = None
+    if args.problem_ids:
+        raw_val = args.problem_ids.strip()
+        fpath = Path(raw_val[1:] if raw_val.startswith('@') else raw_val)
+        if fpath.exists() and fpath.is_file():
+            if fpath.suffix == '.json':
+                import json
+                jdata = json.loads(fpath.read_text())
+                if 'problem_ids_csv' in jdata:
+                    problem_ids = [x.strip() for x in jdata['problem_ids_csv'].split(',') if x.strip()]
+                elif 'problem_ids' in jdata:
+                    problem_ids = [str(x).strip() for x in jdata['problem_ids'] if str(x).strip()]
+                elif isinstance(jdata, list):
+                    problem_ids = [str(x).strip() for x in jdata if str(x).strip()]
+            else:
+                problem_ids = [line.strip() for line in fpath.read_text().splitlines() if line.strip() and not line.startswith('#')]
+        else:
+            problem_ids = [x.strip() for x in args.problem_ids.split(',') if x.strip()]
+
     result = run_benchmark(config, args.output_dir, args.solver, args.samples_n,
                           args.dry_run, not args.no_resume,
-                          args.problem_ids.split(',') if args.problem_ids else None,
+                          problem_ids,
                           args.difficulty, args.limit)
     if args.dry_run:
         print(f"Validated {len(result['manifest']['problem_ids'])} problems; no model calls or writes")

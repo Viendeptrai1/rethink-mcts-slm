@@ -14,8 +14,7 @@ import os
 import subprocess
 import modal
 
-# 1. Configuration
-APP_NAME = "rethink-vllm"
+APP_NAME = os.environ.get("MODAL_APP_NAME", "rethink-vllm")
 MODEL_ID = os.environ.get("VLLM_MODEL_ID", "Qwen/Qwen2.5-Coder-14B-Instruct")
 GPU_TYPE = os.environ.get("VLLM_GPU", "H200")  # H200, H100, A100-80GB, A10G
 MAX_MODEL_LEN = int(os.environ.get("VLLM_MAX_MODEL_LEN", "16384"))

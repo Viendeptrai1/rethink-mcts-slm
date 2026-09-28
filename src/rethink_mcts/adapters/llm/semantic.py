@@ -194,13 +194,18 @@ class SemanticPromptedLLM(
         template = self.env.get_template("analyze_block.jinja")
         trace_snippets = []
         for v in trace.block_visits[:self.max_prompt_blocks]:
-            trace_snippets.append(f"Block {v.block_id} frame={v.frame_id}: {v.source_snippet.strip()}\nBefore: {v.locals_before}\nAfter: {v.locals_after}\nExit: {v.exit_kind}")
+            before_str = ", ".join(f"{k}={val}" for k, val in v.locals_before.items()) if v.locals_before else "none"
+            after_str = ", ".join(f"{k}={val}" for k, val in v.locals_after.items()) if v.locals_after else "none"
+            exit_note = f" (exit: {v.exit_kind})" if v.exit_kind and v.exit_kind != "fallthrough" else ""
+            trace_snippets.append(
+                f"[{v.block_id}{exit_note}]\n# Locals before: {before_str}\n{v.source_snippet.strip()}\n# Locals after: {after_str}"
+            )
 
         prompt = template.render(
             statement=statement,
             candidate_code=candidate_code,
             facts_text=f"{facts.failure_kind}: expected {facts.expected_output_snippet}, got {facts.actual_output_snippet}",
-            trace_text="\n".join(trace_snippets)
+            trace_text="\n\n".join(trace_snippets)
         )
 
         req = GenerationRequest(
@@ -215,32 +220,58 @@ class SemanticPromptedLLM(
         # Parse JSON structure
         try:
             import json
+            import re
             cleaned = resp.content.strip()
-            if cleaned.startswith("```"):
+            match = re.search(r"```(?:json)?\s*([\s\S]*?)\s*```", cleaned)
+            if match:
+                cleaned = match.group(1).strip()
+            elif cleaned.startswith("```"):
                 lines = cleaned.splitlines()
-                cleaned = "\n".join(lines[1:-1]).strip()
+                if lines and lines[0].strip().startswith("```"):
+                    lines = lines[1:]
+                if lines and lines[-1].strip().startswith("```"):
+                    lines = lines[:-1]
+                cleaned = "\n".join(lines).strip()
             data = json.loads(cleaned)
+
+            raw_items = []
+            summary = ""
+            if isinstance(data, list):
+                raw_items = data
+            elif isinstance(data, dict):
+                summary = str(data.get("summary", ""))
+                raw_items = data.get("assessments", data.get("blocks", data.get("analysis", [])))
+
             assessments = []
-            for item in data.get("assessments", []):
-                v_str = str(item.get("verdict", "unknown")).lower()
-                verdict = BlockVerdict.CORRECT if v_str == "correct" else (BlockVerdict.INCORRECT if v_str == "incorrect" else BlockVerdict.UNKNOWN)
-                assessments.append(
-                    BlockAssessment(
-                        block_id=str(item.get("block_id", "")),
-                        verdict=verdict,
-                        explanation=str(item.get("explanation", ""))
-                    )
-                )
+            for item in raw_items:
+                if not isinstance(item, dict):
+                    continue
+                bid = str(item.get("block_id", item.get("block", "")))
+                if "correct" in item:
+                    c_val = item["correct"]
+                    if isinstance(c_val, bool):
+                        verdict = BlockVerdict.CORRECT if c_val else BlockVerdict.INCORRECT
+                    else:
+                        c_str = str(c_val).strip().lower()
+                        verdict = BlockVerdict.CORRECT if c_str in ("true", "1", "yes") else (BlockVerdict.INCORRECT if c_str in ("false", "0", "no") else BlockVerdict.UNKNOWN)
+                else:
+                    v_str = str(item.get("verdict", "unknown")).strip().lower()
+                    verdict = BlockVerdict.CORRECT if v_str == "correct" else (BlockVerdict.INCORRECT if v_str == "incorrect" else BlockVerdict.UNKNOWN)
+                expl = str(item.get("explanation", item.get("reason", "")))
+                assessments.append(BlockAssessment(block_id=bid, verdict=verdict, explanation=expl))
+
             return BlockAnalysis(
                 analysis_id=str(uuid.uuid4()),
                 assessments=tuple(assessments),
-                summary_explanation=str(data.get("summary", ""))
+                summary_explanation=summary
             )
-        except Exception:
+        except Exception as exc:
+            import logging
+            logging.getLogger(__name__).warning("Failed to parse block analysis output: %s. Raw: %r", exc, resp.content)
             return BlockAnalysis(
                 analysis_id=str(uuid.uuid4()),
                 assessments=(),
-                summary_explanation="Failed to parse block analysis output"
+                summary_explanation=f"Failed to parse block analysis output: {exc}"
             )
 
     def _complete(self, request):

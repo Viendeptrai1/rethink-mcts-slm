@@ -11,7 +11,13 @@ from rethink_mcts.domain.problem import PublicProblem
 from rethink_mcts.domain.tree import Tree, NodeStatus, CloseReason
 from rethink_mcts.domain.candidate import ProgramCandidate, CandidateOrigin
 from rethink_mcts.domain.budget import BudgetLimits, BudgetManager, Usage
-from rethink_mcts.domain.errors import NoTestsError, BudgetExceededError
+from rethink_mcts.domain.errors import (
+    NoTestsError,
+    BudgetExceededError,
+    GenerationTruncatedError,
+    InvalidModelOutputError,
+)
+from rethink_mcts.domain.tree import ProposalBatch
 from rethink_mcts.application.model_calls import invoke_model
 from rethink_mcts.ports.models import ThoughtProposer, CodeGenerator, ThoughtRefiner
 from rethink_mcts.policies.selection import PUCBSelector
@@ -89,12 +95,16 @@ class SearchEngine:
         stop_reason = "budget_exhausted"
         try:
             # 1. Expand root once to bootstrap initial thoughts (§7.2 step 1)
-            root_proposals = invoke_model(budget, self.proposer, "propose", "expansion",
-                statement=problem.statement,
-                active_thoughts=(),
-                width=self.width,
-                feedback=None
-            )
+            try:
+                root_proposals = invoke_model(budget, self.proposer, "propose", "expansion",
+                    statement=problem.statement,
+                    active_thoughts=(),
+                    width=self.width,
+                    feedback=None
+                )
+            except (InvalidModelOutputError, GenerationTruncatedError) as exc:
+                logger.warning("Root proposal failed or truncated: %s", exc)
+                root_proposals = ProposalBatch(batch_id=str(uuid.uuid4()), proposals=())
             logger.info("Bootstrap: Root expanded with %d initial thought proposals", len(root_proposals.proposals))
             for p in root_proposals.proposals:
                 logger.info("  -> Proposal [prior=%.2f]: %s", p.normalized_prior, p.text)
@@ -139,12 +149,17 @@ class SearchEngine:
                             latest[0], latest[1], problem, budget, reserved_model_calls=2)
                     elif latest:
                         feedback_by_node.pop(node.node_id, None)
-                    proposals = invoke_model(budget, self.proposer, "propose", "expansion",
-                        statement=problem.statement,
-                        active_thoughts=active_thoughts,
-                        width=self.width,
-                        feedback=feedback_by_node.get(node.node_id)
-                    )
+                    try:
+                        proposals = invoke_model(budget, self.proposer, "propose", "expansion",
+                            statement=problem.statement,
+                            active_thoughts=active_thoughts,
+                            width=self.width,
+                            feedback=feedback_by_node.get(node.node_id)
+                        )
+                    except (InvalidModelOutputError, GenerationTruncatedError) as exc:
+                        logger.warning("Expansion failed or truncated for node %s: %s", node.node_id, exc)
+                        node.mark_closed(CloseReason.NO_VALID_PROPOSALS)
+                        continue
                     if not proposals.proposals:
                         node.mark_closed(CloseReason.NO_VALID_PROPOSALS)
                         continue
@@ -163,11 +178,15 @@ class SearchEngine:
                     # Generate code
                     budget.record_code_generation_attempt()
                     logger.info("Generating candidate code for node %s with thoughts: %s", node.node_id, active_thoughts)
-                    code = invoke_model(budget, self.generator, "generate", "code",
-                        statement=problem.statement,
-                        execution_spec=problem.execution_spec,
-                        active_thoughts=active_thoughts
-                    )
+                    try:
+                        code = invoke_model(budget, self.generator, "generate", "code",
+                            statement=problem.statement,
+                            execution_spec=problem.execution_spec,
+                            active_thoughts=active_thoughts
+                        )
+                    except (InvalidModelOutputError, GenerationTruncatedError) as exc:
+                        logger.warning("Code generation failed or truncated for node %s: %s", node.node_id, exc)
+                        code = f"# Code generation failed or truncated: {exc}"
 
                     seq_counter += 1
                     candidate = ProgramCandidate(
@@ -226,14 +245,18 @@ class SearchEngine:
                             parent_thoughts = tree.get_active_thought_path_to_parent(node.node_id)
                             curr_rev = tree.get_revision(node.active_revision_id)
 
-                            new_thought = invoke_model(budget, self.refiner, "refine", "rethink",
-                                statement=problem.statement,
-                                execution_spec=problem.execution_spec,
-                                parent_thoughts=parent_thoughts,
-                                erroneous_thought=curr_rev.thought_text,
-                                candidate_code=candidate.code,
-                                feedback=feedback
-                            )
+                            try:
+                                new_thought = invoke_model(budget, self.refiner, "refine", "rethink",
+                                    statement=problem.statement,
+                                    execution_spec=problem.execution_spec,
+                                    parent_thoughts=parent_thoughts,
+                                    erroneous_thought=curr_rev.thought_text,
+                                    candidate_code=candidate.code,
+                                    feedback=feedback
+                                )
+                            except (InvalidModelOutputError, GenerationTruncatedError) as exc:
+                                logger.warning("Rethink failed or truncated on leaf %s: %s", node.node_id, exc)
+                                break
                             logger.info("Rethink produced revised thought: %s", new_thought)
 
                             # Create leaf revision
@@ -243,11 +266,15 @@ class SearchEngine:
                             budget.record_code_generation_attempt()
                             budget.record_rethink_attempt()
                             revised_thoughts = tree.get_active_thought_path(node.node_id)
-                            new_code = invoke_model(budget, self.generator, "generate", "code",
-                                statement=problem.statement,
-                                execution_spec=problem.execution_spec,
-                                active_thoughts=revised_thoughts
-                            )
+                            try:
+                                new_code = invoke_model(budget, self.generator, "generate", "code",
+                                    statement=problem.statement,
+                                    execution_spec=problem.execution_spec,
+                                    active_thoughts=revised_thoughts
+                                )
+                            except (InvalidModelOutputError, GenerationTruncatedError) as exc:
+                                logger.warning("Regeneration failed or truncated on leaf %s: %s", node.node_id, exc)
+                                new_code = f"# Code generation failed or truncated: {exc}"
 
                             seq_counter += 1
                             candidate = ProgramCandidate(

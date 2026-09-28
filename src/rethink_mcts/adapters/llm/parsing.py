@@ -88,6 +88,12 @@ def extract_python_code(raw_text: str) -> str:
     if text.startswith("```") and text.endswith("```"):
         return strip_single_code_fence(text)
 
+    # If unclosed code fence (e.g. truncated generation)
+    if text.startswith("```"):
+        lines = text.splitlines()
+        if len(lines) >= 2:
+            return "\n".join(lines[1:]).strip()
+
     return text
 
 

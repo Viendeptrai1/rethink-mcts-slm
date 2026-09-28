@@ -349,3 +349,25 @@ def test_graph_requires_provider_usage_when_configured(tmp_path):
     solver = GraphSolver(gateway, None, BudgetLimits(), require_exact_token_count=True)
     with pytest.raises(ModelError, match='token usage'):
         solver.solve(problem())
+
+
+def test_docker_real_container_execution_and_trace():
+    import shutil
+    if shutil.which("docker") is None:
+        pytest.skip("Docker not installed")
+    from rethink_mcts.adapters.execution.docker_executor import DockerExecutor
+    from rethink_mcts.adapters.execution.tracing import DynamicTraceCollector
+    executor = DockerExecutor(image="rethink-worker:py311", allow_host_fallback=False)
+    cand = candidate("print('DOCKER_OK')")
+    test_case = StdinCase("", "DOCKER_OK\n", case_id="c1")
+    limits = ProblemLimits(timeout_seconds=5.0)
+    summary = executor.evaluate(cand, [test_case], ExecutionSpec(mode="stdin"), limits)
+    assert summary.all_passed is True
+    assert summary.case_results[0].status.value == "AC"
+
+    tracer = DynamicTraceCollector(backend="docker", image="rethink-worker:py311")
+    tr_cand = candidate("a = 1\nb = a + 2\nprint(b)")
+    trace_res = tracer.collect_trace(tr_cand, test_case, ExecutionSpec(mode="stdin"), timeout_seconds=5.0)
+    assert trace_res.status == "success"
+    assert len(trace_res.block_visits) > 0
+

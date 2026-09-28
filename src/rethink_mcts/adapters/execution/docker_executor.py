@@ -2,7 +2,9 @@
 import shutil
 import subprocess
 import uuid
+import time
 from rethink_mcts.adapters.execution.trusted_fixture_executor import TrustedFixtureExecutor
+from rethink_mcts.domain.candidate import CandidateVerdict
 from rethink_mcts.domain.errors import ExecutionError
 
 
@@ -32,6 +34,16 @@ class DockerExecutor(TrustedFixtureExecutor):
             self._ready = True
         return super().evaluate(candidate, tests, spec, limits)
 
+    def _run_single_case(self, code, test_case, spec, limits, case_id):
+        max_retries = 2
+        for attempt in range(max_retries + 1):
+            res = super()._run_single_case(code, test_case, spec, limits, case_id)
+            if res.status != CandidateVerdict.INFRA_ERROR or attempt == max_retries:
+                return res
+            # Sleep briefly to allow docker daemon socket/worker queue to recover
+            time.sleep(0.5 * (attempt + 1))
+        return res
+
     def _command(self, path, code, limits):
         self._container_name = "rethink-exec-" + uuid.uuid4().hex
         return ["docker", "run", "--rm", "-i", "--name", self._container_name,
@@ -45,6 +57,8 @@ class DockerExecutor(TrustedFixtureExecutor):
         if self._container_name:
             try:
                 subprocess.run(["docker", "rm", "-f", self._container_name],
-                               capture_output=True, timeout=10)
+                               capture_output=True, timeout=5)
+            except Exception:
+                pass
             finally:
                 self._container_name = None

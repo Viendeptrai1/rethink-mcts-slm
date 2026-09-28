@@ -3,6 +3,7 @@ Verbal feedback builder coordinating execution facts, bytecode CFG trace, and bl
 """
 
 import uuid
+import logging
 from typing import Optional
 from dataclasses import asdict
 from rethink_mcts.application.model_calls import invoke_model
@@ -18,6 +19,8 @@ from rethink_mcts.domain.feedback import (
 )
 from rethink_mcts.ports.execution import TraceCollector
 from rethink_mcts.ports.models import BlockAnalyzer
+
+logger = logging.getLogger(__name__)
 
 
 class FeedbackService:
@@ -132,6 +135,7 @@ class FeedbackService:
             if level == "block" and self.block_analyzer and trace_result and trace_result.status == "success":
                 try:
                     if budget and not budget.can_call_model(1 + reserved_model_calls):
+                        logger.info("Budget limit: cannot call block analyzer (need 1 + %d reserved calls)", reserved_model_calls)
                         raise BudgetExceededError("Reserved regeneration calls take priority")
                     if budget:
                         analysis = invoke_model(budget, self.block_analyzer, "analyze", "block_analysis",
@@ -143,14 +147,19 @@ class FeedbackService:
                             facts=facts,
                             trace=trace_result
                         )
-                except Exception:
+                    if analysis and analysis.assessments:
+                        logger.info("Block analysis succeeded with %d assessments", len(analysis.assessments))
+                except Exception as exc:
+                    logger.warning("Block analysis skipped/failed: %s", exc)
                     analysis = None
 
         effective = level
         if level in ("trace", "block") and (not trace_result or trace_result.status != "success"):
             effective, reason = "facts_only", reason + ":trace_unavailable"
+            logger.info("Feedback downgraded to %s: trace unavailable (%s)", effective, trace_result.degraded_reason if trace_result else "no trace")
         elif level == "block" and analysis is None:
             effective, reason = "trace", reason + ":analysis_unavailable_or_budget"
+            logger.info("Feedback downgraded to %s: analysis unavailable or budget reservation", effective)
         feedback = VerbalFeedback(
             feedback_id=feedback_id, candidate_id=candidate.candidate_id,
             facts=facts, trace=trace_result, analysis=analysis, level=effective,

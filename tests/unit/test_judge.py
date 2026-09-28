@@ -24,3 +24,20 @@ def test_u18_hidden_suite_empty_returns_incomplete_or_zero():
     assert res.hidden_passed == 0
     assert res.hidden_pass_rate == 0.0
     assert res.execution_summary.pass_rate is None
+
+
+def test_infra_error_detection_in_executor():
+    """Verify that docker daemon / socket connection failures are classified as INFRA_ERROR."""
+    assert TrustedFixtureExecutor._is_infra_error(
+        "docker: Cannot connect to the Docker daemon at unix:///Users/kotori/.docker/run/docker.sock. Is the docker daemon running?",
+        1
+    ) is True
+    assert TrustedFixtureExecutor._is_infra_error(
+        "dial unix /Users/kotori/.docker/run/docker.sock: connect: no such file or directory",
+        125
+    ) is True
+    assert TrustedFixtureExecutor._is_infra_error(
+        "Traceback (most recent call last):\n  File 'test.py', line 1, in <module>\nZeroDivisionError: division by zero",
+        1
+    ) is False
+

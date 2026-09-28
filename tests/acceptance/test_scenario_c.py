@@ -25,7 +25,7 @@ def test_scenario_c_endpoint_swap_without_code_changes(tmp_path):
     assert res1.selected_candidate is not None
 
     # 2. Second run with simulated remote profile (using mock transport to avoid external network dependence)
-    cfg2 = AppConfig.from_yaml_file("configs/remote_14b.yaml")
+    cfg2 = AppConfig.from_yaml_file("configs/benchmark_apps_14b.yaml")
     cfg2.model.transport = "mock"
     cfg2.experiment.allow_mock = True
     cfg2.storage.output_dir = str(tmp_path / "run2")

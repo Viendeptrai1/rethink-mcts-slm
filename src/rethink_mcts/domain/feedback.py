@@ -87,7 +87,7 @@ class VerbalFeedback:
         if self.facts.traceback_snippet:
             parts.append(f"Traceback:\n{self.facts.traceback_snippet}")
 
-        if self.trace and self.trace.block_visits:
+        if self.level in ("trace", "block") and self.trace and self.trace.block_visits:
             trace_parts = ["[EXECUTION TRACE (BASIC BLOCKS)]"]
             for v in self.trace.block_visits[:self.max_prompt_blocks]:  # Bounded presentation
                 delta = []
@@ -102,7 +102,7 @@ class VerbalFeedback:
                 trace_parts.append(f"... ({self.trace.omitted_visits_count} loop visits omitted)")
             parts.append("\n".join(trace_parts))
 
-        if self.analysis and self.analysis.assessments:
+        if self.level == "block" and self.analysis and self.analysis.assessments:
             analysis_parts = ["[BLOCK ANALYSIS]"]
             for a in self.analysis.assessments:
                 analysis_parts.append(f"Block {a.block_id}: {a.verdict.value.upper()} - {a.explanation}")

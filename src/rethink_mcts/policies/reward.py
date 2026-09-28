@@ -27,9 +27,9 @@ class PaperDualRewardPolicy:
 
     def should_call_critic(self, execution_summary: ExecutionSummary) -> bool:
         """
-        Only call critic if all public tests passed and total > 0 (U04).
+        Only call critic if all public tests passed, total > 0, and llm_weight > 0 (U04).
         """
-        return execution_summary.all_passed and execution_summary.total > 0
+        return self.b > 0.0 and execution_summary.all_passed and execution_summary.total > 0
 
     def compute_reward(
         self,
