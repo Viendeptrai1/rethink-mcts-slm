@@ -1,0 +1,47 @@
+[
+  {
+    "candidate_id": "cand_acb0f2cf7f",
+    "problem_id": "apps_3174",
+    "code": "import sys\nimport math\nfrom typing import List, Tuple\n\ndef find_minimal_D(N: int, K: int, cities: List[Tuple[int, int, int]]) -> float:\n    def euclidean_distance(p1: Tuple[int, int], p2: Tuple[int, int]) -> float:\n        return math.sqrt((p1[0] - p2[0]) ** 2 + (p1[1] - p2[1]) ** 2)\n\n    # Sort cities by their coordinates\n    cities.sort()\n\n    # Calculate all pairwise distances\n    distances = []\n    for i in range(N):\n        for j in range(i + 1, N):\n            dist = euclidean_distance(cities[i][:2], cities[j][:2])\n            distances.append((dist, i, j))\n    \n    # Sort distances in ascending order\n    distances.sort()\n\n    # Union-Find data structure\n    parent = list(range(N))\n    rank = [0] * N\n\n    def find(x: int) -> int:\n        if parent[x] != x:\n            parent[x] = find(parent[x])\n        return parent[x]\n\n    def union(x: int, y: int) -> None:\n        rootX = find(x)\n        rootY = find(y)\n        if rootX != rootY:\n            if rank[rootX] > rank[rootY]:\n                parent[rootY] = rootX\n            elif rank[rootX] < rank[rootY]:\n                parent[rootX] = rootY\n            else:\n                parent[rootY] = rootX\n                rank[rootX] += 1\n\n    # Check if a subset with sum divisible by K exists in a county\n    def check_happiness(county: List[int]) -> bool:\n        n = len(county)\n        sums = [0] * (1 << n)\n        for mask in range(1 << n):\n            for i in range(n):\n                if mask & (1 << i):\n                    sums[mask] += cities[county[i]][2]\n        for mask in range(1 << n):\n            if sums[mask] % K == 0:\n                return True\n        return False\n\n    # Binary search for the minimal D\n    left, right = 0.0, 100000000.0\n    while right - left > 1e-6:\n        mid = (left + right) / 2\n        union_find_reset()\n        for dist, i, j in distances:\n            if dist > mid:\n                break\n            union(i, j)\n        \n        # Check if there's a county satisfying the happiness condition\n        county_sums = {}\n        for i in range(N):\n            root = find(i)\n            if root not in county_sums:\n                county_sums[root] = []\n            county_sums[root].append(i)\n        \n        happy = False\n        for county in county_sums.values():\n            if check_happiness(county):\n                happy = True\n                break\n        \n        if happy:\n            right = mid\n        else:\n            left = mid\n\n    return round(left, 3)\n\ndef main():\n    import sys\n    input = sys.stdin.read\n    data = input().split()\n    \n    N = int(data[0])\n    K = int(data[1])\n    cities = []\n    index = 2\n    for _ in range(N):\n        x = int(data[index])\n        y = int(data[index + 1])\n        k = int(data[index + 2])\n        cities.append((x, y, k))\n        index += 3\n    \n    result = find_minimal_D(N, K, cities)\n    print(result)\n\nif __name__ == \"__main__\":\n    main()",
+    "code_hash": "40422ff643a5a6ae",
+    "language": "python",
+    "node_id": "n_1_4196aa",
+    "revision_id": "rev_n_1_4196aa_0",
+    "thought_path_snapshot": [
+      "Start by calculating the Euclidean distance between every pair of cities and sort these distances in ascending order. This allows us to consider building roads starting from the shortest possible distances, incrementally increasing D until we find a configuration that satisfies the prime minister's conditions."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 1
+  },
+  {
+    "candidate_id": "cand_7065152279",
+    "problem_id": "apps_3174",
+    "code": "import sys\nimport math\n\ndef find(parent, i):\n    if parent[i] != i:\n        parent[i] = find(parent, parent[i])\n    return parent[i]\n\ndef union(parent, rank, x, y):\n    rootX = find(parent, x)\n    rootY = find(parent, y)\n    \n    if rootX != rootY:\n        if rank[rootX] > rank[rootY]:\n            parent[rootY] = rootX\n        elif rank[rootX] < rank[rootY]:\n            parent[rootX] = rootY\n        else:\n            parent[rootY] = rootX\n            rank[rootX] += 1\n\ndef can_form_happy_county(cities, D, K):\n    n = len(cities)\n    parent = list(range(n))\n    rank = [0] * n\n    \n    edges = []\n    for i in range(n):\n        for j in range(i + 1, n):\n            dist = math.sqrt((cities[i][0] - cities[j][0]) ** 2 + (cities[i][1] - cities[j][1]) ** 2)\n            if dist <= D:\n                edges.append((dist, i, j))\n    \n    edges.sort()\n    \n    for dist, u, v in edges:\n        union(parent, rank, u, v)\n    \n    county_sums = {}\n    for i in range(n):\n        root = find(parent, i)\n        if root not in county_sums:\n            county_sums[root] = 0\n        county_sums[root] += cities[i][2]\n    \n    for county_sum in county_sums.values():\n        if county_sum % K == 0:\n            return True\n    \n    return False\n\ndef main():\n    import sys\n    input = sys.stdin.read\n    data = input().split()\n    \n    index = 0\n    N = int(data[index])\n    K = int(data[index + 1])\n    index += 2\n    \n    cities = []\n    for _ in range(N):\n        x = int(data[index])\n        y = int(data[index + 1])\n        k = int(data[index + 2])\n        cities.append((x, y, k))\n        index += 3\n    \n    left = 0.0\n    right = 200000.0\n    epsilon = 1e-9\n    \n    while right - left > epsilon:\n        mid = (left + right) / 2\n        if can_form_happy_county(cities, mid, K):\n            right = mid\n        else:\n            left = mid\n    \n    print(f\"{right:.3f}\")\n\nif __name__ == \"__main__\":\n    main()",
+    "code_hash": "4f7ead968d0e6970",
+    "language": "python",
+    "node_id": "n_1_4196aa",
+    "revision_id": "rev_n_1_4196aa_1",
+    "thought_path_snapshot": [
+      "The error arises because the `union_find_reset` function is called but not defined. To fix this, we need to reset the Union-Find structure properly before each iteration of the binary search. This can be done by reinitializing the `parent` and `rank` lists within the loop where the Union-Find structure is used."
+    ],
+    "origin": "rethink",
+    "generation_record_id": null,
+    "created_sequence": 2
+  },
+  {
+    "candidate_id": "cand_7bd270721d",
+    "problem_id": "apps_3174",
+    "code": "import sys\nimport math\nfrom typing import List, Tuple\n\ndef distance(p1: Tuple[int, int], p2: Tuple[int, int]) -> float:\n    return math.sqrt((p1[0] - p2[0]) ** 2 + (p1[1] - p2[1]) ** 2)\n\ndef can_form_happy_county(cities: List[Tuple[int, int, int]], D: float, K: int) -> bool:\n    n = len(cities)\n    parent = list(range(n))\n    \n    def find(x: int) -> int:\n        if parent[x] != x:\n            parent[x] = find(parent[x])\n        return parent[x]\n    \n    def union(x: int, y: int) -> None:\n        rootX = find(x)\n        rootY = find(y)\n        if rootX != rootY:\n            parent[rootX] = rootY\n    \n    for i in range(n):\n        for j in range(i + 1, n):\n            if distance(cities[i][:2], cities[j][:2]) <= D:\n                union(i, j)\n    \n    county_sums = {}\n    for i in range(n):\n        root = find(i)\n        if root not in county_sums:\n            county_sums[root] = 0\n        county_sums[root] += cities[i][2]\n    \n    for county_sum in county_sums.values():\n        if county_sum % K == 0:\n            return True\n    \n    return False\n\ndef find_min_D(N: int, K: int, cities: List[Tuple[int, int, int]]) -> float:\n    max_dist = 0.0\n    for i in range(N):\n        for j in range(i + 1, N):\n            max_dist = max(max_dist, distance(cities[i][:2], cities[j][:2]))\n    \n    low, high = 0.0, max_dist\n    while high - low > 1e-6:\n        mid = (low + high) / 2\n        if can_form_happy_county(cities, mid, K):\n            high = mid\n        else:\n            low = mid\n    \n    return low\n\ndef main() -> None:\n    import sys\n    input = sys.stdin.read\n    data = input().split()\n    \n    N = int(data[0])\n    K = int(data[1])\n    cities = []\n    index = 2\n    for _ in range(N):\n        x = int(data[index])\n        y = int(data[index + 1])\n        k = int(data[index + 2])\n        cities.append((x, y, k))\n        index += 3\n    \n    result = find_min_D(N, K, cities)\n    print(f\"{result:.3f}\")\n\nif __name__ == \"__main__\":\n    main()",
+    "code_hash": "ac516ba82322fb38",
+    "language": "python",
+    "node_id": "n_1_4196aa",
+    "revision_id": "rev_n_1_4196aa_2",
+    "thought_path_snapshot": [
+      "The issue lies in the binary search implementation. The search range for `D` should be adjusted based on the actual distances between cities, not a fixed upper limit of 200000.0. We need to compute the maximum possible distance between any two cities to set the correct upper bound for the binary search."
+    ],
+    "origin": "rethink",
+    "generation_record_id": null,
+    "created_sequence": 3
+  }
+]

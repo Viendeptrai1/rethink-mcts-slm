@@ -1,0 +1,122 @@
+[
+  {
+    "candidate_id": "cand_9eb2c87d31",
+    "problem_id": "apps_990",
+    "code": "import sys\nfrom collections import defaultdict\n\ndef main():\n    import sys\n    input = sys.stdin.read\n    data = input().split()\n    \n    index = 0\n    N = int(data[index])\n    index += 1\n    \n    edges = []\n    for _ in range(N - 1):\n        a = int(data[index]) - 1\n        index += 1\n        b = int(data[index]) - 1\n        index += 1\n        edges.append((a, b))\n    \n    M = int(data[index])\n    index += 1\n    \n    restrictions = []\n    for _ in range(M):\n        u = int(data[index]) - 1\n        index += 1\n        v = int(data[index]) - 1\n        index += 1\n        restrictions.append((u, v))\n    \n    # Build the tree\n    tree = defaultdict(list)\n    for a, b in edges:\n        tree[a].append(b)\n        tree[b].append(a)\n    \n    # Precompute the LCA using binary lifting\n    MAX_LOG = 17\n    depth = [0] * N\n    parent = [[-1] * MAX_LOG for _ in range(N)]\n    \n    def dfs(node, par):\n        parent[node][0] = par\n        if par != -1:\n            depth[node] = depth[par] + 1\n        for i in range(1, MAX_LOG):\n            if parent[node][i - 1] != -1:\n                parent[node][i] = parent[parent[node][i - 1]][i - 1]\n        for neighbor in tree[node]:\n            if neighbor != par:\n                dfs(neighbor, node)\n    \n    dfs(0, -1)\n    \n    def lca(u, v):\n        if depth[u] > depth[v]:\n            u, v = v, u\n        diff = depth[v] - depth[u]\n        for i in range(MAX_LOG):\n            if diff & (1 << i):\n                v = parent[v][i]\n        if u == v:\n            return u\n        for i in range(MAX_LOG - 1, -1, -1):\n            if parent[u][i] != parent[v][i]:\n                u = parent[u][i]\n                v = parent[v][i]\n        return parent[u][0]\n    \n    # Dynamic programming to count valid colorings\n    dp = [[0, 0] for _ in range(N)]\n    dp[0][0] = 1\n    dp[0][1] = 1\n    \n    def dfs_dp(node, par):\n        for neighbor in tree[node]:\n            if neighbor != par:\n                dfs_dp(neighbor, node)\n                dp[node][0] *= (dp[neighbor][0] + dp[neighbor][1])\n                dp[node][1] *= (dp[neighbor][0] + dp[neighbor][1])\n                dp[node][1] += dp[neighbor][0]\n        \n        for u, v in restrictions:\n            if lca(u, v) == node:\n                dp[node][0] = 0\n    \n    dfs_dp(0, -1)\n    \n    result = dp[0][0] + dp[0][1]\n    print(result)\n\nif __name__ == \"__main__\":\n    main()",
+    "code_hash": "d5fca7d8f79ed77e",
+    "language": "python",
+    "node_id": "n_1_96f780",
+    "revision_id": "rev_n_1_96f780_0",
+    "thought_path_snapshot": [
+      "Use dynamic programming to count valid colorings by considering subtrees and their constraints."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 1
+  },
+  {
+    "candidate_id": "cand_722997697e",
+    "problem_id": "apps_990",
+    "code": "# Code generation failed or truncated: Provider truncated generation at the output limit",
+    "code_hash": "e4b4adccffe91489",
+    "language": "python",
+    "node_id": "n_1_96f780",
+    "revision_id": "rev_n_1_96f780_1",
+    "thought_path_snapshot": [
+      "The issue lies in the way the dynamic programming table `dp` is updated. Specifically, the condition `if lca(u, v) == node:` incorrectly sets `dp[node][0]` to 0, which leads to an incorrect count of valid colorings. Instead, we should ensure that for each restriction, at least one edge on the path between `u` and `v` is black, but this should not directly zero out the white coloring option for the current node. We need to adjust the DP transitions to account for this requirement more carefully."
+    ],
+    "origin": "rethink",
+    "generation_record_id": null,
+    "created_sequence": 2
+  },
+  {
+    "candidate_id": "cand_b6fe00822e",
+    "problem_id": "apps_990",
+    "code": "import sys\nfrom collections import defaultdict\n\ndef count_ways_to_paint_edges(N, edges, M, restrictions):\n    # Build the tree\n    tree = defaultdict(list)\n    for a, b in edges:\n        tree[a].append(b)\n        tree[b].append(a)\n    \n    # Function to find the lowest common ancestor (LCA) using binary lifting\n    def preprocess_lca():\n        max_log = 17  # log2(50) + 1\n        parent = [[-1] * max_log for _ in range(N + 1)]\n        depth = [0] * (N + 1)\n        \n        def dfs(node, par, d):\n            parent[node][0] = par\n            depth[node] = d\n            for child in tree[node]:\n                if child != par:\n                    dfs(child, node, d + 1)\n        \n        dfs(1, -1, 0)\n        \n        for i in range(1, max_log):\n            for node in range(1, N + 1):\n                if parent[node][i - 1] != -1:\n                    parent[node][i] = parent[parent[node][i - 1]][i - 1]\n        \n        return parent, depth\n    \n    def lca(u, v):\n        if depth[u] > depth[v]:\n            u, v = v, u\n        diff = depth[v] - depth[u]\n        for i in range(diff.bit_length()):\n            if diff & (1 << i):\n                v = parent[v][i]\n        if u == v:\n            return u\n        for i in range(max_log - 1, -1, -1):\n            if parent[u][i] != parent[v][i]:\n                u = parent[u][i]\n                v = parent[v][i]\n        return parent[u][0]\n    \n    parent, depth = preprocess_lca()\n    \n    # Check if the path between u and v contains at least one black edge\n    def check_restriction(u, v):\n        l = lca(u, v)\n        return (depth[u] - depth[l]) % 2 == 1 or (depth[v] - depth[l]) % 2 == 1\n    \n    # Count the number of valid ways to paint the edges\n    def count_valid_paintings():\n        total_ways = 2 ** (N - 1)\n        for u, v in restrictions:\n            if not check_restriction(u, v):\n                total_ways //= 2\n        return total_ways\n    \n    return count_valid_paintings()\n\n# Read input\ninput = sys.stdin.read\ndata = input().split()\nindex = 0\n\nN = int(data[index])\nindex += 1\nedges = []\nfor _ in range(N - 1):\n    a = int(data[index])\n    index += 1\n    b = int(data[index])\n    index += 1\n    edges.append((a, b))\n\nM = int(data[index])\nindex += 1\nrestrictions = []\nfor _ in range(M):\n    u = int(data[index])\n    index += 1\n    v = int(data[index])\n    index += 1\n    restrictions.append((u, v))\n\n# Output the result\nprint(count_ways_to_paint_edges(N, edges, M, restrictions))",
+    "code_hash": "2186595385a157ab",
+    "language": "python",
+    "node_id": "n_1_96f780",
+    "revision_id": "rev_n_1_96f780_2",
+    "thought_path_snapshot": [
+      "To solve this problem, we need to count the number of ways to paint the edges of a tree such that each of the M restrictions is satisfied. A restriction requires that the path between two vertices contains at least one black edge. We can approach this by considering the connected components formed when we remove the edges that must be black due to the restrictions. The number of valid colorings is then determined by the number of ways to color the remaining edges while ensuring the restrictions are met."
+    ],
+    "origin": "rethink",
+    "generation_record_id": null,
+    "created_sequence": 3
+  },
+  {
+    "candidate_id": "cand_8d1efed2fc",
+    "problem_id": "apps_990",
+    "code": "import sys\nfrom collections import defaultdict\n\ndef dfs(node, parent, colors, restrictions, graph):\n    count = 1\n    for neighbor in graph[node]:\n        if neighbor != parent:\n            for color in range(2):\n                colors[(node, neighbor)] = color\n                valid = True\n                for u, v in restrictions:\n                    if not is_path_black(u, v, node, neighbor, colors, graph):\n                        valid = False\n                        break\n                if valid:\n                    count += dfs(neighbor, node, colors, restrictions, graph)\n            colors.pop((node, neighbor))\n    return count\n\ndef is_path_black(u, v, start, end, colors, graph):\n    visited = set()\n    stack = [(start, [start])]\n    while stack:\n        node, path = stack.pop()\n        if node == v:\n            for i in range(len(path) - 1):\n                if colors.get((path[i], path[i + 1]), 0) == 0 and colors.get((path[i + 1], path[i]), 0) == 0:\n                    return False\n            return True\n        visited.add(node)\n        for neighbor in graph[node]:\n            if neighbor != end and neighbor not in visited:\n                stack.append((neighbor, path + [neighbor]))\n    return False\n\ndef main():\n    import sys\n    input = sys.stdin.read\n    data = input().split()\n    \n    index = 0\n    N = int(data[index])\n    index += 1\n    \n    graph = defaultdict(list)\n    for _ in range(N - 1):\n        a = int(data[index])\n        b = int(data[index + 1])\n        graph[a].append(b)\n        graph[b].append(a)\n        index += 2\n    \n    M = int(data[index])\n    index += 1\n    \n    restrictions = []\n    for _ in range(M):\n        u = int(data[index])\n        v = int(data[index + 1])\n        restrictions.append((u, v))\n        index += 2\n    \n    colors = {}\n    result = dfs(1, -1, colors, restrictions, graph)\n    print(result)\n\nif __name__ == \"__main__\":\n    main()",
+    "code_hash": "b929ae345f1f55ff",
+    "language": "python",
+    "node_id": "n_2_28bb23",
+    "revision_id": "rev_n_2_28bb23_0",
+    "thought_path_snapshot": [
+      "Apply a depth-first search (DFS) approach to explore all possible edge colorings and check each against the restrictions."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 4
+  },
+  {
+    "candidate_id": "cand_3f4e8f3d8b",
+    "problem_id": "apps_990",
+    "code": "import sys\nfrom collections import defaultdict\n\ndef dfs(node, parent, color, graph, restrictions):\n    count = 1\n    for neighbor in graph[node]:\n        if neighbor != parent:\n            for r in restrictions:\n                u, v = r\n                if (node == u and neighbor == v) or (node == v and neighbor == u):\n                    if color[neighbor] == 'W':\n                        count = 0\n            count *= dfs(neighbor, node, color, graph, restrictions)\n    return count\n\ndef count_valid_paintings(N, edges, M, restrictions):\n    graph = defaultdict(list)\n    for a, b in edges:\n        graph[a].append(b)\n        graph[b].append(a)\n    \n    total_count = 0\n    for i in range(2**(N-1)):\n        color = ['W'] * (N + 1)\n        for j in range(N-1):\n            if (i >> j) & 1:\n                color[edges[j][0]] = 'B'\n                color[edges[j][1]] = 'B'\n        \n        valid = True\n        for u, v in restrictions:\n            path_black = False\n            stack = [u]\n            visited = set()\n            while stack:\n                node = stack.pop()\n                if node == v:\n                    path_black = True\n                    break\n                visited.add(node)\n                for neighbor in graph[node]:\n                    if neighbor not in visited:\n                        stack.append(neighbor)\n            if not path_black:\n                valid = False\n                break\n        \n        if valid:\n            total_count += dfs(1, -1, color, graph, restrictions)\n    \n    return total_count\n\ndef main():\n    import sys\n    input = sys.stdin.read\n    data = input().split()\n    \n    index = 0\n    N = int(data[index])\n    index += 1\n    edges = []\n    for _ in range(N-1):\n        a = int(data[index])\n        b = int(data[index+1])\n        edges.append((a, b))\n        index += 2\n    \n    M = int(data[index])\n    index += 1\n    restrictions = []\n    for _ in range(M):\n        u = int(data[index])\n        v = int(data[index+1])\n        restrictions.append((u, v))\n        index += 2\n    \n    result = count_valid_paintings(N, edges, M, restrictions)\n    print(result)\n\nif __name__ == \"__main__\":\n    main()",
+    "code_hash": "1b2d5ef19512da02",
+    "language": "python",
+    "node_id": "n_2_28bb23",
+    "revision_id": "rev_n_2_28bb23_1",
+    "thought_path_snapshot": [
+      "The issue lies in the DFS traversal where the count is incremented only when a valid coloring is found. However, the initial count should be zero, and we should add the result of the recursive calls to get the total count of valid colorings. Additionally, the `is_path_black` function should correctly check if there is at least one black edge on the path between `u` and `v`."
+    ],
+    "origin": "rethink",
+    "generation_record_id": null,
+    "created_sequence": 5
+  },
+  {
+    "candidate_id": "cand_f7ec316ac1",
+    "problem_id": "apps_990",
+    "code": "import sys\nfrom collections import defaultdict\n\ndef dfs(node, parent, color, restrictions, graph):\n    valid = True\n    for u, v in restrictions:\n        if (node == u and v in graph[node] and color[graph[node].index(v)] == 'W') or \\\n           (node == v and u in graph[node] and color[graph[node].index(u)] == 'W'):\n            valid = False\n            break\n    \n    if not valid:\n        return 0\n    \n    if node == len(graph) - 1:\n        return 1\n    \n    count = 0\n    for neighbor in graph[node]:\n        if neighbor != parent:\n            for c in ['B', 'W']:\n                color[graph[node].index(neighbor)] = c\n                count += dfs(neighbor, node, color, restrictions, graph)\n                color[graph[node].index(neighbor)] = 'W'\n    \n    return count\n\ndef main():\n    import sys\n    input = sys.stdin.read\n    data = input().split()\n    \n    index = 0\n    N = int(data[index])\n    index += 1\n    graph = defaultdict(list)\n    for _ in range(N-1):\n        a = int(data[index]) - 1\n        b = int(data[index+1]) - 1\n        graph[a].append(b)\n        graph[b].append(a)\n        index += 2\n    \n    M = int(data[index])\n    index += 1\n    restrictions = []\n    for _ in range(M):\n        u = int(data[index]) - 1\n        v = int(data[index+1]) - 1\n        restrictions.append((u, v))\n        index += 2\n    \n    color = ['W'] * (N-1)\n    result = dfs(0, -1, color, restrictions, graph)\n    print(result)\n\nif __name__ == \"__main__\":\n    main()",
+    "code_hash": "a3c72de969f205a9",
+    "language": "python",
+    "node_id": "n_2_28bb23",
+    "revision_id": "rev_n_2_28bb23_2",
+    "thought_path_snapshot": [
+      "The issue lies in the DFS function, which incorrectly multiplies the counts without considering the validity of the current coloring. Instead, we should directly check if the current coloring satisfies all restrictions and count it as valid without further recursive calls."
+    ],
+    "origin": "rethink",
+    "generation_record_id": null,
+    "created_sequence": 6
+  },
+  {
+    "candidate_id": "cand_7c1d393a53",
+    "problem_id": "apps_990",
+    "code": "import sys\n\ndef count_valid_paintings(N, edges, M, restrictions):\n    def dfs(node, parent, black_edges):\n        if node == N:\n            return 1\n        \n        count = 0\n        for neighbor in adjacency_list[node]:\n            if neighbor != parent:\n                if (node, neighbor) in black_edges or (neighbor, node) in black_edges:\n                    count += dfs(neighbor, node, black_edges)\n                else:\n                    black_edges.add((node, neighbor))\n                    count += dfs(neighbor, node, black_edges)\n                    black_edges.remove((node, neighbor))\n        \n        return count\n\n    adjacency_list = [[] for _ in range(N)]\n    for a, b in edges:\n        adjacency_list[a-1].append(b-1)\n        adjacency_list[b-1].append(a-1)\n\n    total_ways = 0\n    for mask in range(1 << (N-1)):\n        black_edges = set()\n        for i in range(N-1):\n            if mask & (1 << i):\n                black_edges.add(edges[i])\n        \n        valid = True\n        for u, v in restrictions:\n            found_black = False\n            stack = [u-1]\n            visited = set()\n            while stack:\n                current = stack.pop()\n                if current == v-1:\n                    found_black = True\n                    break\n                visited.add(current)\n                for neighbor in adjacency_list[current]:\n                    if neighbor not in visited and (current, neighbor) in black_edges or (neighbor, current) in black_edges:\n                        stack.append(neighbor)\n            if not found_black:\n                valid = False\n                break\n        \n        if valid:\n            total_ways += dfs(0, -1, black_edges)\n    \n    return total_ways\n\ndef main():\n    import sys\n    input = sys.stdin.read\n    data = input().split()\n    \n    index = 0\n    N = int(data[index])\n    index += 1\n    edges = []\n    for _ in range(N-1):\n        a = int(data[index])\n        b = int(data[index+1])\n        edges.append((a-1, b-1))\n        index += 2\n    \n    M = int(data[index])\n    index += 1\n    restrictions = []\n    for _ in range(M):\n        u = int(data[index])\n        v = int(data[index+1])\n        restrictions.append((u-1, v-1))\n        index += 2\n    \n    result = count_valid_paintings(N, edges, M, restrictions)\n    print(result)\n\nif __name__ == \"__main__\":\n    main()",
+    "code_hash": "0c27277a262c1164",
+    "language": "python",
+    "node_id": "n_3_40b5ef",
+    "revision_id": "rev_n_3_40b5ef_0",
+    "thought_path_snapshot": [
+      "Transform the problem into a constraint satisfaction problem and use backtracking to find all valid solutions."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 7
+  },
+  {
+    "candidate_id": "cand_c96aa3a49f",
+    "problem_id": "apps_990",
+    "code": "import sys\nfrom collections import defaultdict\n\ndef dfs(node, parent, color, adj, visited, u, v):\n    if node == v:\n        return True\n    visited[node] = True\n    for neighbor in adj[node]:\n        if neighbor != parent and not visited[neighbor]:\n            if color[(node, neighbor)] == 'B' or dfs(neighbor, node, color, adj, visited, u, v):\n                return True\n    return False\n\ndef count_ways(N, edges, M, restrictions):\n    adj = defaultdict(list)\n    for a, b in edges:\n        adj[a].append(b)\n        adj[b].append(a)\n    \n    total_ways = 2 ** (N - 1)\n    \n    for u, v in restrictions:\n        valid_ways = 0\n        for mask in range(total_ways):\n            color = {}\n            for i, (a, b) in enumerate(edges):\n                color[(a, b)] = 'W' if (mask >> i) & 1 else 'B'\n                color[(b, a)] = color[(a, b)]\n            \n            visited = [False] * (N + 1)\n            if dfs(u, -1, color, adj, visited, u, v):\n                valid_ways += 1\n        \n        total_ways = valid_ways\n    \n    return total_ways\n\ndef main():\n    import sys\n    input = sys.stdin.read\n    data = input().split()\n    \n    index = 0\n    N = int(data[index])\n    index += 1\n    edges = []\n    for _ in range(N - 1):\n        a = int(data[index])\n        b = int(data[index + 1])\n        edges.append((a, b))\n        index += 2\n    \n    M = int(data[index])\n    index += 1\n    restrictions = []\n    for _ in range(M):\n        u = int(data[index])\n        v = int(data[index + 1])\n        restrictions.append((u, v))\n        index += 2\n    \n    result = count_ways(N, edges, M, restrictions)\n    print(result)\n\nif __name__ == \"__main__\":\n    main()",
+    "code_hash": "5ec324b664115f49",
+    "language": "python",
+    "node_id": "n_3_40b5ef",
+    "revision_id": "rev_n_3_40b5ef_1",
+    "thought_path_snapshot": [
+      "The issue lies in the DFS function, which incorrectly counts paths without considering the black edges properly. We need to ensure that the DFS correctly traverses the tree and checks for the presence of black edges along the path between any two restricted nodes. Additionally, the initial setup of the adjacency list should correctly map vertices to their neighbors."
+    ],
+    "origin": "rethink",
+    "generation_record_id": null,
+    "created_sequence": 8
+  }
+]

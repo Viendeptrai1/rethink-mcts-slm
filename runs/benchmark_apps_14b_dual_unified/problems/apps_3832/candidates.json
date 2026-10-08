@@ -1,0 +1,107 @@
+[
+  {
+    "candidate_id": "cand_bf499b58ef",
+    "problem_id": "apps_3832",
+    "code": "import sys\nimport math\n\ndef main():\n    import sys\n    import math\n    \n    def read_ints():\n        return list(map(int, sys.stdin.readline().split()))\n    \n    n = read_ints()[0]\n    heights = read_ints()\n    \n    # Find local maxima\n    maxima = []\n    for i in range(n):\n        if (i == 0 or heights[i] > heights[i - 1]) and (i == n - 1 or heights[i] > heights[i + 1]):\n            maxima.append(heights[i])\n    \n    m = len(maxima)\n    if m == 0:\n        print(\" \".join([str(0)] * (math.ceil(n / 2))))\n        return\n    \n    # Sort maxima in descending order\n    maxima.sort(reverse=True)\n    \n    # Calculate prefix sums of maxima\n    prefix_sums = [0] * (m + 1)\n    for i in range(m):\n        prefix_sums[i + 1] = prefix_sums[i] + maxima[i]\n    \n    # Calculate the minimum time required for each k\n    result = []\n    for k in range(1, math.ceil(n / 2) + 1):\n        if k <= m:\n            result.append(prefix_sums[k])\n        else:\n            result.append(prefix_sums[m])\n    \n    print(\" \".join(map(str, result)))\n\nif __name__ == \"__main__\":\n    main()",
+    "code_hash": "3df5e00c38eeac7b",
+    "language": "python",
+    "node_id": "n_1_e2f533",
+    "revision_id": "rev_n_1_e2f533_0",
+    "thought_path_snapshot": [
+      "Identify local maxima in the sequence of hill heights. These are potential candidates for building houses. Calculate the minimum number of operations needed to ensure at least k such maxima exist."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 1
+  },
+  {
+    "candidate_id": "cand_e1bd05fe3c",
+    "problem_id": "apps_3832",
+    "code": "import sys\nfrom heapq import heappush, heappop\n\ndef main():\n    import sys\n    input = sys.stdin.read\n    data = input().split()\n    \n    n = int(data[0])\n    heights = list(map(int, data[1:n+1]))\n    \n    # Calculate the number of hills that are local maxima\n    maxima = [True] * n\n    for i in range(1, n-1):\n        if heights[i] <= heights[i-1] or heights[i] <= heights[i+1]:\n            maxima[i] = False\n    if n > 1:\n        maxima[0] = (heights[0] > heights[1])\n        maxima[n-1] = (heights[n-1] > heights[n-2])\n    \n    # Count the initial number of maxima\n    current_maxima = sum(maxima)\n    \n    # If the initial number of maxima is already enough, no work is needed\n    if current_maxima >= (n + 1) // 2:\n        result = [0] * ((n + 1) // 2)\n        print(\" \".join(map(str, result)))\n        return\n    \n    # Create a min-heap of the heights of non-maxima hills\n    heap = []\n    for i in range(n):\n        if not maxima[i]:\n            heappush(heap, (heights[i], i))\n    \n    # Calculate the minimum time required for each k\n    result = []\n    for k in range(1, (n + 1) // 2 + 1):\n        if current_maxima >= k:\n            result.append(0)\n            continue\n        \n        # We need to increase the number of maxima by (k - current_maxima)\n        additional_maxima_needed = k - current_maxima\n        time = 0\n        \n        while additional_maxima_needed > 0 and heap:\n            height, index = heappop(heap)\n            # Increase the height of this hill to make it a local maximum\n            new_height = heights[index] + 1\n            time += new_height - height\n            \n            # Update the maxima status of the neighbors\n            if index > 0 and new_height > heights[index - 1]:\n                maxima[index - 1] = True\n                current_maxima += 1\n                additional_maxima_needed -= 1\n            if index < n - 1 and new_height > heights[index + 1]:\n                maxima[index + 1] = True\n                current_maxima += 1\n                additional_maxima_needed -= 1\n        \n        # If we couldn't make enough maxima, it's impossible to build k houses\n        if additional_maxima_needed > 0:\n            result.append(-1)\n        else:\n            result.append(time)\n    \n    print(\" \".join(map(str, result)))\n\nif __name__ == \"__main__\":\n    main()",
+    "code_hash": "121772deadfc53bb",
+    "language": "python",
+    "node_id": "n_1_e2f533",
+    "revision_id": "rev_n_1_e2f533_1",
+    "thought_path_snapshot": [
+      "The issue lies in the way the code calculates the minimum time required to adjust the hills. The current approach incorrectly assumes that the sum of the top k maxima directly gives the minimum time needed. Instead, we need to consider reducing the heights of non-maxima hills to make more hills qualify as maxima, ensuring the correct number of hills can support the desired number of houses."
+    ],
+    "origin": "rethink",
+    "generation_record_id": null,
+    "created_sequence": 2
+  },
+  {
+    "candidate_id": "cand_29427c3f29",
+    "problem_id": "apps_3832",
+    "code": "import sys\nimport math\n\ndef main():\n    import sys\n    import math\n\n    def readints():\n        return list(map(int, sys.stdin.readline().split()))\n\n    n = int(sys.stdin.readline())\n    heights = readints()\n\n    # Calculate the number of maxima hills\n    maxima = [True] * n\n    for i in range(1, n):\n        if heights[i] <= heights[i - 1]:\n            maxima[i] = False\n    for i in range(n - 2, -1, -1):\n        if heights[i] <= heights[i + 1]:\n            maxima[i] = False\n\n    # Count the number of maxima\n    num_maxima = sum(maxima)\n\n    # If the number of maxima is already greater than or equal to ceil(n/2), no operations are needed\n    if num_maxima >= math.ceil(n / 2):\n        result = [0] * math.ceil(n / 2)\n    else:\n        # Calculate the number of operations needed to create more maxima\n        operations = []\n        for i in range(1, n - 1):\n            if not maxima[i]:\n                left_height = heights[i - 1]\n                right_height = heights[i + 1]\n                if left_height > heights[i] and right_height > heights[i]:\n                    operations.append((heights[i], i))\n\n        operations.sort()\n        result = []\n        current_operations = 0\n        current_maxima = num_maxima\n\n        for i in range(1, math.ceil(n / 2) + 1):\n            while current_maxima < i and operations:\n                _, index = operations.pop(0)\n                current_operations += 1\n                if index > 0 and index < n - 1:\n                    if heights[index - 1] > heights[index] and heights[index + 1] > heights[index]:\n                        current_maxima += 1\n            result.append(current_operations)\n\n    print(\" \".join(map(str, result)))\n\nif __name__ == \"__main__\":\n    main()",
+    "code_hash": "2a5df5a6e02b633d",
+    "language": "python",
+    "node_id": "n_1_e2f533",
+    "revision_id": "rev_n_1_e2f533_2",
+    "thought_path_snapshot": [
+      "The issue arises because the code incorrectly attempts to increase the height of non-maxima hills to make them maxima, which is not allowed. Instead, the code should focus on decreasing the height of hills to create more maxima by ensuring that hills that are not maxima are reduced until they are lower than their neighbors. This approach will correctly simulate the process of making hills suitable for construction by adjusting their heights."
+    ],
+    "origin": "rethink",
+    "generation_record_id": null,
+    "created_sequence": 3
+  },
+  {
+    "candidate_id": "cand_0b0ceb5707",
+    "problem_id": "apps_3832",
+    "code": "import sys\nfrom math import ceil\n\ndef main():\n    import sys\n    import heapq\n    \n    def read_ints():\n        return list(map(int, sys.stdin.readline().split()))\n    \n    n = read_ints()[0]\n    heights = read_ints()\n    \n    # Create a max-heap based on the heights\n    max_heap = [-h for h in heights]\n    heapq.heapify(max_heap)\n    \n    # Calculate the prefix sums of the sorted heights in descending order\n    sorted_heights = sorted(heights, reverse=True)\n    prefix_sums = [0] * (n + 1)\n    for i in range(n):\n        prefix_sums[i + 1] = prefix_sums[i] + sorted_heights[i]\n    \n    # Calculate the minimum time required for each k\n    results = []\n    for k in range(1, ceil(n / 2) + 1):\n        # We need to find the minimum height such that at least k hills are taller\n        # This can be done using binary search\n        left, right = 0, 100000\n        while left < right:\n            mid = (left + right) // 2\n            count = sum(1 for h in heights if h > mid)\n            if count >= k:\n                right = mid\n            else:\n                left = mid + 1\n        \n        min_height = left\n        # Calculate the total time required to make at least k hills taller than min_height\n        total_time = prefix_sums[n] - prefix_sums[k] - (k - 1) * min_height\n        results.append(total_time)\n    \n    print(\" \".join(map(str, results)))\n\nif __name__ == \"__main__\":\n    main()",
+    "code_hash": "779dee0ea11ada67",
+    "language": "python",
+    "node_id": "n_2_d32e9a",
+    "revision_id": "rev_n_2_d32e9a_0",
+    "thought_path_snapshot": [
+      "Sort the hills by their heights in descending order. Starting from the tallest hills, simulate removing the necessary amount of height to ensure that the remaining hills form at least k peaks. This approach helps in minimizing the total number of operations."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 4
+  },
+  {
+    "candidate_id": "cand_25876daf47",
+    "problem_id": "apps_3832",
+    "code": "import sys\nimport math\n\ndef main():\n    import sys\n    import math\n    \n    def readints():\n        return list(map(int, sys.stdin.readline().split()))\n    \n    n = readints()[0]\n    heights = readints()\n    \n    # Find all peak positions\n    peaks = []\n    for i in range(n):\n        if (i == 0 or heights[i] > heights[i-1]) and (i == n-1 or heights[i] > heights[i+1]):\n            peaks.append(i)\n    \n    # Sort heights in descending order\n    sorted_heights = sorted(heights, reverse=True)\n    \n    # Calculate the minimum time required for each k\n    results = []\n    for k in range(1, math.ceil(n / 2) + 1):\n        total_time = 0\n        for i in range(k, len(sorted_heights)):\n            total_time += sorted_heights[i] - sorted_heights[k-1]\n        results.append(total_time)\n    \n    print(\" \".join(map(str, results)))\n\nif __name__ == \"__main__\":\n    main()",
+    "code_hash": "bae5ac1a257e8db6",
+    "language": "python",
+    "node_id": "n_2_d32e9a",
+    "revision_id": "rev_n_2_d32e9a_1",
+    "thought_path_snapshot": [
+      "The issue lies in the calculation of `total_time`. The current approach incorrectly subtracts `(k - 1) * min_height` from the prefix sum, which does not accurately account for the required height adjustments. Instead, we should focus on reducing the heights of the non-peak hills to ensure that at least `k` hills remain as peaks. A more accurate approach would involve sorting the hills and calculating the necessary reductions directly."
+    ],
+    "origin": "rethink",
+    "generation_record_id": null,
+    "created_sequence": 5
+  },
+  {
+    "candidate_id": "cand_47dba3d49b",
+    "problem_id": "apps_3832",
+    "code": "import sys\nfrom math import ceil\n\ndef main():\n    import sys\n    input = sys.stdin.read\n    data = input().split()\n    \n    n = int(data[0])\n    heights = list(map(int, data[1:]))\n    \n    # Calculate the number of peaks\n    peaks = [True] * n\n    for i in range(1, n - 1):\n        if heights[i] <= heights[i - 1] or heights[i] <= heights[i + 1]:\n            peaks[i] = False\n    \n    # Count the number of peaks\n    peak_count = sum(peaks)\n    \n    # If the number of peaks is already greater than or equal to n/2, no operations are needed\n    if peak_count >= ceil(n / 2):\n        result = [0] * ceil(n / 2)\n    else:\n        # Calculate the number of non-peak hills\n        non_peak_count = n - peak_count\n        \n        # Calculate the number of additional peaks needed\n        additional_peaks_needed = ceil(n / 2) - peak_count\n        \n        # Calculate the minimum time required to create additional peaks\n        result = []\n        for k in range(1, ceil(n / 2) + 1):\n            if k <= peak_count:\n                result.append(0)\n            elif k <= peak_count + non_peak_count:\n                result.append(k - peak_count)\n            else:\n                result.append(float('inf'))\n    \n    # Print the result\n    print(\" \".join(map(str, result)))\n\nif __name__ == \"__main__\":\n    main()",
+    "code_hash": "ad30e600ed803020",
+    "language": "python",
+    "node_id": "n_2_d32e9a",
+    "revision_id": "rev_n_2_d32e9a_2",
+    "thought_path_snapshot": [
+      "The issue lies in the calculation of the total time required to adjust the hills. The current approach incorrectly sums the differences between the heights, leading to incorrect results. Instead, we need to focus on reducing the heights of non-peak hills to make more hills suitable for construction, ensuring that the total time is minimized for each k."
+    ],
+    "origin": "rethink",
+    "generation_record_id": null,
+    "created_sequence": 6
+  },
+  {
+    "candidate_id": "cand_1f829543dc",
+    "problem_id": "apps_3832",
+    "code": "import sys\nfrom math import ceil\n\ndef min_hours_to_build_houses(n, heights):\n    dp = [[float('inf')] * (n + 1) for _ in range(n + 1)]\n    dp[0][0] = 0\n    \n    for i in range(1, n + 1):\n        for j in range(i + 1):\n            dp[i][j] = dp[i - 1][j]\n            if j > 0 and (i == 1 or heights[i - 1] > heights[i - 2]):\n                dp[i][j] = min(dp[i][j], dp[i - 1][j - 1])\n            if i > 1:\n                dp[i][j] = min(dp[i][j], dp[i - 1][j] + heights[i - 1] - heights[i - 2])\n    \n    result = []\n    for k in range(1, ceil(n / 2) + 1):\n        result.append(dp[n][k])\n    \n    return result\n\ndef main():\n    import sys\n    input = sys.stdin.read\n    data = input().split()\n    \n    n = int(data[0])\n    heights = list(map(int, data[1:]))\n    \n    result = min_hours_to_build_houses(n, heights)\n    print(\" \".join(map(str, result)))\n\nif __name__ == \"__main__\":\n    main()",
+    "code_hash": "af4382ee654b98f5",
+    "language": "python",
+    "node_id": "n_3_5e8c55",
+    "revision_id": "rev_n_3_5e8c55_0",
+    "thought_path_snapshot": [
+      "Use dynamic programming to keep track of the minimum number of operations required to create exactly i peaks for each i from 1 to ceil(n/2). This involves iterating through the hills and updating the DP table based on whether the current hill can be a peak or not."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 7
+  }
+]

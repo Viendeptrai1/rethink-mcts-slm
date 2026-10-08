@@ -1,0 +1,122 @@
+[
+  {
+    "candidate_id": "cand_34038b60df",
+    "problem_id": "apps_3159",
+    "code": "import sys\n\ndef is_ad(image):\n    allowed_chars = set(\"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789?!,.\")\n    for row in image:\n        for char in row:\n            if char not in allowed_chars:\n                return True\n    return False\n\ndef remove_ads(H, W, webpage):\n    result = [[' ' for _ in range(W)] for _ in range(H)]\n    visited = [[False for _ in range(W)] for _ in range(H)]\n    \n    def get_image(x, y):\n        image = []\n        stack = [(x, y)]\n        directions = [(-1, 0), (1, 0), (0, -1), (0, 1)]\n        \n        while stack:\n            cx, cy = stack.pop()\n            if visited[cx][cy]:\n                continue\n            visited[cx][cy] = True\n            image.append((cx, cy))\n            \n            for dx, dy in directions:\n                nx, ny = cx + dx, cy + dy\n                if 0 <= nx < H and 0 <= ny < W and webpage[nx][ny] == '+':\n                    stack.append((nx, ny))\n        \n        return image\n    \n    for i in range(H):\n        for j in range(W):\n            if webpage[i][j] == '+' and not visited[i][j]:\n                image = get_image(i, j)\n                image_content = []\n                for x, y in image:\n                    image_content.append(webpage[x][y])\n                \n                if is_ad(image_content):\n                    for x, y in image:\n                        result[x][y] = ' '\n    \n    return [''.join(row) for row in result]\n\ndef main():\n    import sys\n    input = sys.stdin.read\n    data = input().split()\n    \n    H = int(data[0])\n    W = int(data[1])\n    webpage = data[2:]\n    \n    result = remove_ads(H, W, webpage)\n    for line in result:\n        print(line)\n\nif __name__ == \"__main__\":\n    main()",
+    "code_hash": "074858d8a8eaa98a",
+    "language": "python",
+    "node_id": "n_1_71ddb5",
+    "revision_id": "rev_n_1_71ddb5_0",
+    "thought_path_snapshot": [
+      "Iterate through the grid to detect the boundaries of each image using the '+' character. Once an image boundary is detected, analyze the content inside to check for any disallowed characters. If a disallowed character is found, flag the entire image for removal."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 1
+  },
+  {
+    "candidate_id": "cand_691ef23b72",
+    "problem_id": "apps_3159",
+    "code": "def remove_ads(H, W, webpage):\n    def is_valid_char(c):\n        return c.isalnum() or c in \"?!., \"\n\n    def find_images():\n        images = []\n        visited = [[False] * W for _ in range(H)]\n        \n        for i in range(1, H - 1):\n            for j in range(1, W - 1):\n                if webpage[i][j] == '+' and not visited[i][j]:\n                    image = []\n                    queue = [(i, j)]\n                    visited[i][j] = True\n                    \n                    while queue:\n                        x, y = queue.pop()\n                        image.append((x, y))\n                        \n                        for dx, dy in [(-1, 0), (1, 0), (0, -1), (0, 1)]:\n                            nx, ny = x + dx, y + dy\n                            if 0 <= nx < H and 0 <= ny < W and webpage[nx][ny] == '+' and not visited[nx][ny]:\n                                queue.append((nx, ny))\n                                visited[nx][ny] = True\n                    \n                    images.append(image)\n        \n        return images\n\n    def get_image_boundaries(image):\n        min_x = min(p[0] for p in image)\n        max_x = max(p[0] for p in image)\n        min_y = min(p[1] for p in image)\n        max_y = max(p[1] for p in image)\n        return min_x, max_x, min_y, max_y\n\n    def is_ad(image):\n        for x, y in image:\n            if not is_valid_char(webpage[x][y]):\n                return True\n        return False\n\n    def remove_image(image):\n        for x, y in image:\n            webpage[x] = webpage[x][:y] + ' ' + webpage[x][y+1:]\n\n    # Split each line into individual characters\n    webpage = [list(line) for line in webpage]\n\n    images = find_images()\n    ads = []\n\n    for image in images:\n        if is_ad(image):\n            ads.append(image)\n\n    # Sort ads by size (number of pixels)\n    ads.sort(key=lambda img: len(img))\n\n    for ad in ads:\n        remove_image(ad)\n\n    # Join the characters back into strings\n    webpage = [''.join(row) for row in webpage]\n\n    return '\\n'.join(webpage)\n\n# Example usage:\nif __name__ == \"__main__\":\n    import sys\n    input = sys.stdin.read\n    data = input().splitlines()\n    H, W = map(int, data[0].split())\n    webpage = data[1:]\n    result = remove_ads(H, W, webpage)\n    print(result)",
+    "code_hash": "7fb76645997f0e83",
+    "language": "python",
+    "node_id": "n_1_71ddb5",
+    "revision_id": "rev_n_1_71ddb5_1",
+    "thought_path_snapshot": [
+      "The issue arises because the `webpage` list is being treated as a flat list of strings instead of a 2D list of characters. To fix this, we need to split each line of the input into individual characters before processing. This will ensure that `webpage[i][j]` correctly accesses the character at row `i` and column `j`."
+    ],
+    "origin": "rethink",
+    "generation_record_id": null,
+    "created_sequence": 2
+  },
+  {
+    "candidate_id": "cand_8279579db6",
+    "problem_id": "apps_3159",
+    "code": "def remove_ads(H, W, webpage):\n    def is_ad(image):\n        for row in image:\n            for char in row:\n                if char not in \"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789?!,. \":\n                    return True\n        return False\n\n    def get_image_boundaries(i, j):\n        top = i\n        bottom = i\n        left = j\n        right = j\n        \n        # Find top boundary\n        while top >= 0 and webpage[top][j] == '+':\n            top -= 1\n        top += 1\n        \n        # Find bottom boundary\n        while bottom < H and webpage[bottom][j] == '+':\n            bottom += 1\n        bottom -= 1\n        \n        # Find left boundary\n        while left >= 0 and webpage[i][left] == '+':\n            left -= 1\n        left += 1\n        \n        # Find right boundary\n        while right < W and webpage[i][right] == '+':\n            right += 1\n        right -= 1\n        \n        return top, bottom, left, right\n\n    def get_image(top, bottom, left, right):\n        return [list(webpage[i][left:right+1]) for i in range(top, bottom+1)]\n\n    def replace_image_with_whitespace(top, bottom, left, right):\n        for i in range(top, bottom+1):\n            for j in range(left, right+1):\n                webpage[i] = webpage[i][:j] + ' ' + webpage[i][j+1:]\n\n    # Create a copy of the webpage to avoid modifying it while iterating\n    webpage_copy = [list(row) for row in webpage]\n\n    for i in range(1, H-1):\n        for j in range(1, W-1):\n            if webpage[i][j] == '+' and webpage[i-1][j] == '+' and webpage[i+1][j] == '+' and webpage[i][j-1] == '+' and webpage[i][j+1] == '+':\n                top, bottom, left, right = get_image_boundaries(i, j)\n                image = get_image(top, bottom, left, right)\n                \n                if is_ad(image):\n                    replace_image_with_whitespace(top, bottom, left, right)\n\n    # Convert the list of lists back to a list of strings\n    return [''.join(row) for row in webpage]\n\n# Read input\nimport sys\ninput = sys.stdin.read\ndata = input().split()\n\nH = int(data[0])\nW = int(data[1])\nwebpage = data[2:]\n\n# Remove ads\nresult = remove_ads(H, W, webpage)\n\n# Print result\nfor row in result:\n    print(row, end='')",
+    "code_hash": "31d58cb040a9abdd",
+    "language": "python",
+    "node_id": "n_1_71ddb5",
+    "revision_id": "rev_n_1_71ddb5_2",
+    "thought_path_snapshot": [
+      "The error occurs because the `webpage` is being modified in place while iterating over it, which causes issues when trying to replace characters. To fix this, we should create a copy of the `webpage` before modifying it, ensuring that the original structure remains intact during the iteration process."
+    ],
+    "origin": "rethink",
+    "generation_record_id": null,
+    "created_sequence": 3
+  },
+  {
+    "candidate_id": "cand_68354ece8e",
+    "problem_id": "apps_3159",
+    "code": "import sys\n\ndef is_valid_char(c):\n    return c.isalnum() or c in \"?!., \"\n\ndef find_images_and_ads(H, W, grid):\n    visited = [[False] * W for _ in range(H)]\n    images = []\n\n    def dfs(x, y, image):\n        if x < 0 or x >= H or y < 0 or y >= W or visited[x][y]:\n            return\n        visited[x][y] = True\n        image.append((x, y))\n        if grid[x][y] == '+':\n            dfs(x + 1, y, image)\n            dfs(x - 1, y, image)\n            dfs(x, y + 1, image)\n            dfs(x, y - 1, image)\n\n    for i in range(H):\n        for j in range(W):\n            if grid[i][j] == '+' and not visited[i][j]:\n                image = []\n                dfs(i, j, image)\n                images.append(image)\n\n    ads = []\n    for image in images:\n        min_x = min(p[0] for p in image)\n        max_x = max(p[0] for p in image)\n        min_y = min(p[1] for p in image)\n        max_y = max(p[1] for p in image)\n        for x in range(min_x + 1, max_x):\n            for y in range(min_y + 1, max_y):\n                if not is_valid_char(grid[x][y]):\n                    ads.append(image)\n                    break\n            else:\n                continue\n            break\n\n    return ads\n\ndef remove_ads(H, W, grid, ads):\n    result = [list(row) for row in grid]\n    for ad in ads:\n        for x, y in ad:\n            result[x][y] = ' '\n    return [''.join(row) for row in result]\n\ndef main():\n    import sys\n    input = sys.stdin.read\n    data = input().split()\n    \n    H = int(data[0])\n    W = int(data[1])\n    grid = data[2:]\n    \n    ads = find_images_and_ads(H, W, grid)\n    result = remove_ads(H, W, grid, ads)\n    \n    for row in result:\n        print(row, end='')\n\nif __name__ == \"__main__\":\n    main()",
+    "code_hash": "12f27ceefb47105b",
+    "language": "python",
+    "node_id": "n_2_81109d",
+    "revision_id": "rev_n_2_81109d_0",
+    "thought_path_snapshot": [
+      "Use a depth-first search (DFS) approach starting from each '+' character to identify all connected '+' characters, forming the boundary of an image. During the DFS, also check for disallowed characters within the identified image area. If found, mark the image for deletion."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 4
+  },
+  {
+    "candidate_id": "cand_5e8126adc3",
+    "problem_id": "apps_3159",
+    "code": "def remove_ads(H, W, grid):\n    def is_ad(image):\n        for row in image:\n            for char in row:\n                if char not in \"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789?!,. \":\n                    return True\n        return False\n\n    def get_image_boundaries(grid, i, j):\n        top = i\n        bottom = i\n        left = j\n        right = j\n        \n        # Find top boundary\n        while top >= 0 and grid[top][j] == '+':\n            top -= 1\n        top += 1\n        \n        # Find bottom boundary\n        while bottom < H and grid[bottom][j] == '+':\n            bottom += 1\n        bottom -= 1\n        \n        # Find left boundary\n        while left >= 0 and grid[i][left] == '+':\n            left -= 1\n        left += 1\n        \n        # Find right boundary\n        while right < W and grid[i][right] == '+':\n            right += 1\n        right -= 1\n        \n        return top, bottom, left, right\n\n    def get_image(grid, top, bottom, left, right):\n        image = []\n        for i in range(top, bottom + 1):\n            row = []\n            for j in range(left, right + 1):\n                row.append(grid[i][j])\n            image.append(row)\n        return image\n\n    def replace_image(grid, top, bottom, left, right):\n        for i in range(top, bottom + 1):\n            for j in range(left, right + 1):\n                grid[i][j] = ' '\n\n    # Process the grid\n    for i in range(1, H - 1):\n        for j in range(1, W - 1):\n            if grid[i][j] == '+' and grid[i - 1][j] == '+' and grid[i + 1][j] == '+' and grid[i][j - 1] == '+' and grid[i][j + 1] == '+':\n                top, bottom, left, right = get_image_boundaries(grid, i, j)\n                image = get_image(grid, top, bottom, left, right)\n                if is_ad(image):\n                    replace_image(grid, top, bottom, left, right)\n\n    # Print the result\n    for row in grid:\n        print(''.join(row))\n\n# Read input\nimport sys\ninput = sys.stdin.read\ndata = input().split()\n\nH = int(data[0])\nW = int(data[1])\ngrid = [list(data[2 + i * W:2 + (i + 1) * W]) for i in range(H)]\n\n# Call the function\nremove_ads(H, W, grid)",
+    "code_hash": "a9a5a2b9f78fa194",
+    "language": "python",
+    "node_id": "n_2_81109d",
+    "revision_id": "rev_n_2_81109d_1",
+    "thought_path_snapshot": [
+      "The error occurs because the grid is being treated as a single string instead of a list of strings, causing incorrect indexing. The grid should be split into individual rows before processing."
+    ],
+    "origin": "rethink",
+    "generation_record_id": null,
+    "created_sequence": 5
+  },
+  {
+    "candidate_id": "cand_3eece3e415",
+    "problem_id": "apps_3159",
+    "code": "def remove_ads(H, W, grid):\n    def is_valid(x, y):\n        return 0 <= x < H and 0 <= y < W\n\n    def is_border(x, y):\n        return grid[x][y] == '+'\n\n    def is_ad_char(c):\n        return not (c.isalnum() or c in \"?!., \")\n\n    def find_image_boundaries():\n        boundaries = []\n        for i in range(1, H - 1):\n            for j in range(1, W - 1):\n                if is_border(i, j):\n                    # Check if this is a corner of an image\n                    if (is_border(i - 1, j - 1) and is_border(i - 1, j + 1) and\n                        is_border(i + 1, j - 1) and is_border(i + 1, j + 1)):\n                        continue\n                    # Find the top-left and bottom-right corners of the image\n                    top_left = None\n                    bottom_right = None\n                    for x in range(i, -1, -1):\n                        if is_border(x, j):\n                            top_left = (x, j)\n                            break\n                    for x in range(i, H):\n                        if is_border(x, j):\n                            bottom_right = (x, j)\n                            break\n                    boundaries.append((top_left, bottom_right))\n        return boundaries\n\n    def get_image_area(top_left, bottom_right):\n        return (bottom_right[0] - top_left[0] + 1) * (bottom_right[1] - top_left[1] + 1)\n\n    def contains_ad_char(top_left, bottom_right):\n        for i in range(top_left[0], bottom_right[0] + 1):\n            for j in range(top_left[1], bottom_right[1] + 1):\n                if is_ad_char(grid[i][j]):\n                    return True\n        return False\n\n    def remove_image(top_left, bottom_right):\n        for i in range(top_left[0], bottom_right[0] + 1):\n            for j in range(top_left[1], bottom_right[1] + 1):\n                grid[i] = grid[i][:j] + ' ' + grid[i][j+1:]\n\n    boundaries = find_image_boundaries()\n    images = []\n    for top_left, bottom_right in boundaries:\n        if contains_ad_char(top_left, bottom_right):\n            images.append((top_left, bottom_right, get_image_area(top_left, bottom_right)))\n\n    if images:\n        # Sort images by area in ascending order\n        images.sort(key=lambda x: x[2])\n        # Remove the smallest image containing an ad character\n        top_left, bottom_right, _ = images[0]\n        remove_image(top_left, bottom_right)\n\n    for row in grid:\n        print(row)\n\n# Read input\nimport sys\ninput = sys.stdin.read\ndata = input().splitlines()\nH, W = map(int, data[0].split())\ngrid = data[1:]\n\n# Call the function\nremove_ads(H, W, grid)",
+    "code_hash": "41655839294909eb",
+    "language": "python",
+    "node_id": "n_2_81109d",
+    "revision_id": "rev_n_2_81109d_2",
+    "thought_path_snapshot": [
+      "The error occurs because the code attempts to access grid elements outside the valid range when checking for the '+' characters around a potential image boundary. To fix this, we need to ensure that the indices do not go out of bounds by adding appropriate checks before accessing grid elements."
+    ],
+    "origin": "rethink",
+    "generation_record_id": null,
+    "created_sequence": 6
+  },
+  {
+    "candidate_id": "cand_241def7d07",
+    "problem_id": "apps_3159",
+    "code": "import sys\n\ndef is_valid_char(c):\n    return c.isalnum() or c in \"?!., \"\n\ndef find_images(grid, H, W):\n    images = []\n    visited = [[False] * W for _ in range(H)]\n    \n    for i in range(1, H-1):\n        for j in range(1, W-1):\n            if grid[i][j] == '+' and not visited[i][j]:\n                # Find the top-left corner of the image\n                top = i\n                left = j\n                while top > 0 and grid[top-1][left] == '+':\n                    top -= 1\n                while left > 0 and grid[top][left-1] == '+':\n                    left -= 1\n                \n                # Find the bottom-right corner of the image\n                bottom = i\n                right = j\n                while bottom < H-1 and grid[bottom+1][right] == '+':\n                    bottom += 1\n                while right < W-1 and grid[bottom][right+1] == '+':\n                    right += 1\n                \n                # Check if it's a valid image\n                if bottom - top >= 1 and right - left >= 1:\n                    images.append((top, left, bottom, right))\n                    # Mark the entire image as visited\n                    for x in range(top, bottom+1):\n                        for y in range(left, right+1):\n                            visited[x][y] = True\n    \n    return images\n\ndef remove_ads(grid, H, W):\n    images = find_images(grid, H, W)\n    ads = []\n    \n    for top, left, bottom, right in images:\n        is_ad = False\n        for x in range(top+1, bottom):\n            for y in range(left+1, right):\n                if not is_valid_char(grid[x][y]):\n                    is_ad = True\n                    break\n            if is_ad:\n                break\n        if is_ad:\n            ads.append((top, left, bottom, right))\n    \n    for top, left, bottom, right in ads:\n        for x in range(top, bottom+1):\n            for y in range(left, right+1):\n                grid[x][y] = ' '\n    \n    return grid\n\ndef main():\n    import sys\n    input = sys.stdin.read\n    data = input().split()\n    \n    H = int(data[0])\n    W = int(data[1])\n    grid = [data[2+i*W:2+(i+1)*W] for i in range(H)]\n    \n    result_grid = remove_ads(grid, H, W)\n    \n    for row in result_grid:\n        print(''.join(row), end='')\n\nif __name__ == \"__main__\":\n    main()",
+    "code_hash": "13a5fc1b251be295",
+    "language": "python",
+    "node_id": "n_3_78b2f8",
+    "revision_id": "rev_n_3_78b2f8_0",
+    "thought_path_snapshot": [
+      "Employ a sliding window technique to scan through the grid for potential image boundaries defined by '+'. For each identified image, perform a character validation check. If any invalid character is detected, the image should be marked as an ad and removed."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 7
+  },
+  {
+    "candidate_id": "cand_2365433b6a",
+    "problem_id": "apps_3159",
+    "code": "import sys\n\ndef is_valid_char(c):\n    return c.isalnum() or c in \"?!., \"\n\ndef find_images(grid, H, W):\n    images = []\n    visited = [[False] * W for _ in range(H)]\n    \n    for i in range(1, H - 1):\n        for j in range(1, W - 1):\n            if grid[i][j] == '+' and not visited[i][j]:\n                # Check if it's the start of a new image\n                if grid[i-1][j] == '+' and grid[i+1][j] == '+' and grid[i][j-1] == '+' and grid[i][j+1] == '+':\n                    # Find the boundaries of the image\n                    top, bottom, left, right = i, i, j, j\n                    queue = [(i, j)]\n                    visited[i][j] = True\n                    \n                    while queue:\n                        x, y = queue.pop()\n                        for dx, dy in [(-1, 0), (1, 0), (0, -1), (0, 1)]:\n                            nx, ny = x + dx, y + dy\n                            if 0 <= nx < H and 0 <= ny < W and not visited[nx][ny]:\n                                if grid[nx][ny] == '+':\n                                    visited[nx][ny] = True\n                                    queue.append((nx, ny))\n                                    top = min(top, nx)\n                                    bottom = max(bottom, nx)\n                                    left = min(left, ny)\n                                    right = max(right, ny)\n                    \n                    # Check if the image is at least 3x3\n                    if bottom - top >= 2 and right - left >= 2:\n                        images.append((top, bottom, left, right))\n    \n    return images\n\ndef remove_ads(grid, H, W):\n    images = find_images(grid, H, W)\n    banned_chars = set()\n    \n    # Identify banned characters in images\n    for top, bottom, left, right in images:\n        for i in range(top, bottom + 1):\n            for j in range(left, right + 1):\n                if not is_valid_char(grid[i][j]):\n                    banned_chars.add((top, bottom, left, right))\n                    break\n    \n    # Remove images containing banned characters\n    for top, bottom, left, right in banned_chars:\n        for i in range(top, bottom + 1):\n            for j in range(left, right + 1):\n                grid[i][j] = ' '\n    \n    return grid\n\ndef main():\n    import sys\n    input = sys.stdin.read\n    data = input().splitlines()\n    \n    H, W = map(int, data[0].split())\n    grid = data[1:]\n    \n    result_grid = remove_ads(grid, H, W)\n    \n    for row in result_grid:\n        print(row)\n\nif __name__ == \"__main__\":\n    main()",
+    "code_hash": "c23d2dc1ba5f9283",
+    "language": "python",
+    "node_id": "n_3_78b2f8",
+    "revision_id": "rev_n_3_78b2f8_1",
+    "thought_path_snapshot": [
+      "The issue arises because the code attempts to access grid elements starting from index 1, which can lead to an IndexError if the grid dimensions are too small. To fix this, the loop should start from index 0 and ensure that the grid boundaries are respected when checking for the '+' characters. Additionally, the code should handle cases where the grid might not have enough rows or columns to form a valid image."
+    ],
+    "origin": "rethink",
+    "generation_record_id": null,
+    "created_sequence": 8
+  }
+]

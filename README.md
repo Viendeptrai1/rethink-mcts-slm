@@ -15,9 +15,10 @@ Tài liệu đặc tả kỹ thuật chi tiết: [docs/rethinkmcts_small_model_s
 5. [Bộ Dữ liệu Chuẩn (HumanEval &amp; APPS)](#5-bộ-dữ-liệu-chuẩn-humaneval--apps)
 6. [Hướng dẫn Sử dụng CLI (`rethink`)](#6-hướng-dẫn-sử-dụng-cli-rethink)
 7. [Kịch bản Chạy Mẫu (Quickstarts)](#7-kịch-bản-chạy-mẫu-quickstarts)
-8. [Cấu hình Hệ thống (YAML Configs)](#8-cấu-hình-hệ-thống-yaml-configs)
-9. [Kiểm thử Tự động (36/36 Tests Passed)](#9-kiểm-thử-tự-động-3636-tests-passed)
-10. [Xử lý Sự cố &amp; FAQs](#10-xử-lý-sự-cố--faqs)
+8. [Kết quả Thực nghiệm Đối đầu (7B vs 14B)](#8-kết-quả-thực-nghiệm-đối-đầu-7b-vs-14b)
+9. [Cấu hình Hệ thống (YAML Configs)](#9-cấu-hình-hệ-thống-yaml-configs)
+10. [Kiểm thử Tự động (36/36 Tests Passed)](#10-kiểm-thử-tự-động-3636-tests-passed)
+11. [Xử lý Sự cố &amp; FAQs](#11-xử-lý-sự-cố--faqs)
 
 ---
 
@@ -409,7 +410,45 @@ rethink solve \
 
 ---
 
-## 8. Cấu hình Hệ thống (YAML Configs)
+## 8. Kết quả Thực nghiệm Đối đầu (7B vs 14B)
+
+Thực nghiệm được phân công đối đầu giữa hai luồng mô hình trên cùng tập dữ liệu chuẩn:
+- **Nhánh 7B (`Qwen2.5-Coder-7B-Instruct`):** Do HuyinCP thực hiện trên Modal GPU / CKEY ([chi tiết báo cáo 7B](docs/results/7b/)). **Đã hoàn thành chính thức**.
+- **Nhánh 14B (`Qwen2.5-Coder-14B-Instruct`):** Do Kotori thực hiện trên TLCN. **Đang chờ chạy chính thức trên đúng tập cohort**.
+
+### A. Đối đầu trên HumanEval (164 bài toán chuẩn)
+
+| Phương pháp | Mô hình | Pass@1 (%) | Số bài Pass (trên 164) | Trạng thái |
+| :--- | :---: | :---: | :---: | :--- |
+| **Direct Baseline** | 7B | **80.49%** | 132 | Chính thức |
+| **RethinkMCTS (Test-only)** | 7B | **89.63%** | 147 | Chính thức |
+| **RethinkMCTS (Dual Reward)**| 7B | **91.46%** | 150 | Chính thức |
+| **Direct Baseline** | 14B | 90.24% | 148 | Pilot sơ bộ (chờ đối soát) |
+| **Best-of-3 (BoN-3)** | 14B | 91.46% | 150 | Pilot sơ bộ (chờ đối soát) |
+| **RethinkMCTS** | 14B | **93.29%** | 153 | Pilot sơ bộ (chờ đối soát) |
+
+> **Điểm nhấn nghiên cứu:** Mô hình 7B khi được hỗ trợ bởi RethinkMCTS đạt **91.46%**, vượt qua mô hình 14B sinh trực tiếp (**90.24%**).
+
+### B. Kết quả trên APPS Benchmark (300 bài toán Stratified)
+
+Đánh giá trên bộ 300 bài toán chuẩn Stratified Random Sampling (`seed=2027`: 100 Intro, 100 Inter, 100 Comp theo [`data/cohorts/apps_benchmark_300.json`](data/cohorts/apps_benchmark_300.json)) với cùng cấu hình prompting `native_v2`:
+
+| Phương pháp | 7B Pass@1 (Huy) | 7B Pass Rate (Huy) | 14B Pass@1 (Kotori) | 14B Pass Rate (Kotori) | Mức tăng 14B vs 7B |
+| :--- | :---: | :---: | :---: | :---: | :---: |
+| **Direct Baseline** | 14.00% (42/300) | 30.51% | *(Tham chiếu)* | *(Tham chiếu)* | — |
+| **RethinkMCTS Dual** | 19.00% (57/300) | 43.04% | **36.00%** (108/300) | **53.49%** | **+17.00% Pass@1** (+10.45% Pass Rate) |
+| **RethinkMCTS Test-only**| **22.67%** (68/300) | **45.34%** | *(Pending)* | *(Pending)* | — |
+
+#### Chi tiết Phân tầng Độ khó (14B RethinkMCTS Dual - 300/300 Hoàn tất):
+- **Introductory (100 bài):** **53.00% Pass@1** (53/100) — Hidden Pass Rate: **71.26%** *(vs 7B: 38.00% Pass@1 / 56.70%)*
+- **Interview (100 bài):** **27.00% Pass@1** (27/100) — Hidden Pass Rate: **50.13%** *(vs 7B: 14.00% Pass@1 / 42.36%)*
+- **Competition (100 bài):** **28.00% Pass@1** (28/100) — Hidden Pass Rate: **39.08%** *(vs 7B: 5.00% Pass@1 / 30.07%, tăng vượt bậc +23.00%)*
+
+*Xem báo cáo đối đầu chi tiết tại:* [`docs/results/BENCHMARK_7B_VS_14B_REPORT.md`](docs/results/BENCHMARK_7B_VS_14B_REPORT.md).
+
+---
+
+## 9. Cấu hình Hệ thống (YAML Configs)
 
 Các file cấu hình trong thư mục [`configs/`](configs/) tuân thủ schema nghiêm ngặt được định nghĩa trong [`src/rethink_mcts/config.py`](src/rethink_mcts/config.py):
 
@@ -432,7 +471,7 @@ Các file cấu hình trong thư mục [`configs/`](configs/) tuân thủ schema
 
 ---
 
-## 9. Kiểm thử Tự động (36/36 Tests Passed)
+## 10. Kiểm thử Tự động (36/36 Tests Passed)
 
 Toàn bộ hệ thống được bảo vệ bởi bộ kiểm thử tự động nghiêm ngặt gồm **36 bài test** bao phủ các tầng kiến trúc:
 
@@ -490,7 +529,7 @@ tests/unit/test_policies.py::test_u13_max_reward_vs_public_first PASSED  [100%]
 
 ---
 
-## 10. Xử lý Sự cố & FAQs
+## 11. Xử lý Sự cố & FAQs
 
 **1. Lỗi: `ConnectionRefusedError: [Errno 61] Connection refused` khi chạy `rethink doctor` hoặc `solve`:**
 

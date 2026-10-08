@@ -27,43 +27,63 @@ def parse_thoughts_json(raw_text: str) -> List[Tuple[str, float]]:
     """
     cleaned = strip_single_code_fence(raw_text)
 
+    # 1. Try standard JSON parsing
+    data = None
     try:
         data = json.loads(cleaned)
-    except json.JSONDecodeError as e:
-        # Check if text contains a json block inside
-        match = re.search(r"\{.*\}", cleaned, re.DOTALL)
+    except json.JSONDecodeError:
+        match = re.search(r"(\[.*\]|\{.*\})", cleaned, re.DOTALL)
         if match:
             try:
                 data = json.loads(match.group(0))
             except json.JSONDecodeError:
-                raise InvalidModelOutputError(f"Malformed JSON proposals: {e}") from e
-        else:
-            raise InvalidModelOutputError(f"Could not parse JSON proposals: {e}") from e
-
-    if not isinstance(data, dict) or "thoughts" not in data:
-        raise InvalidModelOutputError("Response JSON must be an object containing a 'thoughts' key")
-
-    thoughts_list = data["thoughts"]
-    if not isinstance(thoughts_list, list):
-        raise InvalidModelOutputError("'thoughts' field must be a JSON array")
+                pass
 
     results: List[Tuple[str, float]] = []
-    for idx, item in enumerate(thoughts_list):
-        if not isinstance(item, dict):
-            continue
-        text = str(item.get("text", "")).strip()
-        score = item.get("reasonableness")
-        if not text or score is None:
-            continue
-        try:
-            score_val = float(score)
-            if score_val == score_val and score_val >= 0:  # Not NaN and >= 0
-                results.append((text, score_val))
-        except (ValueError, TypeError):
-            continue
+    if data is not None:
+        if isinstance(data, list):
+            items = data
+        elif isinstance(data, dict):
+            if "thoughts" in data and isinstance(data["thoughts"], list):
+                items = data["thoughts"]
+            elif "actions" in data and isinstance(data["actions"], list):
+                items = data["actions"]
+            elif "thought" in data or "text" in data:
+                items = [data]
+            else:
+                items = []
+        else:
+            items = []
+
+        for item in items:
+            if not isinstance(item, dict):
+                continue
+            text = str(item.get("thought", item.get("text", ""))).strip()
+            score = item.get("reasonableness", item.get("score", item.get("probability")))
+            if not text or score is None:
+                continue
+            try:
+                score_val = float(score)
+                if score_val == score_val and score_val >= 0:
+                    results.append((text, score_val))
+            except (ValueError, TypeError):
+                continue
+
+    # 2. Check for repeated keys in one dict or text if regex finds more pairs
+    t_matches = re.findall(r'\"(?:thought|text)\"\s*:\s*\"([^\"]+)\"', cleaned)
+    s_matches = re.findall(r'\"(?:reasonableness|score|probability)\"\s*:\s*([0-9.]+)', cleaned)
+    if len(t_matches) == len(s_matches) and len(t_matches) > len(results):
+        alt_results = []
+        for t, s in zip(t_matches, s_matches):
+            try:
+                alt_results.append((t.strip(), float(s)))
+            except (ValueError, TypeError):
+                pass
+        if len(alt_results) > len(results):
+            results = alt_results
 
     if not results:
-        raise InvalidModelOutputError("No valid proposals found in thoughts JSON")
+        raise InvalidModelOutputError(f"Could not parse valid thought proposals from: {raw_text[:200]}")
 
     return results
 
@@ -110,6 +130,9 @@ def parse_critic_score(raw_text: str, score_min: float = 0.0, score_max: float =
             if "score" in data:
                 val = float(data["score"])
                 return max(score_min, min(score_max, val))
+            if "evaluation" in data:
+                val = float(data["evaluation"])
+                return max(score_min, min(score_max, val))
         except Exception:
             pass
 
@@ -120,8 +143,8 @@ def parse_critic_score(raw_text: str, score_min: float = 0.0, score_max: float =
     except ValueError:
         pass
 
-    # 3. Look for explicit score field or trailing number
-    match = re.search(r"(?:score\s*[:=]\s*|rating\s*[:=]\s*)?(-?\d+(?:\.\d+)?)", cleaned, re.IGNORECASE)
+    # 3. Look for explicit score/evaluation field or trailing number
+    match = re.search(r"(?:score\s*[:=]\s*|rating\s*[:=]\s*|evaluation\s*[:=]\s*)?(-?\d+(?:\.\d+)?)", cleaned, re.IGNORECASE)
     if match:
         try:
             val = float(match.group(1))
