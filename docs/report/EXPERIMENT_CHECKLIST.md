@@ -21,9 +21,8 @@ Ký hiệu:
 
 ## II. Nhóm A — Phân tích Offline làm được NGAY (🧮 0 tốn GPU)
 
-- [ ] **A1. 🧮 Phân tích sâu LLM Critic trên 14B APPS-300 (Paper Table 3 & RQ3):**
-  - Nguồn: 300 file `evaluations.json` trong `runs/benchmark_14b_batch_01..10`, `retry_01..04`, `last_one`.
-  - Tính: Phân phối điểm `self_eval_raw` trên 160 bài kích hoạt Critic; tương quan với `hidden_pass_rate`; số bài có $\ge 2$ ứng viên đạt $v_{\text{test}}=1.0$ mà Critic làm thay đổi ứng viên được chọn.
+- [x] **A1. 🧮 Phân tích sâu LLM Critic trên 14B APPS-300 (Paper Table 3 & RQ3):**
+  - Đã tính trên 161 lượt gọi Critic của 14B: Pearson $r = +0.170$ ($p = 0.031$), Spearman $\rho = +0.243$ ($p = 0.0019$), Point-biserial $r = +0.239$ ($p = 0.0023$). Bắt đúng 22 bài overfit. Chi tiết tại [Chương 5 §5.2](05_phan_tich_thao_luan.md).
 - [x] **A2. 🧮 Kiểm định Ý nghĩa Thống kê (McNemar's Test & Bootstrap 95% CI):**
   - Đã tính cho cặp **14B MCTS Dual vs 14B Direct trên Full APPS-300**: $\chi^2 = 18.4808, p = 1.72 \times 10^{-5}$, Bootstrap 95% CI: Direct $[20.67\%, 30.33\%]$ vs MCTS $[30.67\%, 41.67\%]$, $\Delta = +10.67\%$ (95% CI: $[3.67\%, 18.00\%]$). MCTS cứu được 42 bài Direct sai. Còn cặp HumanEval và 7B APPS.
 - [ ] **A3. 🧮 Phân loại Lỗi, Tỷ lệ Cứu vãn nhờ Rethink & Tỷ lệ Code Hợp lệ trên Cây (Paper Table 4):**
@@ -35,6 +34,9 @@ Ký hiệu:
   - Trích xuất từ lịch sử ứng viên $k = 1, 2, \dots, 16$ trong `evaluations.json` của 300 bài 14B để vẽ đường cong Pass@1 và Public Pass Rate theo ngân sách $k \in \{1, 2, 4, 8, 16\}$.
 - [ ] **A7. 🧮 Trích xuất 3 Case Studies Điển hình & Ví dụ Trace (Paper Table 13 & 14):**
   - Xuất 2 bài thành công nhờ `block_analysis` + `rethink` và 1 bài thất bại do overfit public tests để đưa vào Chương 2 & Chương 5.7.
+- [x] **A8. 🧮 Thí nghiệm Đối đầu Self-Critic (Qwen2.5-Coder-14B) vs Cross-Critic (Mistral Codestral):**
+  - Đã chạy thẩm định chéo trên toàn bộ 161 ứng viên mã đạt $v_{\text{test}} = 1.0$ của APPS-300 bằng mô hình `codestral-latest`.
+  - Kết quả: Self-Critic ($\rho = +0.243, p = 0.0019$) vượt trội hoàn toàn so với Cross-Critic Codestral ($\rho = +0.033, p = 0.68$). Codestral bị bão hòa trần 90.1% và bỏ sót 95.16% bài overfit. Chi tiết tại [Chương 5 §5.2.2](05_phan_tich_thao_luan.md). Nguồn: `runs/cross_critic_analysis_14b/`.
 
 ---
 

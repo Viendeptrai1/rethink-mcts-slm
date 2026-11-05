@@ -16,17 +16,37 @@
 
 ---
 
-## 5.2. Vai trò của LLM Critic & Hiện tượng *Critic Degradation* (Ablation 1 — RQ3)
+## 5.2. Vai trò của LLM Critic & Thí nghiệm Đối đầu Self-Critic vs Cross-Critic (RQ3)
 
+### 5.2.1. Hiện tượng *Critic Degradation* ở Mô hình Nhỏ (7B) vs Năng lực Thẩm định ở 14B
 - **Bằng chứng trên 7B:** Trên APPS-300, cấu hình **Test-only (22.67%)** vượt **Dual Reward (19.00%)** tới **+3.67% Pass@1**. Ngược lại, trên HumanEval-164 (nơi chỉ có rất ít `given_tests`), 7B Dual (**91.46%**) lại cao hơn 7B Test-only (**89.63%**).
 - **Giải thích gắn với lý thuyết bài báo gốc (Paper §6, trang 6):**
   - Bài báo gốc chỉ ra Dual Evaluation đặc biệt quan trọng khi số lượng public tests ít (như HumanEval).
   - Khi số lượng public tests nhiều hơn (như cấu hình `half` của 7B trên APPS), bản thân $v_{\text{test}}$ đã đủ tính phân loại; lúc này điểm tự chấm $v_{\text{llm}}$ của mô hình nhỏ 7B bị nhiễu sẽ làm lệch thứ tự chọn ứng viên.
-- **Trên 14B (Cần hoàn tất [A1](EXPERIMENT_CHECKLIST.md) & [E3](EXPERIMENT_CHECKLIST.md)):**
-  - Trong run 14B Dual APPS-300, `prepared/apps` chỉ cấp **2 public tests/bài**, dẫn đến **160/300 bài** có ứng viên vượt qua toàn bộ public tests và kích hoạt Critic (`self_eval_raw`).
-  - **Phân tích Offline A1 (Không tốn GPU):** Trích xuất `self_eval_raw` từ 300 file `evaluations.json` để kiểm tra:
-    1. Trong 160 bài gọi Critic, có bao nhiêu bài có $\ge 2$ ứng viên cùng đạt $v_{\text{test}} = 1.0$ mà điểm Critic đã giúp phân định thắng thua?
-    2. Hệ số tương quan (Point-biserial / Spearman) giữa điểm `self_eval_raw` và `hidden_pass_rate` là dương hay âm?
+
+### 5.2.2. Thí nghiệm Thực chứng Đối đầu: Self-Critic (Qwen2.5-Coder-14B) vs Cross-Critic (Mistral Codestral) ✅
+*(Trích xuất từ kết quả thực nghiệm chuẩn hóa trên toàn bộ 161 lượt kích hoạt Critic của APPS-300 tại [`runs/cross_critic_analysis_14b/summary.json`](../../runs/cross_critic_analysis_14b/summary.json))*
+
+Để kiểm tra giả thuyết: *"Liệu một mô hình độc lập bên ngoài (Cross-Critic) có khách quan hơn và ít bị thiên kiến tự xác nhận (Confirmation Bias) hơn so với việc mô hình tự đánh giá code của chính nó (Self-Critic) hay không?"*, chúng tôi cho mô hình chuyên biệt mã nguồn hàng đầu thế giới **Mistral Codestral (`codestral-latest`)** đánh giá chéo độc lập trên chính xác cùng một prompt và 161 ứng viên mã đã vượt qua 100% public tests do Qwen2.5-Coder-14B sinh ra.
+
+#### Bảng 5.2. So sánh Năng lực Thẩm định: Self-Critic (Qwen-14B) vs Cross-Critic (Codestral)
+
+| Chỉ số Thống kê | Self-Critic (Qwen2.5-Coder-14B) | Cross-Critic (Mistral Codestral) | Nhận xét & Ý nghĩa Thống kê |
+| :--- | :---: | :---: | :--- |
+| **Hệ số Tương quan Hạng Spearman ($\rho$)** | **+0.2426** ($p = 0.0019$) | +0.0327 ($p = 0.6806$) | **Qwen-14B có ý nghĩa thống kê vượt bậc ($p < 0.01$)**, Codestral không có tương quan. |
+| **Hệ số Tương quan Tuyến tính Pearson ($r$)** | **+0.1699** ($p = 0.0312$) | -0.0556 ($p = 0.4838$) | **Qwen-14B đạt $p < 0.05$**, Codestral hơi âm nhẹ do quá tập trung điểm trần 1.0. |
+| **Tương quan Point-Biserial ($r_{\text{pb}}$ với Hidden Pass)** | **+0.2391** ($p = 0.0023$) | -0.0417 ($p = 0.5997$) | Điểm chấm của Qwen-14B dự đoán chính xác xác suất pass 100% test ẩn. |
+| **Phân phối Điểm chấm ($v_{\text{llm}}$)** | 1.0: 121 · **-1.0: 35** · Khác: 5 | 1.0: 145 (90.1%) · -1.0: 5 · Khác: 11 | **Codestral bị bão hòa trần (Sycophancy)**: Cho điểm tuyệt đối 90.1% số lần. |
+| **Tỷ lệ Phê duyệt Sai trên 62 bài Quá khớp (Overfit)** | **64.52%** (Bắt trúng 22 bài sai) | **95.16%** (Bỏ sót 59/62 bài sai) | Qwen-14B khắt khe và phát hiện lỗi biên tốt hơn gấp **7.3 lần** so với Codestral. |
+| **Tỷ lệ Phê duyệt Đúng trên 99 bài Pass Ẩn** | 84.85% (84/99 bài) | 92.93% (92/99 bài) | Codestral do chấm điểm quá dễ dãi nên tỷ lệ pass cao nhưng mất tính phân loại. |
+
+#### 🧠 Thảo luận & Phát hiện Khoa học Giá trị:
+1. **Lợi thế Đồng bộ Không gian Suy luận Nội tại (Internal Reasoning Alignment):**
+   - Trái với trực giác ban đầu rằng mô hình ngoài sẽ khách quan hơn, kết quả thực nghiệm cho thấy **mô hình tự sinh mã lại có năng lực phát hiện lỗi biên của chính mình tốt hơn**. Do Qwen2.5-Coder-14B tự sinh ra cây tư duy (`reasoning_path`), khi đóng vai trò Critic đọc lại suy luận và mã của chính mình, nó nhận diện được những bước tư duy "gượng ép" hoặc giả định mong manh mà nó đã tạo ra ở các bước trước, từ đó chấm điểm phạt $-1.0$ (chặn đứng 22 trường hợp quá khớp).
+2. **Hội chứng Cả tin Bề mặt (Sycophancy & Surface-Level Plausibility) của Mô hình Ngoài:**
+   - Khi một mô hình bên ngoài (Codestral) tiếp nhận một đoạn mã đã định dạng đẹp đẽ kèm tiền đề *"Mã đã vượt qua toàn bộ kiểm thử công khai"*, nó chỉ phân tích ngữ nghĩa bề mặt (Surface-level semantic check). Do không tham gia vào quá trình khám phá cây MCTS và không biết các nhánh lỗi trước đó, Codestral dễ dàng tin tưởng rằng mã đã hoàn thiện, dẫn đến hiện tượng **nịnh bợ / cả tin (Sycophancy)** với 90.1% điểm trần và để lọt tới 95.16% số bài quá khớp!
+3. **Đóng góp cho Thiết kế Hệ thống Đa Tác nhân (Multi-Agent Systems):**
+   - Kết quả này mang lại khuyến nghị khoa học đắt giá: Khi thiết kế mạng Critic thẩm định trong tìm kiếm cây, **không nên giao phó cho một LLM ngoài đọc mã chay**, mà Critic bên ngoài bắt buộc phải có môi trường sinh ca kiểm thử nghịch đảo (Counterexample Generation) hoặc Symbolic Execution thì mới khắc phục được thiên kiến nịnh bợ bề mặt.
 
 ---
 
