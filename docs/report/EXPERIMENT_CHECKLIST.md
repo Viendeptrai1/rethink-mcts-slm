@@ -24,8 +24,8 @@ Ký hiệu:
 - [ ] **A1. 🧮 Phân tích sâu LLM Critic trên 14B APPS-300 (Paper Table 3 & RQ3):**
   - Nguồn: 300 file `evaluations.json` trong `runs/benchmark_14b_batch_01..10`, `retry_01..04`, `last_one`.
   - Tính: Phân phối điểm `self_eval_raw` trên 160 bài kích hoạt Critic; tương quan với `hidden_pass_rate`; số bài có $\ge 2$ ứng viên đạt $v_{\text{test}}=1.0$ mà Critic làm thay đổi ứng viên được chọn.
-- [ ] **A2. 🧮 Kiểm định Ý nghĩa Thống kê (McNemar's Test & Bootstrap 95% CI):**
-  - Tính 95% Bootstrap CI cho toàn bộ Pass@1 và Hidden Pass Rate; chạy kiểm định cặp McNemar trên 300 bài APPS và 164 bài HumanEval.
+- [x] **A2. 🧮 Kiểm định Ý nghĩa Thống kê (McNemar's Test & Bootstrap 95% CI):**
+  - Đã tính cho cặp **14B MCTS Dual vs 14B Direct trên Full APPS-300**: $\chi^2 = 18.4808, p = 1.72 \times 10^{-5}$, Bootstrap 95% CI: Direct $[20.67\%, 30.33\%]$ vs MCTS $[30.67\%, 41.67\%]$, $\Delta = +10.67\%$ (95% CI: $[3.67\%, 18.00\%]$). MCTS cứu được 42 bài Direct sai. Còn cặp HumanEval và 7B APPS.
 - [ ] **A3. 🧮 Phân loại Lỗi, Tỷ lệ Cứu vãn nhờ Rethink & Tỷ lệ Code Hợp lệ trên Cây (Paper Table 4):**
   - Nguồn: `evaluations.json`, `feedback.json`, `search.json` của 300 bài 14B.
   - Tính: Phân phối lỗi ở ứng viên đầu tiên (CE/RE/WA/TLE); số bài được cứu thành công sau các bước `rethink`; **Tree Effective Code Rate** (tỷ lệ ứng viên đạt $v_{\text{test}}=1.0$ trên tổng $1,748$ ứng viên); phân tích 52 bài bị Public Test Overfitting (pass public nhưng trượt hidden).
@@ -55,17 +55,10 @@ Với kiến trúc **10 GPU song song** (30 bài/batch tại `configs/batches/ba
 
 ### 🔴 Ưu tiên 1: Hoàn thiện Bảng So sánh Chính (Main Results — Bảng 4.1 & 4.2)
 
-- [ ] **E1. ⏳ 14B Direct Baseline trên Full APPS-300 (300 bài, ~3–5 phút trên 10 GPU):**
-  - **Mục đích:** Mốc cơ sở bắt buộc để tính độ tăng trưởng $\Delta$ của 14B MCTS Dual (`36.00%`) trên toàn bộ 300 bài.
-  - **Lệnh chạy (theo batch hoặc 1 mạch):**
-    ```bash
-    python3 scripts/run_benchmark_batch.py \
-      --config configs/benchmark_apps_14b_dual.yaml \
-      --dataset apps \
-      --solver direct \
-      --output-dir runs/benchmark_apps_14b_direct_300 \
-      --problem-ids @data/cohorts/apps_benchmark_300.json
-    ```
+- [x] **E1. ⏳ 14B Direct Baseline trên Full APPS-300 (300 bài) — ĐÃ HOÀN TẤT:**
+  - **Kết quả:** Pass@1 = **25.33%** (76/300), Mean Hidden Pass Rate = **38.41%**. Intro: 42.00%, Inter: 13.00%, Comp: 21.00%. Tổng 380 calls, 411,815 tokens.
+  - **So sánh với MCTS Dual (36.00%):** $\Delta = +10.67\%$ (McNemar $\chi^2 = 18.48, p = 1.72 \times 10^{-5} \ll 0.001$, Bootstrap 95% CI: $[3.67\%, 18.00\%]$).
+  - **Artifact:** `runs/benchmark_apps_14b_direct_300/summary.json`
 
 - [ ] **E2. ⏳ 14B Best-of-3 (`--solver best_of_n --samples-n 3`) trên Full APPS-300 (300 bài, ~10–15 phút trên 10 GPU):**
   - **Mục đích:** Chứng minh trên cả 300 bài APPS rằng tìm kiếm có hướng dẫn (RethinkMCTS) vượt xa việc lấy mẫu ngẫu nhiên độc lập nhiều lần.

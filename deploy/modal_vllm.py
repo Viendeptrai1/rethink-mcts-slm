@@ -16,9 +16,9 @@ import modal
 
 APP_NAME = os.environ.get("MODAL_APP_NAME", "rethink-vllm")
 MODEL_ID = os.environ.get("VLLM_MODEL_ID", "Qwen/Qwen2.5-Coder-14B-Instruct")
-GPU_TYPE = os.environ.get("VLLM_GPU", "H200")  # H200, H100, A100-80GB, A10G
+GPU_TYPE = os.environ.get("VLLM_GPU", "L40S")  # L40S ($1.95/hr, 48GB VRAM), H200, A100-80GB
 MAX_MODEL_LEN = int(os.environ.get("VLLM_MAX_MODEL_LEN", "16384"))
-IDLE_SCALEDOWN_SECONDS = 300  # Auto-shutdown after 5 minutes of inactivity to save costs
+IDLE_SCALEDOWN_SECONDS = int(os.environ.get("MODAL_IDLE_SECONDS", "180"))  # Auto-shutdown after 3 mins of inactivity
 
 # 2. Container Environment & Persistent Cache
 app = modal.App(APP_NAME)

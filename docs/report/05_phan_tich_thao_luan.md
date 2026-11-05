@@ -7,10 +7,12 @@
 - **Trên HumanEval-164:**
   - `Qwen2.5-Coder-7B` khi gắn RethinkMCTS Dual đạt **91.46% (150/164)**, vượt qua `Qwen2.5-Coder-14B` chạy Direct (**90.24%, 148/164**).
   - `Qwen2.5-Coder-14B` khi gắn RethinkMCTS đạt **93.29% (153/164)** chỉ với trung bình **4.55 lời gọi/bài** (ít hơn cả Best-of-3: 5.77 lời gọi/bài).
-- **Trên APPS-300 (Đặc biệt ở mức độ Competition):**
+- **Trên APPS-300 (Đặc biệt ở mức độ Competition & Interview):**
   - Bài báo gốc nhận xét trên GPT-3.5 vs GPT-4o-mini rằng mô hình yếu hơn hưởng lợi nhiều hơn từ RethinkMCTS.
-  - Tuy nhiên, ở phân khúc **mô hình nhỏ $\le$ 14B**, kết quả thực nghiệm chỉ ra một quy luật bổ sung quan trọng: **Ở mức độ khó Competition, mô hình 7B chạm trần kiến thức thuật toán** (Direct 4.00% $\to$ MCTS Dual 5.00% $\to$ Test-only 9.00%), trong khi **14B MCTS Dual nhảy vọt lên 28.00%** (ngang bằng con số 28% của GPT-4o-mini trong Table 1 bài báo gốc!).
-  - *Cần bổ sung:* Số liệu **14B Direct trên APPS-300** ([E1](EXPERIMENT_CHECKLIST.md)) để tách biệt chính xác phần đóng góp của bản thân trọng số 14B và phần đóng góp của tìm kiếm MCTS trên 14B.
+  - Tuy nhiên, ở phân khúc **mô hình nhỏ $\le$ 14B**, kết quả thực nghiệm chỉ ra một quy luật bổ sung quan trọng:
+    1. **Ở mức độ khó Competition, mô hình 7B chạm trần kiến thức thuật toán** (Direct 4.00% $\to$ MCTS Dual 5.00% $\to$ Test-only 9.00%), trong khi **14B Direct đạt 21.00%** và **14B MCTS Dual nhảy vọt lên 28.00%** (ngang bằng con số 28% của GPT-4o-mini trong Table 1 bài báo gốc!).
+    2. **Ở mức độ khó Interview, MCTS tạo ra bước nhảy vọt lớn nhất (+14.00%):** Direct chỉ đạt **13.00%** (13/100), trong khi MCTS Dual đạt tới **27.00%** (27/100) — **tăng trưởng hơn gấp đôi (+107.7% tương đối)**. Điều này cho thấy với các bài toán phỏng vấn có cấu trúc logic vừa tầm, cơ chế duyệt cây và sửa tư duy lá phát huy tác dụng cứu bài mạnh mẽ nhất.
+    3. **Tổng thể trên 300 bài:** RethinkMCTS Dual nâng Pass@1 từ **25.33% (76/300)** lên **36.00% (108/300)** ($\Delta = +10.67\%$, cứu thành công 42 bài mà Direct bó tay, kiểm định McNemar $\chi^2 = 18.48, p = 1.72 \times 10^{-5} \ll 0.001$). Mean Hidden Pass Rate cũng tăng tương ứng từ **38.41%** lên **53.49%** ($+15.08\%$).
 
 ---
 

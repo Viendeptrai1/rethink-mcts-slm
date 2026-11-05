@@ -8,12 +8,13 @@ Ký hiệu: `✅` Đã có số liệu từ artifact · `⏳` Cần chạy thêm
 
 - **Nguồn 7B:** [BENCHMARK_7B_VS_14B_REPORT.md](../results/BENCHMARK_7B_VS_14B_REPORT.md), [rethinkmcts-apps-native-v2-w4-retry.md](../results/7b/rethinkmcts-apps-native-v2-w4-retry.md), [rethinkmcts-test-only-v1.md](../results/7b/rethinkmcts-test-only-v1.md).
 - **Nguồn 14B Dual:** [runs/benchmark_apps_14b_dual_unified/summary.json](../../runs/benchmark_apps_14b_dual_unified/summary.json).
+- **Nguồn 14B Direct:** [runs/benchmark_apps_14b_direct_300/summary.json](../../runs/benchmark_apps_14b_direct_300/summary.json).
 
 ### Bảng 4.1a. Tổng hợp Pass@1 (%) và Mean Hidden Pass Rate (%) trên APPS-300
 
 | Phương pháp | 7B Pass@1 | 7B Pass Rate | 14B Pass@1 | 14B Pass Rate | Trạng thái / Checklist |
 | :--- | :-: | :-: | :-: | :-: | :--- |
-| **Direct Generation** | ✅ 14.00% (42/300) | ✅ 30.51% | ⏳ TODO | ⏳ TODO | Cần chạy [E1](EXPERIMENT_CHECKLIST.md) |
+| **Direct Generation** | ✅ 14.00% (42/300) | ✅ 30.51% | ✅ **25.33%** (76/300) | ✅ **38.41%** | Đã hoàn tất 300/300 bài [E1](EXPERIMENT_CHECKLIST.md) |
 | **Best-of-3 (BoN-3)** | ⏳ TODO | ⏳ TODO | ⏳ TODO | ⏳ TODO | Cần chạy [E2](EXPERIMENT_CHECKLIST.md) |
 | **Iterative Repair** | ⏳ TODO | ⏳ TODO | ⏳ TODO | ⏳ TODO | Cần chạy [E5](EXPERIMENT_CHECKLIST.md) |
 | **RethinkMCTS (Test-only)** | ✅ **22.67%** (68/300) | ✅ **45.34%** | ⏳ TODO | ⏳ TODO | Cần chạy [E3](EXPERIMENT_CHECKLIST.md) |
@@ -23,10 +24,10 @@ Ký hiệu: `✅` Đã có số liệu từ artifact · `⏳` Cần chạy thêm
 
 | Phân tầng (100 bài/tầng) | Chỉ số | 7B Direct | 7B MCTS Dual | 7B MCTS Test-only | 14B Direct | 14B MCTS Dual |
 | :--- | :--- | :-: | :-: | :-: | :-: | :-: |
-| **Introductory** | Pass@1 (%)<br>Pass Rate (%) | 31.00%<br>45.84% | 38.00%<br>56.70% | **41.00%**<br>61.14% | ⏳ [E1](EXPERIMENT_CHECKLIST.md) | **53.00%** (53/100)<br>**71.26%** |
-| **Interview** | Pass@1 (%)<br>Pass Rate (%) | 7.00%<br>26.18% | 14.00%<br>42.36% | **18.00%**<br>45.46% | ⏳ [E1](EXPERIMENT_CHECKLIST.md) | **27.00%** (27/100)<br>**50.13%** |
-| **Competition** | Pass@1 (%)<br>Pass Rate (%) | 4.00%<br>19.52% | 5.00%<br>30.07% | **9.00%**<br>29.42% | ⏳ [E1](EXPERIMENT_CHECKLIST.md) | **28.00%** (28/100)<br>**39.08%** |
-| **Toàn bộ (300 bài)** | **Pass@1 (%)**<br>**Pass Rate (%)** | **14.00%**<br>**30.51%** | **19.00%**<br>**43.04%** | **22.67%**<br>**45.34%** | ⏳ [E1](EXPERIMENT_CHECKLIST.md) | **36.00%** (108/300)<br>**53.49%** |
+| **Introductory** | Pass@1 (%)<br>Pass Rate (%) | 31.00%<br>45.84% | 38.00%<br>56.70% | **41.00%**<br>61.14% | ✅ **42.00%** (42/100)<br>✅ **53.50%** | **53.00%** (53/100)<br>**71.26%** |
+| **Interview** | Pass@1 (%)<br>Pass Rate (%) | 7.00%<br>26.18% | 14.00%<br>42.36% | **18.00%**<br>45.46% | ✅ **13.00%** (13/100)<br>✅ **31.48%** | **27.00%** (27/100)<br>**50.13%** |
+| **Competition** | Pass@1 (%)<br>Pass Rate (%) | 4.00%<br>19.52% | 5.00%<br>30.07% | **9.00%**<br>29.42% | ✅ **21.00%** (21/100)<br>✅ **30.24%** | **28.00%** (28/100)<br>**39.08%** |
+| **Toàn bộ (300 bài)** | **Pass@1 (%)**<br>**Pass Rate (%)** | **14.00%**<br>**30.51%** | **19.00%**<br>**43.04%** | **22.67%**<br>**45.34%** | ✅ **25.33%** (76/300)<br>✅ **38.41%** | **36.00%** (108/300)<br>**53.49%** |
 
 > **Ghi chú kỹ thuật minh bạch:**
 > 1. Ở nhánh 7B APPS: Dual có 295/300 bài sinh xong candidate (3 bài search timeout 900s, 2 bài lỗi cú pháp khi trace), Test-only có 297/300 bài (3 bài search timeout 900s); tất cả các bài thiếu candidate đều được gán điểm 0 vào mẫu số 300.
@@ -95,9 +96,17 @@ Ký hiệu: `✅` Đã có số liệu từ artifact · `⏳` Cần chạy thêm
 
 ## 4.5. Kiểm định Ý nghĩa Thống kê (Statistical Significance)
 
-| Cặp đối sánh | Tập dữ liệu | Kiểm định | Trạng thái |
-| :--- | :--- | :--- | :--- |
-| 14B MCTS vs 14B Direct & BoN-3 | HumanEval (164 bài) | McNemar + Bootstrap CI 95% | 🧮 Làm ngay được ([A2](EXPERIMENT_CHECKLIST.md)) |
-| 14B MCTS vs 14B Direct & BoN-3 | APPS Intro thăm dò (100 bài) | McNemar + Bootstrap CI 95% | 🧮 Làm ngay được ([A2](EXPERIMENT_CHECKLIST.md)) |
-| 14B MCTS Dual vs 14B Direct | APPS-300 (300 bài) | McNemar + Bootstrap CI 95% | ⏳ Chờ chạy xong [E1](EXPERIMENT_CHECKLIST.md) |
-| 7B Test-only vs 7B Dual vs 7B Direct | APPS-300 (300 bài) | McNemar + Bootstrap CI 95% | 🧮 Cần lấy bảng kết quả theo bài của 7B ([A5](EXPERIMENT_CHECKLIST.md)) |
+| Cặp đối sánh | Tập dữ liệu | Kiểm định | Kết quả chi tiết | Trạng thái |
+| :--- | :--- | :--- | :--- | :--- |
+| **14B MCTS Dual vs 14B Direct** | **APPS-300 (300 bài)** | McNemar ($\chi^2$) + Bootstrap CI 95% | **$\chi^2 = 18.4808, p = 1.72 \times 10^{-5}$** ($p \ll 0.001$)<br>Direct 95% CI: $[20.67\%, 30.33\%]$<br>MCTS 95% CI: $[30.67\%, 41.67\%]$<br>$\Delta = +10.67\%$ (95% CI: $[3.67\%, 18.00\%]$) | ✅ **Hoàn thành [A2]** |
+| 14B MCTS vs 14B Direct & BoN-3 | HumanEval (164 bài) | McNemar + Bootstrap CI 95% | Xem chi tiết bên dưới | 🧮 Làm ngay được ([A2](EXPERIMENT_CHECKLIST.md)) |
+| 14B MCTS vs 14B Direct & BoN-3 | APPS Intro thăm dò (100 bài) | McNemar + Bootstrap CI 95% | Xem chi tiết bên dưới | 🧮 Làm ngay được ([A2](EXPERIMENT_CHECKLIST.md)) |
+| 7B Test-only vs 7B Dual vs 7B Direct | APPS-300 (300 bài) | McNemar + Bootstrap CI 95% | Cần ghép bảng kết quả theo bài của 7B | 🧮 Làm ngay được ([A5](EXPERIMENT_CHECKLIST.md)) |
+
+### Chi tiết Phân tích Cặp bài (Paired Contingency Table) trên 14B APPS-300:
+- **Cả hai cùng giải đúng (Both Pass):** 66 bài.
+- **Cả hai cùng giải sai (Both Fail):** 182 bài.
+- **Direct giải đúng, MCTS giải sai ($b$):** 10 bài.
+- **Direct giải sai, MCTS cứu thành công ($c$):** **42 bài**.
+- **Chênh lệch cứu bài thực tế:** MCTS giải cứu thành công $42 - 10 = +32$ bài toán hóc búa từ tay Direct.
+- **Ý nghĩa:** Kiểm định McNemar hiệu chỉnh liên tục cho giá trị $\chi^2 = 18.4808$ với $p = 1.7163 \times 10^{-5} \ll 0.001$, khẳng định mức vượt trội $+10.67\%$ của RethinkMCTS Dual so với Direct là có ý nghĩa thống kê vượt bậc, không phải do phương sai ngẫu nhiên. Khoảng tin cậy Bootstrap 95% cho độ chênh lệch $\Delta$ là $[3.67\%, 18.00\%]$, hoàn toàn nằm trên vùng dương.
