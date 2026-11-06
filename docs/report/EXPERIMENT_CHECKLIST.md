@@ -24,15 +24,23 @@ Ký hiệu:
 - [x] **A1. 🧮 Phân tích sâu LLM Critic trên 14B APPS-300 (Paper Table 3 & RQ3):**
   - Đã tính trên 161 lượt gọi Critic của 14B: Pearson $r = +0.170$ ($p = 0.031$), Spearman $\rho = +0.243$ ($p = 0.0019$), Point-biserial $r = +0.239$ ($p = 0.0023$). Bắt đúng 22 bài overfit. Chi tiết tại [Chương 5 §5.2](05_phan_tich_thao_luan.md).
 - [x] **A2. 🧮 Kiểm định Ý nghĩa Thống kê (McNemar's Test & Bootstrap 95% CI):**
-  - Đã tính cho cặp **14B MCTS Dual vs 14B Direct trên Full APPS-300**: $\chi^2 = 18.4808, p = 1.72 \times 10^{-5}$, Bootstrap 95% CI: Direct $[20.67\%, 30.33\%]$ vs MCTS $[30.67\%, 41.67\%]$, $\Delta = +10.67\%$ (95% CI: $[3.67\%, 18.00\%]$). MCTS cứu được 42 bài Direct sai. Còn cặp HumanEval và 7B APPS.
+  - **14B APPS-300 (MCTS vs Direct):** $\chi^2 = 18.4808, p = 1.72 \times 10^{-5} \ll 0.001$, Bootstrap 95% CI $\Delta = +10.67\%$ ($[+3.67\%, +18.00\%]$). Cứu 42 bài.
+  - **14B HumanEval-164 (MCTS Test-only vs Direct):** $\Delta = +3.05\%$, cứu 9 bài Direct sai.
+  - **14B APPS Intro (MCTS vs Direct):** $\chi^2 = 4.9231, p = 0.0265 < 0.05$, Bootstrap 95% CI $\Delta = +9.00\%$ ($[+3.00\%, +16.00\%]$).
+  - Chi tiết tại [Chương 4 §4.5](04_ket_qua_thuc_nghiem.md).
 - [x] **A3. 🧮 Phân loại Lỗi, Tỷ lệ Cứu vãn nhờ Rethink & Tỷ lệ Code Hợp lệ trên Cây (Paper Table 4):**
   - Đã trích xuất xong từ 300 bài 14B: 216 bài kích hoạt Rethink; cứu thành công 77 bài pass public (35.6%) và **38 bài pass hidden (17.6%)**; đóng góp 35.2% tổng số bài giải đúng của 14B. Tree Effective Code Rate = **9.21%** (161/1,748 code). Lỗi lần đầu: 85.2% WA, 13.9% RE, 0.9% TLE, 0% CE. Chi tiết tại [Chương 5 §5.5](05_phan_tich_thao_luan.md).
-- [ ] **A5. 🧮 Đồng bộ Kết quả Theo Bài & Chi phí của Nhánh 7B:**
-  - Lấy kết quả chi tiết từng bài của 7B để chạy kiểm định cặp McNemar trên 300 bài APPS.
+- [x] **A5. 🧮 Phân tích Tương quan & Kiểm định Thống kê Quy mô 7B vs 14B (Chi-Square & Odds Ratio):**
+  - Đã tính toàn bộ kiểm định $\chi^2$ (hiệu chỉnh Yates) và Odds Ratio đối đầu giữa 7B và 14B trên APPS-300 và HumanEval-164:
+    - APPS Direct: $\chi^2 = 11.4881, p = 7.00 \times 10^{-4} < 0.001$, Odds Ratio = 2.08.
+    - APPS MCTS Dual: $\chi^2 = 20.8986, p = 4.84 \times 10^{-6} \ll 0.001$, Odds Ratio = 2.40.
+    - Phân tầng Competition: $\chi^2 = 17.5649, p = 2.78 \times 10^{-5} \ll 0.001$, Odds Ratio = **7.39 $\times$** (bước nhảy vọt từ 5% lên 28%).
+    - HumanEval Direct: $\chi^2 = 5.4911, p = 0.0191 < 0.05$, Odds Ratio = 2.24.
+    - Chi tiết tại [Chương 4 §4.9](04_ket_qua_thuc_nghiem.md).
 - [x] **A6. 🧮 Đường cong Mở rộng theo Ngân sách (Test-Time Scaling Curve — Proposal Ablation 3 & Paper Fig. 5):**
   - Đã dựng xong đường cong Pass@1 theo $k \in \{1, 2, 4, 8, 16\}$ trên 300 bài 14B: $k=1$ (22.00%) $\to$ $k=2$ (26.67%) $\to$ $k=4$ (31.33%) $\to$ $k=8$ (35.00%) $\to$ $k=16$ (36.00%). Tăng trưởng đơn điệu hàm logarit. Chi tiết tại [Chương 5 §5.6](05_phan_tich_thao_luan.md).
-- [ ] **A7. 🧮 Trích xuất 3 Case Studies Điển hình & Ví dụ Trace (Paper Table 13 & 14):**
-  - Xuất 2 bài thành công nhờ `block_analysis` + `rethink` và 1 bài thất bại do overfit public tests để đưa vào Chương 2 & Chương 5.7.
+- [x] **A7. 🧮 Trích xuất 3 Case Studies Điển hình & Ví dụ Trace (Paper Table 13 & 14):**
+  - Đã trích xuất và phân tích chi tiết 3 bài: `apps_1055` (sửa lỗi đệ quy vô hạn Thanos sort bằng CFG + rethink), `apps_3019` (bứt phá phân tầng Competition nhờ sàng nguyên tố), và `apps_1029` (thất bại do quá khớp test công khai). Chi tiết tại [Chương 5 §5.7](05_phan_tich_thao_luan.md).
 - [x] **A8. 🧮 Thí nghiệm Đối đầu Self-Critic (Qwen2.5-Coder-14B) vs Cross-Critic (Mistral Codestral):**
   - Đã chạy thẩm định chéo trên toàn bộ 161 ứng viên mã đạt $v_{\text{test}} = 1.0$ của APPS-300 bằng mô hình `codestral-latest`.
   - Kết quả: Self-Critic ($\rho = +0.243, p = 0.0019$) vượt trội hoàn toàn so với Cross-Critic Codestral ($\rho = +0.033, p = 0.68$). Codestral bị bão hòa trần 90.1% và bỏ sót 95.16% bài overfit. Chi tiết tại [Chương 5 §5.2.2](05_phan_tich_thao_luan.md). Nguồn: `runs/cross_critic_analysis_14b/`.

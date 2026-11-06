@@ -128,9 +128,36 @@ Pass@1 (%)
 
 ---
 
-## 5.7. Nghiên cứu Tình huống Điển hình (Qualitative Case Studies — Paper Appendix C.5 & C.6)
+## 5.7. Nghiên cứu Tình huống Điển hình (Qualitative Case Studies — [A7]) ✅
 
-Chọn từ dữ liệu thật trong `runs/benchmark_14b_batch_*` ([A7](EXPERIMENT_CHECKLIST.md)):
-1. **Case Study 1 (Thành công nhờ Block Analysis + Rethink):** 1 bài toán mà ứng viên đầu tiên bị `WrongAnswer` hoặc `IndexError`, CFG trace chỉ ra đúng biến bị sai trong vòng lặp, bước `rethink` sửa lại tư duy tại lá và ứng viên tiếp theo đạt 100% hidden tests (kèm ảnh chụp cây từ **Trace Viewer**).
-2. **Case Study 2 (Thành công nhờ 14B vượt 7B ở bài Competition):** 1 bài Competition mà 7B thất bại nhưng 14B phân rã đúng thuật toán quy hoạch động / đồ thị.
-3. **Case Study 3 (Thất bại điển hình — Public Overfitting):** 1 trong 52 bài pass cả 2 public tests nhưng trượt hidden test (ví dụ do TLE với input lớn hoặc thiếu corner case $N=0$), minh họa giới hạn của bộ kiểm thử công khai ít mẫu.
+*(Trích xuất trực tiếp từ các bài toán thực tế trong [`runs/benchmark_apps_14b_dual_unified/`](../../runs/benchmark_apps_14b_dual_unified/))*
+
+### 5.7.1. Case Study 1: Giải cứu Thành công nhờ CFG Block Analysis + Rethink (`apps_1055` — Thanos Sort)
+- **Đề bài:** Cho mảng $A$ gồm $N$ phần tử ($N$ là lũy thừa của 2). Trong mỗi thao tác kiểu "Thanos snap", nếu mảng chưa được sắp xếp tăng dần, ta có thể xóa đi một nửa bên trái hoặc nửa bên phải. Tìm độ dài lớn nhất của mảng con được sắp xếp còn lại.
+- **Thất bại ở Ứng viên Đầu tiên (Candidate 0):**
+  - Mô hình định nghĩa hàm đệ quy `max_sorted_length(arr, start, end)` nhưng đặt điều kiện đệ quy trước khi kiểm tra `is_sorted`. Khi mảng chỉ còn 1 phần tử (`end - start == 1`), chỉ số `mid = (start + end) // 2 == start`, dẫn đến lời gọi đệ quy nhánh phải `max_sorted_length(arr, mid, end)` lặp lại với tham số y hệt nhau vô tận.
+  - **Hậu quả:** Bị `RecursionError: maximum recursion depth exceeded` ngay tại Test 1.
+- **Phản hồi Khối lệnh CFG & Sửa tư duy lá (Rethink):**
+  - Trình phân tích CFG chỉ ra biến `start` và `mid` bị kẹt giá trị bằng nhau tại khung ngăn xếp đệ quy cuối cùng.
+  - Bước `rethink` nhận ra cấu trúc đệ quy chia đôi dựa trên chỉ số index bị lỗi biên và sửa lại tư duy: *"Thay vì dùng chỉ số `start, end`, hãy cắt mảng trực tiếp bằng slice `left_half = arr[:mid]` và `right_half = arr[mid:]`, đặt điều kiện dừng cơ sở ngay đầu hàm `if n == 1 or is_sorted(arr): return n`"*.
+- **Ứng viên Kế tiếp (Candidate 1):**
+  - Mô hình sinh lại code theo tư duy mới, hoàn toàn thoát khỏi bẫy đệ quy vô hạn.
+  - **Kết quả:** Vượt qua 100% test công khai và giải đúng **100% test ẩn** (đạt điểm tuyệt đối)!
+
+---
+
+### 5.7.2. Case Study 2: Bứt phá Năng lực ở Phân tầng Competition (`apps_3019` — Distinct Prime Factors)
+- **Đặc trưng:** Bài toán mức độ Competition đòi hỏi tối ưu số học và sàng nguyên tố. Mô hình 7B ở bài này bị `TimeLimitExceeded` do dùng thuật toán kiểm tra ước số thô sơ $O(N)$.
+- **Cách tiếp cận của 14B RethinkMCTS:**
+  - Mô hình 14B ở nhánh tư duy đầu tiên tách bài toán thành 2 bước rõ ràng: (1) Sàng số nguyên tố và phân tích thừa số nguyên tố với cận $\sqrt{N}$; (2) Sử dụng quy hoạch động bitmask hoặc đếm phân phối.
+  - Trải qua 3 vòng `rethink` để tinh chỉnh việc tiền xử lý bảng ước số, ứng viên cuối cùng tối ưu hóa thời gian chạy dưới 0.15s/test và vượt qua toàn bộ các bộ test ẩn hóc búa của Codeforces.
+
+---
+
+### 5.7.3. Case Study 3: Thất bại Điển hình do Quá khớp Kiểm thử Công khai (`apps_1029`)
+- **Nguyên nhân thất bại:**
+  - Bài toán yêu cầu tìm số lượng phần tử ghép thỏa mãn điều kiện xâu. Ứng viên mã của 14B sử dụng duyệt vét cạn (brute-force).
+  - Vì bộ test công khai (`public_tests`) chỉ có 2 test cases rất nhỏ ($N \le 5$), code chạy đúng và đạt $v_{\text{test}} = 1.0$.
+  - Tuy nhiên, trong tập test ẩn có các trường hợp $N$ lớn và các trường hợp biên có số 0 ở đầu (`leading zeros`).
+  - **Kết quả:** Pass 2/2 test công khai (100%), nhưng chỉ pass **45.83% test ẩn** (bị Wrong Answer ở các test lớn). 
+  - **Điểm sáng:** Qwen-14B Self-Critic đã nhận ra điểm yếu này và tự phạt điểm $-1.0$, trong khi mô hình ngoài Codestral-22B lại bị lừa và cho điểm $1.0$ (minh chứng cho Bảng 5.2).
