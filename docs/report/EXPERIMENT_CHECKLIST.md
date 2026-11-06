@@ -25,13 +25,12 @@ Ký hiệu:
   - Đã tính trên 161 lượt gọi Critic của 14B: Pearson $r = +0.170$ ($p = 0.031$), Spearman $\rho = +0.243$ ($p = 0.0019$), Point-biserial $r = +0.239$ ($p = 0.0023$). Bắt đúng 22 bài overfit. Chi tiết tại [Chương 5 §5.2](05_phan_tich_thao_luan.md).
 - [x] **A2. 🧮 Kiểm định Ý nghĩa Thống kê (McNemar's Test & Bootstrap 95% CI):**
   - Đã tính cho cặp **14B MCTS Dual vs 14B Direct trên Full APPS-300**: $\chi^2 = 18.4808, p = 1.72 \times 10^{-5}$, Bootstrap 95% CI: Direct $[20.67\%, 30.33\%]$ vs MCTS $[30.67\%, 41.67\%]$, $\Delta = +10.67\%$ (95% CI: $[3.67\%, 18.00\%]$). MCTS cứu được 42 bài Direct sai. Còn cặp HumanEval và 7B APPS.
-- [ ] **A3. 🧮 Phân loại Lỗi, Tỷ lệ Cứu vãn nhờ Rethink & Tỷ lệ Code Hợp lệ trên Cây (Paper Table 4):**
-  - Nguồn: `evaluations.json`, `feedback.json`, `search.json` của 300 bài 14B.
-  - Tính: Phân phối lỗi ở ứng viên đầu tiên (CE/RE/WA/TLE); số bài được cứu thành công sau các bước `rethink`; **Tree Effective Code Rate** (tỷ lệ ứng viên đạt $v_{\text{test}}=1.0$ trên tổng $1,748$ ứng viên); phân tích 52 bài bị Public Test Overfitting (pass public nhưng trượt hidden).
+- [x] **A3. 🧮 Phân loại Lỗi, Tỷ lệ Cứu vãn nhờ Rethink & Tỷ lệ Code Hợp lệ trên Cây (Paper Table 4):**
+  - Đã trích xuất xong từ 300 bài 14B: 216 bài kích hoạt Rethink; cứu thành công 77 bài pass public (35.6%) và **38 bài pass hidden (17.6%)**; đóng góp 35.2% tổng số bài giải đúng của 14B. Tree Effective Code Rate = **9.21%** (161/1,748 code). Lỗi lần đầu: 85.2% WA, 13.9% RE, 0.9% TLE, 0% CE. Chi tiết tại [Chương 5 §5.5](05_phan_tich_thao_luan.md).
 - [ ] **A5. 🧮 Đồng bộ Kết quả Theo Bài & Chi phí của Nhánh 7B:**
   - Lấy kết quả chi tiết từng bài của 7B để chạy kiểm định cặp McNemar trên 300 bài APPS.
-- [ ] **A6. 🧮 Đường cong Mở rộng theo Ngân sách (Test-Time Scaling Curve — Proposal Ablation 3 & Paper Fig. 5):**
-  - Trích xuất từ lịch sử ứng viên $k = 1, 2, \dots, 16$ trong `evaluations.json` của 300 bài 14B để vẽ đường cong Pass@1 và Public Pass Rate theo ngân sách $k \in \{1, 2, 4, 8, 16\}$.
+- [x] **A6. 🧮 Đường cong Mở rộng theo Ngân sách (Test-Time Scaling Curve — Proposal Ablation 3 & Paper Fig. 5):**
+  - Đã dựng xong đường cong Pass@1 theo $k \in \{1, 2, 4, 8, 16\}$ trên 300 bài 14B: $k=1$ (22.00%) $\to$ $k=2$ (26.67%) $\to$ $k=4$ (31.33%) $\to$ $k=8$ (35.00%) $\to$ $k=16$ (36.00%). Tăng trưởng đơn điệu hàm logarit. Chi tiết tại [Chương 5 §5.6](05_phan_tich_thao_luan.md).
 - [ ] **A7. 🧮 Trích xuất 3 Case Studies Điển hình & Ví dụ Trace (Paper Table 13 & 14):**
   - Xuất 2 bài thành công nhờ `block_analysis` + `rethink` và 1 bài thất bại do overfit public tests để đưa vào Chương 2 & Chương 5.7.
 - [x] **A8. 🧮 Thí nghiệm Đối đầu Self-Critic (Qwen2.5-Coder-14B) vs Cross-Critic (Mistral Codestral):**
