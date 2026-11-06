@@ -85,21 +85,10 @@ Với kiến trúc **10 GPU song song** (30 bài/batch tại `configs/batches/ba
       --problem-ids @data/batches/batch_01.json
     ```
 
-- [ ] **E9. ⏳ 14B RethinkMCTS Dual Reward trên Full HumanEval-164 (164 bài):**
-  - **Mục đích:** Bổ sung mảnh ghép còn thiếu ở Bảng 4.2 (vì `runs/humaneval_mcts_14b` hiện tại là Test-only `llm_weight=0.0`).
-  - **Lệnh chạy:**
-    ```bash
-    python3 scripts/run_benchmark_batch.py \
-      --config configs/benchmark_humaneval_14b.yaml \
-      --dataset humaneval \
-      --solver mcts \
-      --output-dir runs/humaneval_mcts_dual_14b \
-      --set prompts.bundle=native_v2 \
-      --set reward.test_weight=0.8 \
-      --set reward.llm_weight=0.2 \
-      --set search.c=4.0 \
-      --set search.max_rethinks_per_node=2
-    ```
+- [x] **E9. ⏳ 14B RethinkMCTS Dual Reward trên Full HumanEval-164 (164 bài) — ĐÃ HOÀN TẤT:**
+  - **Kết quả:** Pass@1 = **90.85%** (149/164 bài), 4.64 calls/bài, 3,217 tokens/bài, 25.26s/bài.
+  - **So sánh trên HumanEval 14B:** Direct (90.24%) < Dual Reward (90.85%) < BoN-3 (91.46%) < Test-only (93.29%). Chi tiết tại [Chương 4 §4.2](04_ket_qua_thuc_nghiem.md).
+  - **Artifact:** `runs/humaneval_mcts_dual_14b/summary.json`
 
 ---
 

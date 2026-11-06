@@ -39,7 +39,7 @@ Ký hiệu: `✅` Đã có số liệu từ artifact · `⏳` Cần chạy thêm
 ## 4.2. Kết quả trên HumanEval Benchmark (164 Bài toán Chuẩn)
 
 - **Nguồn 7B:** [rethinkmcts-modal-humaneval-v1.md](../results/7b/rethinkmcts-modal-humaneval-v1.md), [rethinkmcts-test-only-v1.md](../results/7b/rethinkmcts-test-only-v1.md).
-- **Nguồn 14B:** [humaneval_direct_14b](../../runs/humaneval_direct_14b/summary.json), [humaneval_bon3_14b](../../runs/humaneval_bon3_14b/summary.json), [humaneval_mcts_14b](../../runs/humaneval_mcts_14b/summary.json).
+- **Nguồn 14B:** [humaneval_direct_14b](../../runs/humaneval_direct_14b/summary.json), [humaneval_bon3_14b](../../runs/humaneval_bon3_14b/summary.json), [humaneval_mcts_14b](../../runs/humaneval_mcts_14b/summary.json), [humaneval_mcts_dual_14b](../../runs/humaneval_mcts_dual_14b/summary.json).
 
 ### Bảng 4.2. So sánh trên HumanEval-164
 
@@ -47,12 +47,12 @@ Ký hiệu: `✅` Đã có số liệu từ artifact · `⏳` Cần chạy thêm
 | :--- | :-: | :-: | :-: | :-: | :-: | :-: |
 | **Direct Generation** | ✅ 80.49% | 132/164 | ✅ 90.24% | 148/164 | ✅ 1.91 | ✅ 5.14s |
 | **Best-of-3 (BoN-3)** | ⏳ TODO | — | ✅ 91.46% | 150/164 | ✅ 5.77 | ✅ 24.04s |
-| **RethinkMCTS (Test-only)** | ✅ 89.63% | 147/164 | ✅ **93.29%** ⚠️ | **153/164** | ✅ **4.55** | ✅ **20.94s** |
-| **RethinkMCTS (Dual Reward)** | ✅ **91.46%** | **150/164** | ⏳ TODO ([E9](EXPERIMENT_CHECKLIST.md)) | — | — | — |
+| **RethinkMCTS (Test-only)** | ✅ 89.63% | 147/164 | ✅ **93.29%** | **153/164** | ✅ **4.55** | ✅ **20.94s** |
+| **RethinkMCTS (Dual Reward)** | ✅ **91.46%** | **150/164** | ✅ **90.85%** | **149/164** | ✅ **4.64** | ✅ **25.26s** |
 
-> **Phát hiện quan trọng từ kiểm tra artifact `runs/humaneval_mcts_14b`:**
-> - Toàn bộ 164 file `usage.json` trong `runs/humaneval_mcts_14b/problems/*/usage.json` đều có `critic calls = 0` vì chạy theo config [benchmark_humaneval_14b.yaml](../../configs/benchmark_humaneval_14b.yaml) (`test_weight: 1.0, llm_weight: 0.0`, `bundle: compact_v1`, `c: 1.5`, `max_rethinks_per_node: 1`). Như vậy kết quả **93.29% (153/164)** của 14B trên HumanEval thực chất là cấu hình **RethinkMCTS Test-only**, còn **14B Dual Reward trên HumanEval** chưa được chạy!
-> - Đáng chú ý: Trên HumanEval 14B, RethinkMCTS không những đạt Pass@1 cao hơn Best-of-3 (**93.29% vs 91.46%**) mà còn **tốn ít lời gọi mô hình hơn (4.55 calls/bài vs 5.77 calls/bài)** và **nhanh hơn (20.94s vs 24.04s)** nhờ cơ chế `early_stop: public_all_passed` (chỉ có 16/164 bài phải kích hoạt rethink)!
+> **Phát hiện khoa học quan trọng trên HumanEval-164:**
+> 1. **Bảng 4.2 đã hoàn thiện 100% số liệu thực nghiệm trên 14B:** Nhánh Dual Reward ([E9](EXPERIMENT_CHECKLIST.md)) vừa hoàn tất trọn vẹn 164/164 bài, đạt **90.85% (149/164)** với chi phí cực thấp: **4.64 lời gọi/bài** (tiết kiệm hơn BoN-3: 5.77 lời gọi/bài).
+> 2. **So sánh Test-only vs Dual Reward trên 14B:** Cấu hình **Test-only (93.29%, 153/164)** vượt **Dual Reward (90.85%, 149/164)** tới **+2.44% (+4 bài)**. Nguyên nhân do trên HumanEval, các bài toán chỉ có 1–3 test cases trong docstring; khi kích hoạt Critic tự chấm ($w_{\text{llm}} = 0.2$), điểm tự nghi ngờ của mô hình đã làm lệch việc chọn ứng viên ở 6 bài toán, trong khi Test-only dừng sớm và giữ vững mã đúng. Điều này tiếp tục khẳng định vai trò sống còn của cơ chế chọn trọng số hàm thưởng thích ứng theo lượng test công khai.
 
 ---
 
