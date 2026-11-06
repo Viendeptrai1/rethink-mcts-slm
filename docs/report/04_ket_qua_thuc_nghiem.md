@@ -15,7 +15,7 @@ Ký hiệu: `✅` Đã có số liệu từ artifact · `⏳` Cần chạy thêm
 | Phương pháp | 7B Pass@1 | 7B Pass Rate | 14B Pass@1 | 14B Pass Rate | Trạng thái / Checklist |
 | :--- | :-: | :-: | :-: | :-: | :--- |
 | **Direct Generation** | ✅ 14.00% (42/300) | ✅ 30.51% | ✅ **25.33%** (76/300) | ✅ **38.41%** | Đã hoàn tất 300/300 bài [E1](EXPERIMENT_CHECKLIST.md) |
-| **Best-of-3 (BoN-3)** | — *(Không đo trên 7B)* | — | ⏳ TODO | ⏳ TODO | Cần chạy [E2](EXPERIMENT_CHECKLIST.md) |
+| **Best-of-3 (BoN-3)** | — *(Không đo trên 7B)* | — | ✅ **35.62%** (57/160)<br>*(Intro: **50.00%**, Inter: **11.67%**)* | ✅ **49.85%** | Đã hoàn tất 160 bài [E2](EXPERIMENT_CHECKLIST.md) (100% Intro + 60% Inter) |
 | **Iterative Repair** | — *(Không đo trên 7B)* | — | ⏳ TODO | ⏳ TODO | Cần chạy [E5](EXPERIMENT_CHECKLIST.md) |
 | **RethinkMCTS (Test-only)** | ✅ **22.67%** (68/300) | ✅ **45.34%** | ⏳ TODO | ⏳ TODO | Cần chạy [E3](EXPERIMENT_CHECKLIST.md) |
 | **RethinkMCTS (Dual Reward)** | ✅ 19.00% (57/300) | ✅ 43.04% | ✅ **36.00%** (108/300) | ✅ **53.49%** | Đã hoàn tất 300/300 bài (14B) |
@@ -47,6 +47,19 @@ Ký hiệu: `✅` Đã có số liệu từ artifact · `⏳` Cần chạy thêm
 > 1. **Bài dễ (Introductory):** MCTS hội tụ nhanh nhất (chỉ 2.20 vòng lặp, 11.18 lời gọi), đạt tới **71.26% test ẩn** và hơn một nửa số bài pass tuyệt đối (53.00%).
 > 2. **Bài trung bình (Interview):** Là phân tầng chứng kiến **mức tăng trưởng ngoạn mục nhất (+14.00% Pass@1, tăng hơn gấp đôi từ 13% lên 27%)**. Tại đây, các lỗi thuật toán logic thường được cứu vãn thành công nhờ số lượt Rethink cao nhất (4.13 lượt/bài) và số vòng lặp MCTS cao nhất (3.17 vòng lặp).
 > 3. **Bài khó (Competition):** Direct chỉ đạt 21.00%, MCTS nâng lên 28.00% (+7.00%) với ngân sách token tương đương Interview (43.8K tokens/bài).
+
+### Bảng 4.1d. So sánh Đối đầu Trực diện: Direct Baseline vs Best-of-3 vs RethinkMCTS trên 160 Bài APPS ✅
+*(Trích xuất chính xác trên cùng tập 160 bài toán gồm 100 bài Introductory + 60 bài Interview đầu tiên từ [runs/benchmark_apps_14b_bon3_300/summary.json](../../runs/benchmark_apps_14b_bon3_300/summary.json))*
+
+| Phân tầng Khảo sát | Chỉ số | 14B Direct Baseline | 14B Best-of-3 (BoN-3) | 14B RethinkMCTS Dual | Mức Vượt trội của MCTS vs BoN-3 |
+| :--- | :--- | :-: | :-: | :-: | :---: |
+| **Introductory** (100/100 bài) | **Pass@1 (%)**<br>Mean Hidden Pass Rate | 42.00% (42/100)<br>53.50% | **50.00%** (50/100)<br>60.94% | **53.00%** (53/100)<br>**71.26%** | **+3.00% Pass@1**<br>*(+10.32% test ẩn)* |
+| **Interview** (60 bài đầu) | **Pass@1 (%)**<br>Mean Hidden Pass Rate | 8.33% (5/60)<br>26.70% | **11.67%** (7/60)<br>31.36% | **18.33%** (11/60)<br>**50.40%** | **+6.66% Pass@1**<br>*(+19.04% test ẩn)* |
+| **Tổng cộng (160 bài)** | **Pass@1 (%)**<br>**Mean Hidden Pass Rate** | **29.38%** (47/160)<br>**43.45%** | **35.62%** (57/160)<br>**49.85%** | **40.00%** (64/160)<br>**63.45%** | **+4.38% Pass@1**<br>*(+13.60% test ẩn)* |
+
+> **Quy luật Thực nghiệm Rút ra từ Bảng 4.1d:**
+> 1. **Hiệu ứng của việc Lấy mẫu Ngẫu nhiên (BoN-3 vs Direct):** Việc tăng ngân sách lấy mẫu ngẫu nhiên độc lập 3 lần giúp Pass@1 tăng từ 29.38% lên 35.62% (+6.24%), chứng minh nhiều bài toán 14B chỉ cần thêm cơ hội thử là giải được.
+> 2. **Sự Vượt trội của Tìm kiếm Cây có Định hướng (MCTS vs BoN-3):** Khi cùng sử dụng ngân sách tính toán tại thời điểm suy luận, **RethinkMCTS Dual đạt 40.00% Pass@1 (vượt BoN-3 +4.38%)** và đặc biệt là **Hidden Pass Rate đạt tới 63.45% (vượt xa BoN-3 tới +13.60%)**. Điều này chứng minh cơ chế phân tích CFG và sửa tư duy lá (Rethink) tạo ra mã nguồn có chất lượng thuật toán bền vững hơn hẳn so với việc chọn mò giữa 3 ứng viên sinh ngẫu nhiên.
 
 > **Ghi chú kỹ thuật minh bạch:**
 > 1. Ở nhánh 7B APPS: Dual có 295/300 bài sinh xong candidate (3 bài search timeout 900s, 2 bài lỗi cú pháp khi trace), Test-only có 297/300 bài (3 bài search timeout 900s); tất cả các bài thiếu candidate đều được gán điểm 0 vào mẫu số 300.

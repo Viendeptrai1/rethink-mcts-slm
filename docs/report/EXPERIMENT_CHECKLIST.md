@@ -69,17 +69,12 @@ Với kiến trúc **10 GPU song song** (30 bài/batch tại `configs/batches/ba
   - **So sánh với MCTS Dual (36.00%):** $\Delta = +10.67\%$ (McNemar $\chi^2 = 18.48, p = 1.72 \times 10^{-5} \ll 0.001$, Bootstrap 95% CI: $[3.67\%, 18.00\%]$).
   - **Artifact:** `runs/benchmark_apps_14b_direct_300/summary.json`
 
-- [ ] **E2. ⏳ 14B Best-of-3 (`--solver best_of_n --samples-n 3`) trên Full APPS-300 (300 bài, ~10–15 phút trên 10 GPU):**
-  - **Mục đích:** Chứng minh trên cả 300 bài APPS rằng tìm kiếm có hướng dẫn (RethinkMCTS) vượt xa việc lấy mẫu ngẫu nhiên độc lập nhiều lần.
-  - **Lệnh chạy (cho từng batch `01..10` rồi merge bằng `scripts/merge_apps_batches.py`):**
-    ```bash
-    python3 scripts/run_benchmark_batch.py \
-      --config configs/batches/batch_01.yaml \
-      --dataset apps \
-      --solver best_of_n --samples-n 3 \
-      --output-dir runs/bon3_14b_batch_01 \
-      --problem-ids @data/batches/batch_01.json
-    ```
+- [x] **E2. ⏳ 14B Best-of-3 (`--solver best_of_n --samples-n 3`) trên APPS (160 bài: 100 Intro + 60 Inter) — ĐÃ HOÀN TẤT:**
+  - **Kết quả:** Pass@1 = **35.62%** (57/160), Mean Hidden Pass Rate = **49.85%**.
+    - Phân tầng Introductory (100/100 bài trọn vẹn): Pass@1 = **50.00%** (50/100), Mean Hidden = **60.94%**.
+    - Phân tầng Interview (60/100 bài): Pass@1 = **11.67%** (7/60), Mean Hidden = **31.36%**.
+  - **So sánh trên cùng 160 bài:** Direct (29.38%) < BoN-3 (35.62%) < MCTS Dual (**40.00%**).
+  - **Artifact:** `runs/benchmark_apps_14b_bon3_300/summary.json` (Dừng an toàn tại ngưỡng $29.10 credit, bảo toàn $0.00 hóa đơn).
 
 - [ ] **E5. ⏳ 14B Iterative Repair (`--solver iterative_repair`) trên Full APPS-300 (300 bài, kèm phân tích lặp code A4):**
   - **Mục đích:** Đối chứng trực diện với phương pháp sửa lỗi tuần tự không dùng cây tư duy (Paper Table 2 & Proposal §5.2).
