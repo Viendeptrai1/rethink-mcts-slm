@@ -1,0 +1,31 @@
+import sys
+
+def max_juice_drunk(n, moves):
+    # Initialize the count of glasses of juice Vasya can drink
+    max_juice = 0
+    
+    # Iterate over each possible move Vasya can make
+    for vasya_move in ['a', 'b']:
+        # Create a new list of moves where Vasya's moves are replaced
+        new_moves = list(moves)
+        for i in range(len(moves)):
+            if i % n == 0:  # Vasya's turn
+                new_moves[i] = vasya_move
+        
+        # Count the number of times Vasya drinks juice
+        juice_count = 0
+        for i in range(3, len(new_moves)):
+            if new_moves[i] == new_moves[i-1] == new_moves[i-2] == new_moves[i-3]:
+                juice_count += 1
+        
+        # Update the maximum juice count
+        max_juice = max(max_juice, juice_count)
+    
+    return max_juice
+
+# Read input
+n = int(sys.stdin.readline().strip())
+moves = sys.stdin.readline().strip()
+
+# Output the result
+print(max_juice_drunk(n, moves))

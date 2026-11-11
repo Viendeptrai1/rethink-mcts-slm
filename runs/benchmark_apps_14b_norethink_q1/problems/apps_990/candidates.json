@@ -1,0 +1,161 @@
+[
+  {
+    "candidate_id": "cand_e71f7cd9b6",
+    "problem_id": "apps_990",
+    "code": "import sys\nfrom collections import defaultdict\n\ndef main():\n    import sys\n    input = sys.stdin.read\n    data = input().split()\n    \n    index = 0\n    N = int(data[index])\n    index += 1\n    \n    edges = []\n    for _ in range(N-1):\n        a = int(data[index]) - 1\n        index += 1\n        b = int(data[index]) - 1\n        index += 1\n        edges.append((a, b))\n    \n    M = int(data[index])\n    index += 1\n    \n    restrictions = []\n    for _ in range(M):\n        u = int(data[index]) - 1\n        index += 1\n        v = int(data[index]) - 1\n        index += 1\n        restrictions.append((u, v))\n    \n    # Build the tree\n    tree = defaultdict(list)\n    for a, b in edges:\n        tree[a].append(b)\n        tree[b].append(a)\n    \n    # Function to find the lowest common ancestor (LCA) using binary lifting\n    def preprocess_lca(tree, n):\n        max_power = 17  # 2^16 >= 50\n        parent = [[-1] * max_power for _ in range(n)]\n        level = [0] * n\n        \n        def dfs(node, par, lev):\n            parent[node][0] = par\n            level[node] = lev\n            for child in tree[node]:\n                if child != par:\n                    dfs(child, node, lev + 1)\n        \n        dfs(0, -1, 0)\n        \n        for k in range(1, max_power):\n            for node in range(n):\n                if parent[node][k-1] != -1:\n                    parent[node][k] = parent[parent[node][k-1]][k-1]\n        \n        return parent, level\n    \n    parent, level = preprocess_lca(tree, N)\n    \n    def lca(u, v):\n        if level[u] > level[v]:\n            u, v = v, u\n        diff = level[v] - level[u]\n        for k in range(17):\n            if diff & (1 << k):\n                v = parent[v][k]\n        if u == v:\n            return u\n        for k in range(16, -1, -1):\n            if parent[u][k] != parent[v][k]:\n                u = parent[u][k]\n                v = parent[v][k]\n        return parent[u][0]\n    \n    # Dynamic programming to count valid colorings\n    dp = [0] * (1 << (N-1))\n    dp[0] = 1\n    \n    for u, v in restrictions:\n        l = lca(u, v)\n        mask = 0\n        for i in range(N-1):\n            a, b = edges[i]\n            if (a == u and b == v) or (a == v and b == u) or (a == l and b in {u, v}) or (b == l and a in {u, v}):\n                mask |= (1 << i)\n        \n        new_dp = [0] * (1 << (N-1))\n        for state in range(1 << (N-1)):\n            if dp[state] > 0 and (state & mask) > 0:\n                new_dp[state] += dp[state]\n        dp = new_dp\n    \n    result = sum(dp)\n    print(result)\n\nif __name__ == \"__main__\":\n    main()",
+    "code_hash": "896703fb52772627",
+    "language": "python",
+    "node_id": "n_1_23ee37",
+    "revision_id": "rev_n_1_23ee37_0",
+    "thought_path_snapshot": [
+      "Use dynamic programming to count valid colorings by considering each restriction incrementally."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 1
+  },
+  {
+    "candidate_id": "cand_4a6228cf89",
+    "problem_id": "apps_990",
+    "code": "import sys\nfrom functools import lru_cache\n\ndef main():\n    import sys\n    input = sys.stdin.read\n    data = input().split()\n    \n    index = 0\n    N = int(data[index])\n    index += 1\n    \n    edges = []\n    for _ in range(N - 1):\n        a = int(data[index]) - 1\n        index += 1\n        b = int(data[index]) - 1\n        index += 1\n        edges.append((a, b))\n    \n    M = int(data[index])\n    index += 1\n    \n    restrictions = []\n    for _ in range(M):\n        u = int(data[index]) - 1\n        index += 1\n        v = int(data[index]) - 1\n        index += 1\n        restrictions.append((u, v))\n    \n    # Build the adjacency list for the tree\n    adj_list = [[] for _ in range(N)]\n    for a, b in edges:\n        adj_list[a].append(b)\n        adj_list[b].append(a)\n    \n    # Memoization dictionary\n    memo = {}\n    \n    @lru_cache(None)\n    def dfs(node, parent, mask):\n        if (node, mask) in memo:\n            return memo[(node, mask)]\n        \n        # Count the current state as valid\n        count = 1\n        \n        for neighbor in adj_list[node]:\n            if neighbor == parent:\n                continue\n            \n            # Try both colors for the edge (node, neighbor)\n            new_mask = mask\n            if (node, neighbor) in edges or (neighbor, node) in edges:\n                new_mask |= (1 << (edges.index((node, neighbor)) if (node, neighbor) in edges else edges.index((neighbor, node))))\n            \n            count += dfs(neighbor, node, new_mask)\n        \n        memo[(node, mask)] = count\n        return count\n    \n    # Start DFS from the root (node 0) with an empty mask\n    result = dfs(0, -1, 0)\n    \n    # Subtract invalid configurations where any restriction is not satisfied\n    for u, v in restrictions:\n        # Find the lowest common ancestor (LCA) of u and v\n        lca = find_lca(u, v, adj_list, edges)\n        \n        # Count the number of valid configurations where the path from u to v does not contain a black edge\n        invalid_count = dfs(u, -1, 0) * dfs(v, -1, 0) // dfs(lca, -1, 0)\n        \n        result -= invalid_count\n    \n    print(result)\n\ndef find_lca(u, v, adj_list, edges):\n    # Depth array to store the depth of each node\n    depth = [-1] * len(adj_list)\n    \n    # Parent array to store the parent of each node\n    parent = [-1] * len(adj_list)\n    \n    # BFS to calculate depth and parent\n    queue = [(u, 0)]\n    while queue:\n        node, d = queue.pop(0)\n        depth[node] = d\n        for neighbor in adj_list[node]:\n            if depth[neighbor] == -1:\n                parent[neighbor] = node\n                queue.append((neighbor, d + 1))\n    \n    # Make sure u is deeper than v\n    if depth[u] < depth[v]:\n        u, v = v, u\n    \n    # Lift u to the same depth as v\n    while depth[u] > depth[v]:\n        u = parent[u]\n    \n    # Move up both nodes until they meet\n    while u != v:\n        u = parent[u]\n        v = parent[v]\n    \n    return u\n\nif __name__ == \"__main__\":\n    main()",
+    "code_hash": "1dd55ab3305f1c32",
+    "language": "python",
+    "node_id": "n_2_b8313c",
+    "revision_id": "rev_n_2_b8313c_0",
+    "thought_path_snapshot": [
+      "Employ depth-first search (DFS) with memoization to explore possible edge colorings while respecting the restrictions."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 2
+  },
+  {
+    "candidate_id": "cand_a985cdfc63",
+    "problem_id": "apps_990",
+    "code": "import sys\nfrom typing import List\nfrom pysat.solvers import Glucose4\n\ndef count_valid_paintings(N: int, edges: List[List[int]], M: int, restrictions: List[List[int]]) -> int:\n    # Create a SAT solver instance\n    solver = Glucose4()\n\n    # Each edge can be either black (1) or white (0)\n    num_edges = N - 1\n    edge_vars = [[i * 2 + j for j in range(2)] for i in range(num_edges)]\n\n    # Add clauses for each restriction\n    for u, v in restrictions:\n        # Find the lowest common ancestor (LCA) of u and v\n        lca = find_lca(u, v, edges)\n        # Ensure there is at least one black edge on the path from u to v\n        clause = []\n        for e in range(num_edges):\n            if is_on_path(u, v, e, edges, lca):\n                clause.append(edge_vars[e][1])  # Black edge\n        solver.add_clause(clause)\n\n    # Count the number of solutions\n    count = 0\n    while solver.solve():\n        count += 1\n        model = solver.get_model()\n        for e in range(num_edges):\n            solver.add_clause([-model[edge_vars[e][0]], -model[edge_vars[e][1]]])\n\n    return count\n\ndef find_lca(u: int, v: int, edges: List[List[int]]) -> int:\n    # Implement LCA finding logic here\n    pass\n\ndef is_on_path(u: int, v: int, e: int, edges: List[List[int]], lca: int) -> bool:\n    # Implement path checking logic here\n    pass\n\ndef main():\n    import sys\n    input = sys.stdin.read\n    data = input().split()\n    \n    index = 0\n    N = int(data[index])\n    index += 1\n    edges = []\n    for _ in range(N - 1):\n        a = int(data[index])\n        b = int(data[index + 1])\n        edges.append([a, b])\n        index += 2\n    \n    M = int(data[index])\n    index += 1\n    restrictions = []\n    for _ in range(M):\n        u = int(data[index])\n        v = int(data[index + 1])\n        restrictions.append([u, v])\n        index += 2\n    \n    result = count_valid_paintings(N, edges, M, restrictions)\n    print(result)\n\nif __name__ == \"__main__\":\n    main()",
+    "code_hash": "7128a1eb831927a6",
+    "language": "python",
+    "node_id": "n_3_2d841f",
+    "revision_id": "rev_n_3_2d841f_0",
+    "thought_path_snapshot": [
+      "Transform the problem into a satisfiability problem (SAT) and use a SAT solver to find all valid configurations."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 3
+  },
+  {
+    "candidate_id": "cand_1a029c21de",
+    "problem_id": "apps_990",
+    "code": "# Code generation failed or truncated: Provider truncated generation at the output limit",
+    "code_hash": "e4b4adccffe91489",
+    "language": "python",
+    "node_id": "n_4_e71206",
+    "revision_id": "rev_n_4_e71206_0",
+    "thought_path_snapshot": [
+      "Use dynamic programming to count valid colorings by considering each restriction incrementally.",
+      "Revisit the LCA preprocessing and ensure it correctly identifies the lowest common ancestor for all pairs of nodes. Incorrect LCA calculation can lead to incorrect masking of edges."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 4
+  },
+  {
+    "candidate_id": "cand_290541bce1",
+    "problem_id": "apps_990",
+    "code": "import sys\nfrom functools import lru_cache\n\ndef main():\n    import sys\n    input = sys.stdin.read\n    data = input().split()\n    \n    index = 0\n    N = int(data[index])\n    index += 1\n    \n    edges = []\n    for _ in range(N - 1):\n        a = int(data[index]) - 1\n        index += 1\n        b = int(data[index]) - 1\n        index += 1\n        edges.append((a, b))\n    \n    M = int(data[index])\n    index += 1\n    \n    restrictions = []\n    for _ in range(M):\n        u = int(data[index]) - 1\n        index += 1\n        v = int(data[index]) - 1\n        index += 1\n        restrictions.append((u, v))\n    \n    # Build the adjacency list for the tree\n    adj_list = [[] for _ in range(N)]\n    for a, b in edges:\n        adj_list[a].append(b)\n        adj_list[b].append(a)\n    \n    @lru_cache(None)\n    def dfs(node, parent, mask):\n        if node == N - 1:\n            return 1\n        \n        count = 0\n        for neighbor in adj_list[node]:\n            if neighbor != parent:\n                new_mask = mask | (1 << (neighbor * (N - 1) + node))\n                count += dfs(neighbor, node, new_mask)\n        \n        return count\n    \n    total_ways = 0\n    for i in range(1 << (N - 1)):\n        valid = True\n        for u, v in restrictions:\n            path = set()\n            current = u\n            while current != v:\n                path.add(current)\n                for neighbor in adj_list[current]:\n                    if neighbor != parent[current]:\n                        parent[neighbor] = current\n                        current = neighbor\n                        break\n            \n            path.add(v)\n            found_black = False\n            for node in path:\n                for neighbor in adj_list[node]:\n                    if neighbor != parent[node] and (i & (1 << (node * (N - 1) + neighbor))) != 0:\n                        found_black = True\n                        break\n                if found_black:\n                    break\n            \n            if not found_black:\n                valid = False\n                break\n        \n        if valid:\n            total_ways += 1\n    \n    print(total_ways)\n\nif __name__ == \"__main__\":\n    main()",
+    "code_hash": "8206248456151ce7",
+    "language": "python",
+    "node_id": "n_9_7a7f36",
+    "revision_id": "rev_n_9_7a7f36_0",
+    "thought_path_snapshot": [
+      "Employ depth-first search (DFS) with memoization to explore possible edge colorings while respecting the restrictions.",
+      "Implement a constraint satisfaction algorithm specifically tailored for this problem, leveraging the tree structure and restrictions to prune invalid configurations early and count only valid ones."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 5
+  },
+  {
+    "candidate_id": "cand_5cbbd788da",
+    "problem_id": "apps_990",
+    "code": "import sys\nfrom typing import List, Tuple\n\ndef find_lca(parents: List[int], u: int, v: int) -> int:\n    depth = [0] * len(parents)\n    def dfs(node: int, d: int) -> None:\n        depth[node] = d\n        for child in parents[node]:\n            dfs(child, d + 1)\n    dfs(0, 0)\n    \n    if depth[u] > depth[v]:\n        u, v = v, u\n    \n    for _ in range(depth[v] - depth[u]):\n        v = parents[v]\n    \n    while u != v:\n        u = parents[u]\n        v = parents[v]\n    \n    return u\n\ndef is_path_black(edges: List[Tuple[int, int]], colors: List[bool], u: int, v: int, lca: int) -> bool:\n    def dfs(node: int, target: int, visited: set) -> bool:\n        if node == target:\n            return True\n        visited.add(node)\n        for neighbor in edges[node]:\n            if neighbor not in visited and dfs(neighbor, target, visited):\n                return True\n        return False\n    \n    path_u_to_lca = dfs(u, lca, set())\n    path_v_to_lca = dfs(v, lca, set())\n    \n    for edge in edges[lca]:\n        if edge != u and edge != v:\n            if dfs(edge, u, set()) and dfs(edge, v, set()):\n                return colors[edge]\n    \n    return path_u_to_lca and path_v_to_lca and colors[lca]\n\ndef count_valid_paintings(N: int, edges: List[Tuple[int, int]], M: int, restrictions: List[Tuple[int, int]]) -> int:\n    from itertools import product\n    \n    # Build adjacency list\n    adj_list = [[] for _ in range(N)]\n    for a, b in edges:\n        adj_list[a-1].append(b-1)\n        adj_list[b-1].append(a-1)\n    \n    # Find parent for each node (assuming root is 0)\n    parents = [-1] * N\n    def dfs_parent(node: int, parent: int) -> None:\n        parents[node] = parent\n        for neighbor in adj_list[node]:\n            if neighbor != parent:\n                dfs_parent(neighbor, node)\n    dfs_parent(0, -1)\n    \n    valid_count = 0\n    for color_combination in product([False, True], repeat=len(edges)):\n        valid = True\n        for u, v in restrictions:\n            lca = find_lca(parents, u-1, v-1)\n            if not is_path_black(adj_list, color_combination, u-1, v-1, lca):\n                valid = False\n                break\n        if valid:\n            valid_count += 1\n    \n    return valid_count\n\ndef main():\n    import sys\n    input = sys.stdin.read\n    data = input().split()\n    \n    index = 0\n    N = int(data[index])\n    index += 1\n    edges = []\n    for _ in range(N-1):\n        a = int(data[index]) - 1\n        index += 1\n        b = int(data[index]) - 1\n        index += 1\n        edges.append((a, b))\n    \n    M = int(data[index])\n    index += 1\n    restrictions = []\n    for _ in range(M):\n        u = int(data[index]) - 1\n        index += 1\n        v = int(data[index]) - 1\n        index += 1\n        restrictions.append((u, v))\n    \n    result = count_valid_paintings(N, edges, M, restrictions)\n    print(result)\n\nif __name__ == \"__main__\":\n    main()",
+    "code_hash": "053dbf28eafbcbf9",
+    "language": "python",
+    "node_id": "n_10_41b4d0",
+    "revision_id": "rev_n_10_41b4d0_0",
+    "thought_path_snapshot": [
+      "Transform the problem into a satisfiability problem (SAT) and use a SAT solver to find all valid configurations.",
+      "Implement the missing LCA and path checking functions using depth-first search (DFS). This will allow us to correctly identify the path between any two vertices and ensure that at least one edge on that path is black."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 6
+  },
+  {
+    "candidate_id": "cand_a911ee1b16",
+    "problem_id": "apps_990",
+    "code": "import sys\nfrom functools import lru_cache\n\ndef main():\n    import sys\n    input = sys.stdin.read\n    data = input().split()\n    \n    index = 0\n    N = int(data[index])\n    index += 1\n    \n    edges = []\n    for _ in range(N-1):\n        a = int(data[index]) - 1\n        index += 1\n        b = int(data[index]) - 1\n        index += 1\n        edges.append((a, b))\n    \n    M = int(data[index])\n    index += 1\n    \n    restrictions = []\n    for _ in range(M):\n        u = int(data[index]) - 1\n        index += 1\n        v = int(data[index]) - 1\n        index += 1\n        restrictions.append((u, v))\n    \n    # Precompute the LCA using binary lifting\n    MAX_LOG = 17\n    parent = [[-1] * MAX_LOG for _ in range(N)]\n    depth = [0] * N\n    \n    def dfs(node, par, d):\n        parent[node][0] = par\n        depth[node] = d\n        for i in range(1, MAX_LOG):\n            if parent[node][i-1] != -1:\n                parent[node][i] = parent[parent[node][i-1]][i-1]\n        for neighbor in adj[node]:\n            if neighbor != par:\n                dfs(neighbor, node, d + 1)\n    \n    adj = [[] for _ in range(N)]\n    for a, b in edges:\n        adj[a].append(b)\n        adj[b].append(a)\n    \n    dfs(0, -1, 0)\n    \n    def lca(u, v):\n        if depth[u] > depth[v]:\n            u, v = v, u\n        diff = depth[v] - depth[u]\n        for i in range(MAX_LOG):\n            if diff & (1 << i):\n                v = parent[v][i]\n        if u == v:\n            return u\n        for i in range(MAX_LOG-1, -1, -1):\n            if parent[u][i] != parent[v][i]:\n                u = parent[u][i]\n                v = parent[v][i]\n        return parent[u][0]\n    \n    @lru_cache(None)\n    def dp(node, mask):\n        if mask == (1 << N) - 1:\n            return 1\n        total = 0\n        for neighbor in adj[node]:\n            if (mask >> neighbor) & 1 == 0:\n                new_mask = mask | (1 << neighbor)\n                total += dp(neighbor, new_mask)\n        return total\n    \n    result = 0\n    for u, v in restrictions:\n        l = lca(u, v)\n        if l == u:\n            result += dp(u, 1 << u)\n        elif l == v:\n            result += dp(v, 1 << v)\n        else:\n            result += dp(u, 1 << u) + dp(v, 1 << v) - dp(l, 1 << l)\n    \n    print(result)\n\nif __name__ == \"__main__\":\n    main()",
+    "code_hash": "639cf307db702999",
+    "language": "python",
+    "node_id": "n_5_537885",
+    "revision_id": "rev_n_5_537885_0",
+    "thought_path_snapshot": [
+      "Use dynamic programming to count valid colorings by considering each restriction incrementally.",
+      "Check the dynamic programming state transition logic. Ensure that the state transitions correctly account for the constraints imposed by the restrictions. The current logic might not be correctly filtering states based on the mask."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 7
+  },
+  {
+    "candidate_id": "cand_a84a4b04a2",
+    "problem_id": "apps_990",
+    "code": "import sys\nfrom collections import defaultdict\n\ndef dfs(node, parent, color, graph, restrictions):\n    if node in restrictions:\n        for neighbor in graph[node]:\n            if neighbor != parent:\n                if dfs(neighbor, node, color, graph, restrictions):\n                    return True\n        return False\n    else:\n        for neighbor in graph[node]:\n            if neighbor != parent:\n                if not dfs(neighbor, node, color, graph, restrictions):\n                    return False\n        return True\n\ndef count_valid_colorings(N, edges, M, restrictions):\n    graph = defaultdict(list)\n    for a, b in edges:\n        graph[a].append(b)\n        graph[b].append(a)\n    \n    total_ways = 2 ** (N - 1)\n    \n    for u, v in restrictions:\n        valid_ways = 0\n        for color in range(1 << (N - 1)):\n            restrictions_set = set()\n            for i in range(N - 1):\n                if (color >> i) & 1:\n                    restrictions_set.add(edges[i][0])\n                    restrictions_set.add(edges[i][1])\n            if dfs(u, None, color, graph, restrictions_set) and dfs(v, None, color, graph, restrictions_set):\n                valid_ways += 1\n        total_ways -= (2 ** (N - 1) - valid_ways)\n    \n    return total_ways\n\ndef main():\n    import sys\n    input = sys.stdin.read\n    data = input().split()\n    \n    index = 0\n    N = int(data[index])\n    index += 1\n    edges = []\n    for _ in range(N - 1):\n        a = int(data[index])\n        index += 1\n        b = int(data[index])\n        index += 1\n        edges.append((a, b))\n    \n    M = int(data[index])\n    index += 1\n    restrictions = []\n    for _ in range(M):\n        u = int(data[index])\n        index += 1\n        v = int(data[index])\n        index += 1\n        restrictions.append((u, v))\n    \n    result = count_valid_colorings(N, edges, M, restrictions)\n    print(result)\n\nif __name__ == \"__main__\":\n    main()",
+    "code_hash": "dfbba9d33def741b",
+    "language": "python",
+    "node_id": "n_6_194988",
+    "revision_id": "rev_n_6_194988_0",
+    "thought_path_snapshot": [
+      "Use dynamic programming to count valid colorings by considering each restriction incrementally.",
+      "Consider an alternative approach, such as using depth-first search (DFS) with backtracking to explore all possible edge colorings and counting those that satisfy all restrictions. This approach might be more straightforward to implement and debug."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 8
+  },
+  {
+    "candidate_id": "cand_0d978f3c3c",
+    "problem_id": "apps_990",
+    "code": "import sys\nfrom collections import defaultdict\n\ndef main():\n    import sys\n    input = sys.stdin.read\n    data = input().split()\n    \n    index = 0\n    N = int(data[index])\n    index += 1\n    \n    edges = []\n    for _ in range(N - 1):\n        a = int(data[index]) - 1\n        index += 1\n        b = int(data[index]) - 1\n        index += 1\n        edges.append((a, b))\n    \n    M = int(data[index])\n    index += 1\n    \n    restrictions = []\n    for _ in range(M):\n        u = int(data[index]) - 1\n        index += 1\n        v = int(data[index]) - 1\n        index += 1\n        restrictions.append((u, v))\n    \n    # Build the adjacency list\n    adj_list = defaultdict(list)\n    for a, b in edges:\n        adj_list[a].append(b)\n        adj_list[b].append(a)\n    \n    # Precompute the LCA using binary lifting\n    MAX_LOG = 17\n    parent = [[-1] * MAX_LOG for _ in range(N)]\n    depth = [0] * N\n    \n    def dfs(node, par, d):\n        parent[node][0] = par\n        depth[node] = d\n        for child in adj_list[node]:\n            if child != par:\n                dfs(child, node, d + 1)\n    \n    dfs(0, -1, 0)\n    \n    for k in range(1, MAX_LOG):\n        for node in range(N):\n            if parent[node][k - 1] != -1:\n                parent[node][k] = parent[parent[node][k - 1]][k - 1]\n    \n    def lca(u, v):\n        if depth[u] > depth[v]:\n            u, v = v, u\n        diff = depth[v] - depth[u]\n        for k in range(MAX_LOG):\n            if diff & (1 << k):\n                v = parent[v][k]\n        \n        if u == v:\n            return u\n        \n        for k in range(MAX_LOG - 1, -1, -1):\n            if parent[u][k] != parent[v][k]:\n                u = parent[u][k]\n                v = parent[v][k]\n        \n        return parent[u][0]\n    \n    # Count the number of valid colorings\n    total_ways = 2 ** (N - 1)\n    invalid_ways = 0\n    \n    for u, v in restrictions:\n        l = lca(u, v)\n        if l == u or l == v:\n            invalid_ways += 2 ** (depth[u] + depth[v] - 2 * depth[l] - 1)\n        else:\n            invalid_ways += 2 ** (depth[u] - depth[l] - 1) + 2 ** (depth[v] - depth[l] - 1) - 1\n    \n    result = total_ways - invalid_ways\n    print(result)\n\nif __name__ == \"__main__\":\n    main()",
+    "code_hash": "c4016bf4b384ab19",
+    "language": "python",
+    "node_id": "n_14_e3fa6b",
+    "revision_id": "rev_n_14_e3fa6b_0",
+    "thought_path_snapshot": [
+      "Use dynamic programming to count valid colorings by considering each restriction incrementally.",
+      "Check the dynamic programming state transition logic. Ensure that the state transitions correctly account for the constraints imposed by the restrictions. The current logic might not be correctly filtering states based on the mask.",
+      "Consider using a bitmasking approach to represent the coloring of edges and check each possible coloring against the restrictions."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 9
+  },
+  {
+    "candidate_id": "cand_1f6754f60d",
+    "problem_id": "apps_990",
+    "code": "import sys\nfrom collections import defaultdict\n\ndef dfs(node, parent, target, visited, graph):\n    if node == target:\n        return True\n    visited[node] = True\n    for neighbor in graph[node]:\n        if neighbor != parent and not visited[neighbor]:\n            if dfs(neighbor, node, target, visited, graph):\n                return True\n    return False\n\ndef count_valid_colorings(N, edges, M, restrictions):\n    graph = defaultdict(list)\n    for a, b in edges:\n        graph[a].append(b)\n        graph[b].append(a)\n    \n    total_ways = 2 ** (N - 1)\n    \n    for u, v in restrictions:\n        valid_ways = 0\n        for mask in range(total_ways):\n            visited = [False] * (N + 1)\n            path_has_black = False\n            for i, (a, b) in enumerate(edges):\n                if (mask & (1 << i)) > 0:\n                    if dfs(a, -1, b, visited, graph) or dfs(b, -1, a, visited, graph):\n                        path_has_black = True\n                        break\n            if path_has_black:\n                valid_ways += 1\n        total_ways = valid_ways\n    \n    return total_ways\n\ndef main():\n    import sys\n    input = sys.stdin.read\n    data = input().split()\n    \n    index = 0\n    N = int(data[index])\n    index += 1\n    edges = []\n    for _ in range(N - 1):\n        a = int(data[index])\n        b = int(data[index + 1])\n        edges.append((a, b))\n        index += 2\n    \n    M = int(data[index])\n    index += 1\n    restrictions = []\n    for _ in range(M):\n        u = int(data[index])\n        v = int(data[index + 1])\n        restrictions.append((u, v))\n        index += 2\n    \n    result = count_valid_colorings(N, edges, M, restrictions)\n    print(result)\n\nif __name__ == \"__main__\":\n    main()",
+    "code_hash": "9e07a897bc91ccca",
+    "language": "python",
+    "node_id": "n_17_edf528",
+    "revision_id": "rev_n_17_edf528_0",
+    "thought_path_snapshot": [
+      "Use dynamic programming to count valid colorings by considering each restriction incrementally.",
+      "Consider an alternative approach, such as using depth-first search (DFS) with backtracking to explore all possible edge colorings and counting those that satisfy all restrictions. This approach might be more straightforward to implement and debug.",
+      "Consider using a bitmask to represent edge colors and apply bitwise operations to efficiently check if a path contains a black edge. This could potentially reduce the time complexity of the solution."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 10
+  }
+]

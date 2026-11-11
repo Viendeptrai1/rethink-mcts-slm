@@ -1,0 +1,41 @@
+[
+  {
+    "candidate_id": "cand_bon_0_d67863",
+    "problem_id": "apps_4514",
+    "code": "import sys\nfrom collections import defaultdict, deque\n\ndef main():\n    import sys\n    import threading\n    def compute_subtree_sizes(tree):\n        sizes = {}\n        def dfs(node):\n            size = 1\n            for child in tree[node]:\n                size += dfs(child)\n            sizes[node] = size\n            return size\n        dfs(1)\n        return sizes\n\n    def preprocess_lca(tree, n):\n        levels = [0] * (n + 1)\n        parents = [[0] * 18 for _ in range(n + 1)]\n        \n        def dfs(node, level):\n            levels[node] = level\n            for child in tree[node]:\n                parents[child][0] = node\n                dfs(child, level + 1)\n        \n        dfs(1, 0)\n        \n        for j in range(1, 18):\n            for i in range(1, n + 1):\n                parents[i][j] = parents[parents[i][j - 1]][j - 1]\n        \n        return levels, parents\n\n    def lca(u, v, levels, parents):\n        if levels[u] < levels[v]:\n            u, v = v, u\n        diff = levels[u] - levels[v]\n        for i in range(18):\n            if diff & (1 << i):\n                u = parents[u][i]\n        if u == v:\n            return u\n        for i in range(17, -1, -1):\n            if parents[u][i] != parents[v][i]:\n                u = parents[u][i]\n                v = parents[v][i]\n        return parents[u][0]\n\n    def dfs_order(tree, n):\n        order = []\n        visited = [False] * (n + 1)\n        \n        def dfs(node):\n            visited[node] = True\n            order.append(node)\n            for child in tree[node]:\n                if not visited[child]:\n                    dfs(child)\n            order.append(node)\n        \n        dfs(1)\n        return order\n\n    def solve_query(u, k, order, subtree_sizes, levels, parents):\n        start_index = order.index(u)\n        end_index = start_index + subtree_sizes[u] - 1\n        \n        if k > subtree_sizes[u]:\n            return -1\n        \n        current_node = u\n        current_level = levels[u]\n        \n        while k > 1:\n            max_jump = 0\n            for i in range(18):\n                if levels[current_node] - (1 << i) >= current_level - k + 1:\n                    max_jump = i\n            current_node = parents[current_node][max_jump]\n            k -= (1 << max_jump)\n        \n        return current_node\n\n    def read_input():\n        import sys\n        data = sys.stdin.read().split()\n        index = 0\n        n = int(data[index])\n        q = int(data[index + 1])\n        index += 2\n        tree = defaultdict(list)\n        for i in range(2, n + 1):\n            parent = int(data[index + i - 2])\n            tree[parent].append(i)\n        index += n - 1\n        queries = []\n        for _ in range(q):\n            u = int(data[index])\n            k = int(data[index + 1])\n            queries.append((u, k))\n            index += 2\n        return n, q, tree, queries\n\n    def write_output(results):\n        for result in results:\n            print(result)\n\n    n, q, tree, queries = read_input()\n    subtree_sizes = compute_subtree_sizes(tree)\n    levels, parents = preprocess_lca(tree, n)\n    order = dfs_order(tree, n)\n    results = []\n    for u, k in queries:\n        result = solve_query(u, k, order, subtree_sizes, levels, parents)\n        results.append(result)\n    write_output(results)\n\nthreading.Thread(target=main).start()",
+    "code_hash": "ef6376967dee7e8a",
+    "language": "python",
+    "node_id": null,
+    "revision_id": null,
+    "thought_path_snapshot": [],
+    "origin": "baseline",
+    "generation_record_id": null,
+    "created_sequence": 1
+  },
+  {
+    "candidate_id": "cand_bon_1_f680d1",
+    "problem_id": "apps_4514",
+    "code": "import sys\nfrom collections import defaultdict, deque\n\ndef main():\n    import sys\n    import threading\n    def compute_depths(parents):\n        depths = [0] * len(parents)\n        for i in range(1, len(parents)):\n            depths[i] = depths[parents[i]] + 1\n        return depths\n\n    def dfs(node, depth, parents, order):\n        nonlocal time\n        entry_time[node] = time\n        order.append(node)\n        time += 1\n        for child in adj_list[node]:\n            if entry_time[child] == -1:\n                dfs(child, depth + 1, parents, order)\n        exit_time[node] = time\n        time += 1\n\n    def lca(u, v):\n        if entry_time[u] <= entry_time[v] <= exit_time[u]:\n            return u\n        if entry_time[v] <= entry_time[u] <= exit_time[v]:\n            return v\n        if depths[u] > depths[v]:\n            return lca(parents[u], v)\n        else:\n            return lca(u, parents[v])\n\n    def query(u, k):\n        order = []\n        dfs(u, 0, parents, order)\n        if k > len(order):\n            return -1\n        return order[k - 1]\n\n    input = sys.stdin.read\n    data = input().split()\n    \n    index = 0\n    n = int(data[index])\n    q = int(data[index + 1])\n    index += 2\n    \n    parents = [0] * n\n    for i in range(1, n):\n        parents[i] = int(data[index + i - 1]) - 1\n    index += n - 1\n    \n    adj_list = defaultdict(list)\n    for i in range(1, n):\n        adj_list[parents[i]].append(i)\n    \n    depths = compute_depths(parents)\n    \n    global time\n    time = 0\n    entry_time = [-1] * n\n    exit_time = [-1] * n\n    \n    results = []\n    for _ in range(q):\n        u = int(data[index]) - 1\n        k = int(data[index + 1])\n        index += 2\n        results.append(query(u, k))\n    \n    for result in results:\n        print(result)\n\nthreading.Thread(target=main).start()",
+    "code_hash": "d5199a7ce8c0f31a",
+    "language": "python",
+    "node_id": null,
+    "revision_id": null,
+    "thought_path_snapshot": [],
+    "origin": "baseline",
+    "generation_record_id": null,
+    "created_sequence": 2
+  },
+  {
+    "candidate_id": "cand_bon_2_628e4a",
+    "problem_id": "apps_4514",
+    "code": "import sys\nfrom collections import defaultdict, deque\n\ndef main():\n    import sys\n    import threading\n    def compute_depths(parents):\n        depths = [0] * len(parents)\n        for i in range(1, len(parents)):\n            depths[i] = depths[parents[i]] + 1\n        return depths\n\n    def dfs(node, parent, order, depths, adj_list):\n        order.append(node)\n        for neighbor in adj_list[node]:\n            if neighbor != parent:\n                dfs(neighbor, node, order, depths, adj_list)\n        order.append(node)\n\n    def process_query(order, depths, u, k):\n        start_index = order.index(u)\n        end_index = start_index + depths[u] + 1\n        if k <= end_index - start_index:\n            return order[start_index + k - 1]\n        else:\n            return -1\n\n    def solve():\n        import sys\n        import threading\n        input = sys.stdin.read\n        data = input().split()\n        \n        n = int(data[0])\n        q = int(data[1])\n        \n        parents = [0] + list(map(int, data[2:n+1]))\n        \n        adj_list = defaultdict(list)\n        for i in range(2, n+1):\n            adj_list[parents[i]].append(i)\n        \n        depths = compute_depths(parents)\n        \n        order = []\n        dfs(1, -1, order, depths, adj_list)\n        \n        results = []\n        query_index = n + 1\n        for _ in range(q):\n            u = int(data[query_index])\n            k = int(data[query_index + 1])\n            query_index += 2\n            results.append(process_query(order, depths, u, k))\n        \n        print(\" \".join(map(str, results)))\n\n    threading.Thread(target=solve).start()\n\nif __name__ == \"__main__\":\n    main()",
+    "code_hash": "2471a3dbcf765feb",
+    "language": "python",
+    "node_id": null,
+    "revision_id": null,
+    "thought_path_snapshot": [],
+    "origin": "baseline",
+    "generation_record_id": null,
+    "created_sequence": 3
+  }
+]

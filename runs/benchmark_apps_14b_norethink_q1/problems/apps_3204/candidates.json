@@ -1,0 +1,178 @@
+[
+  {
+    "candidate_id": "cand_58f733ef58",
+    "problem_id": "apps_3204",
+    "code": "import sys\n\ndef main():\n    import sys\n    import heapq\n    \n    def solve(N, times):\n        # Initialize the DP table\n        dp = [[float('inf')] * (N + 1) for _ in range(10**5 + 1)]\n        dp[0][0] = 0\n        \n        # Priority queue to store the state (time, boats_passed)\n        pq = [(0, 0)]\n        \n        while pq:\n            current_time, boats_passed = heapq.heappop(pq)\n            \n            if boats_passed == N:\n                return dp[current_time][boats_passed]\n            \n            if boats_passed < N:\n                next_arrival = times[boats_passed]\n                \n                # Option 1: Raise the bridge if it's not already raised\n                if current_time + 60 <= next_arrival:\n                    new_time = next_arrival + 20\n                    if dp[new_time][boats_passed + 1] > dp[current_time][boats_passed] + 60:\n                        dp[new_time][boats_passed + 1] = dp[current_time][boats_passed] + 60\n                        heapq.heappush(pq, (new_time, boats_passed + 1))\n                \n                # Option 2: Keep the bridge raised if the next boat arrives soon enough\n                if current_time + 60 + 20 <= next_arrival + 30 * 60:\n                    new_time = next_arrival + 20\n                    if dp[new_time][boats_passed + 1] > dp[current_time][boats_passed]:\n                        dp[new_time][boats_passed + 1] = dp[current_time][boats_passed]\n                        heapq.heappush(pq, (new_time, boats_passed + 1))\n                \n                # Option 3: Lower the bridge if it's been raised long enough\n                if current_time >= 60:\n                    new_time = current_time - 60\n                    if dp[new_time][boats_passed] > dp[current_time][boats_passed] + 60:\n                        dp[new_time][boats_passed] = dp[current_time][boats_passed] + 60\n                        heapq.heappush(pq, (new_time, boats_passed))\n        \n        return -1  # Should not reach here if input is valid\n\n    # Read input\n    N = int(sys.stdin.readline())\n    times = [int(sys.stdin.readline()) for _ in range(N)]\n    \n    # Solve the problem\n    result = solve(N, times)\n    \n    # Print the result\n    print(result)\n\nif __name__ == \"__main__\":\n    main()",
+    "code_hash": "c4b04bc86cc864e6",
+    "language": "python",
+    "node_id": "n_2_44f335",
+    "revision_id": "rev_n_2_44f335_0",
+    "thought_path_snapshot": [
+      "Implement a dynamic programming solution where each state represents the optimal decision (raise or lower the bridge) given the current time and the number of boats that have arrived. This method would consider all possible scenarios to minimize bridge unavailability while adhering to the waiting limit."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 1
+  },
+  {
+    "candidate_id": "cand_4c9581e822",
+    "problem_id": "apps_3204",
+    "code": "def operate_bridge(N, arrival_times):\n    bridge_up_time = 0\n    current_time = 0\n    waiting_boats = []\n    \n    for arrival in arrival_times:\n        # Lower the bridge if there are no waiting boats and the current time is after the last boat's arrival\n        if not waiting_boats and current_time > arrival:\n            current_time += 60\n        \n        # Wait until the boat arrives if the bridge is not up\n        if current_time < arrival:\n            current_time = arrival\n        \n        # Add the boat to the waiting list\n        waiting_boats.append(arrival)\n        \n        # Check if the oldest boat has been waiting for more than 30 minutes\n        while waiting_boats and current_time - waiting_boats[0] > 1800:\n            waiting_boats.pop(0)\n        \n        # Raise the bridge if there are waiting boats\n        if waiting_boats:\n            if current_time < waiting_boats[0]:\n                current_time = waiting_boats[0]\n            current_time += 60\n            bridge_up_time += 60\n        \n        # Let all waiting boats pass through\n        while waiting_boats:\n            current_time += 20\n            waiting_boats.pop(0)\n    \n    return bridge_up_time\n\n# Read input\nimport sys\ninput = sys.stdin.read\ndata = input().split()\n\nN = int(data[0])\narrival_times = list(map(int, data[1:]))\n\n# Calculate and print the result\nprint(operate_bridge(N, arrival_times))",
+    "code_hash": "5e4ba2d06554d831",
+    "language": "python",
+    "node_id": "n_1_a7f993",
+    "revision_id": "rev_n_1_a7f993_0",
+    "thought_path_snapshot": [
+      "Develop a greedy algorithm that processes boats in the order they arrive, raising the bridge immediately when a boat arrives and lowering it as soon as all waiting boats have passed. This approach ensures minimal bridge unavailability but may not always optimize for the 30-minute waiting limit."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 2
+  },
+  {
+    "candidate_id": "cand_fe35888606",
+    "problem_id": "apps_3204",
+    "code": "import heapq\n\ndef operate_bridge(N, arrival_times):\n    # Priority queue to manage boats based on their arrival times\n    pq = []\n    current_time = 0\n    unavailable_time = 0\n    max_wait_time = 30 * 60  # 30 minutes in seconds\n\n    for arrival in arrival_times:\n        # Check if the bridge can be lowered before the next boat arrives\n        while pq and pq[0] + max_wait_time < arrival:\n            last_boat_time = heapq.heappop(pq)\n            # Bridge is lowered immediately after the last boat passes\n            current_time = max(current_time, last_boat_time) + 60\n            unavailable_time += 60\n\n        # Raise the bridge if it's not already raised\n        if current_time < arrival:\n            unavailable_time += 60\n            current_time = arrival + 60\n\n        # Boat passes through the bridge\n        current_time += 20\n        heapq.heappush(pq, current_time)\n\n    # Process remaining boats in the queue\n    while pq:\n        last_boat_time = heapq.heappop(pq)\n        # Bridge is lowered immediately after the last boat passes\n        current_time = max(current_time, last_boat_time) + 60\n        unavailable_time += 60\n\n    return unavailable_time\n\n# Read input\nimport sys\ninput = sys.stdin.read\ndata = input().split()\n\nN = int(data[0])\narrival_times = list(map(int, data[1:]))\n\n# Output the result\nprint(operate_bridge(N, arrival_times))",
+    "code_hash": "f47af5bf606d80f7",
+    "language": "python",
+    "node_id": "n_3_b96c5b",
+    "revision_id": "rev_n_3_b96c5b_0",
+    "thought_path_snapshot": [
+      "Use a priority queue to manage boats based on their arrival times and the potential impact on subsequent boats' waiting times. This strategy would aim to balance the immediate needs of arriving boats with the future efficiency of bridge operations, ensuring no boat waits longer than 30 minutes."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 3
+  },
+  {
+    "candidate_id": "cand_0db8ca07cd",
+    "problem_id": "apps_3204",
+    "code": "def operate_bridge(N, arrival_times):\n    # Initialize variables\n    current_time = 0\n    bridge_up = False\n    bridge_up_start_time = 0\n    total_bridge_unavailable_time = 0\n    boat_index = 0\n\n    while boat_index < N:\n        current_time = arrival_times[boat_index]\n        \n        if not bridge_up:\n            # Raise the bridge\n            bridge_up = True\n            bridge_up_start_time = current_time\n            current_time += 60  # Time to raise the bridge\n        \n        # Process all boats that can pass through the bridge\n        while boat_index < N and current_time >= arrival_times[boat_index] and current_time - arrival_times[boat_index] <= 1800:\n            current_time += 20  # Time for one boat to pass through\n            boat_index += 1\n        \n        # Lower the bridge if no more boats are waiting\n        if boat_index == N or current_time - arrival_times[boat_index] > 1800:\n            bridge_up = False\n            total_bridge_unavailable_time += current_time - bridge_up_start_time\n            current_time += 60  # Time to lower the bridge\n\n    return total_bridge_unavailable_time\n\n# Read input\nimport sys\ninput = sys.stdin.read\ndata = input().split()\n\nN = int(data[0])\narrival_times = list(map(int, data[1:]))\n\n# Output the result\nprint(operate_bridge(N, arrival_times))",
+    "code_hash": "ec9aa722abc9a9c8",
+    "language": "python",
+    "node_id": "n_5_235db3",
+    "revision_id": "rev_n_5_235db3_0",
+    "thought_path_snapshot": [
+      "Implement a dynamic programming solution where each state represents the optimal decision (raise or lower the bridge) given the current time and the number of boats that have arrived. This method would consider all possible scenarios to minimize bridge unavailability while adhering to the waiting limit.",
+      "Consider a greedy algorithm that processes boats in order of their arrival times, deciding whether to raise or lower the bridge based on the next boat's arrival time and the 30-minute waiting limit. This approach might simplify the logic and reduce computational complexity."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 4
+  },
+  {
+    "candidate_id": "cand_4a8f2bbad0",
+    "problem_id": "apps_3204",
+    "code": "import heapq\n\ndef operate_bridge(N, arrival_times):\n    # Initialize variables\n    current_time = 0\n    bridge_unavailable_time = 0\n    waiting_boats = []\n    \n    for arrival_time in arrival_times:\n        # Move current time forward to the boat's arrival time\n        current_time = max(current_time, arrival_time)\n        \n        # Check if any boat has been waiting for more than 30 minutes\n        while waiting_boats and current_time - waiting_boats[0][0] > 1800:\n            _, boat_index = heapq.heappop(waiting_boats)\n            # This boat has waited too long, we need to raise the bridge immediately\n            bridge_unavailable_time += 60\n            current_time += 60\n        \n        # Add the current boat to the waiting list\n        heapq.heappush(waiting_boats, (current_time, arrival_time))\n        \n        # Process all boats that can pass through the bridge now\n        while waiting_boats and waiting_boats[0][0] <= current_time:\n            _, boat_index = heapq.heappop(waiting_boats)\n            # The boat passes through the bridge\n            current_time += 20\n        \n        # If there are still boats waiting, keep the bridge raised\n        if waiting_boats:\n            bridge_unavailable_time += 60\n            current_time += 60\n    \n    return bridge_unavailable_time\n\n# Read input\nimport sys\ninput = sys.stdin.read\ndata = input().split()\nN = int(data[0])\narrival_times = list(map(int, data[1:]))\n\n# Output the result\nprint(operate_bridge(N, arrival_times))",
+    "code_hash": "c5284c4f5aecd29b",
+    "language": "python",
+    "node_id": "n_8_7768cc",
+    "revision_id": "rev_n_8_7768cc_0",
+    "thought_path_snapshot": [
+      "Develop a greedy algorithm that processes boats in the order they arrive, raising the bridge immediately when a boat arrives and lowering it as soon as all waiting boats have passed. This approach ensures minimal bridge unavailability but may not always optimize for the 30-minute waiting limit.",
+      "Consider using a priority queue to manage the waiting boats, prioritizing those that are closest to reaching their 30-minute waiting limit. This would allow the algorithm to proactively address potential delays and optimize bridge usage."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 5
+  },
+  {
+    "candidate_id": "cand_7382257652",
+    "problem_id": "apps_3204",
+    "code": "import heapq\n\ndef operate_bridge(N, arrival_times):\n    # Priority queue to manage boats based on their arrival times\n    pq = []\n    # Total time the bridge is unavailable to road traffic\n    total_unavailable_time = 0\n    # Current time\n    current_time = 0\n    \n    for arrival in arrival_times:\n        # Check if the bridge can be lowered before the next boat arrives\n        while pq and pq[0] + 30 * 60 < arrival:\n            # Lower the bridge\n            current_time = max(current_time, pq[0] + 30 * 60)\n            total_unavailable_time += 60\n            heapq.heappop(pq)\n        \n        # Raise the bridge for the current boat\n        if not pq:\n            current_time = max(current_time, arrival)\n            total_unavailable_time += 60\n        \n        # Add the current boat's departure time to the priority queue\n        heapq.heappush(pq, current_time + 20)\n    \n    # Lower the bridge for any remaining boats\n    while pq:\n        current_time = max(current_time, pq[0] + 30 * 60)\n        total_unavailable_time += 60\n        heapq.heappop(pq)\n    \n    return total_unavailable_time\n\n# Read input\nimport sys\ninput = sys.stdin.read\ndata = input().split()\nN = int(data[0])\narrival_times = list(map(int, data[1:]))\n\n# Output the result\nprint(operate_bridge(N, arrival_times))",
+    "code_hash": "30fb34ccea0bdb30",
+    "language": "python",
+    "node_id": "n_10_9ba91f",
+    "revision_id": "rev_n_10_9ba91f_0",
+    "thought_path_snapshot": [
+      "Use a priority queue to manage boats based on their arrival times and the potential impact on subsequent boats' waiting times. This strategy would aim to balance the immediate needs of arriving boats with the future efficiency of bridge operations, ensuring no boat waits longer than 30 minutes.",
+      "Implement a greedy algorithm that prioritizes raising the bridge as soon as the last boat has passed, minimizing the time the bridge is unavailable to road traffic while ensuring no boat waits more than 30 minutes."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 6
+  },
+  {
+    "candidate_id": "cand_1631e059fe",
+    "problem_id": "apps_3204",
+    "code": "import sys\nfrom heapq import heappush, heappop\n\ndef main():\n    import sys\n    input = sys.stdin.read\n    data = input().split()\n    \n    N = int(data[0])\n    arrival_times = list(map(int, data[1:]))\n    \n    # Initialize the priority queue\n    pq = []\n    heappush(pq, (arrival_times[0] + 60, 0))  # (time when bridge is free, number of boats processed)\n    \n    total_bridge_unavailable_time = 0\n    \n    for i in range(1, N):\n        current_time = arrival_times[i]\n        \n        # Process the queue until we find the earliest time we can start processing the current boat\n        while pq and pq[0][0] <= current_time:\n            free_time, processed_boats = heappop(pq)\n        \n        # Calculate the time when the bridge will be free after processing the current boat\n        if pq:\n            last_free_time, last_processed_boats = pq[0]\n            if last_free_time <= current_time:\n                free_time = max(current_time, last_free_time) + 60\n            else:\n                free_time = last_free_time + 60\n        else:\n            free_time = current_time + 60\n        \n        # Update the total bridge unavailable time\n        total_bridge_unavailable_time += free_time - current_time\n        \n        # Push the new state into the priority queue\n        heappush(pq, (free_time, i))\n    \n    print(total_bridge_unavailable_time)\n\nif __name__ == \"__main__\":\n    main()",
+    "code_hash": "921253f5f1cfebc4",
+    "language": "python",
+    "node_id": "n_4_250674",
+    "revision_id": "rev_n_4_250674_0",
+    "thought_path_snapshot": [
+      "Implement a dynamic programming solution where each state represents the optimal decision (raise or lower the bridge) given the current time and the number of boats that have arrived. This method would consider all possible scenarios to minimize bridge unavailability while adhering to the waiting limit.",
+      "Re-evaluate the dynamic programming approach to ensure that all states are being updated correctly. Specifically, verify that the conditions for raising, keeping raised, and lowering the bridge are accurately implemented and that the priority queue is correctly managing the states."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 7
+  },
+  {
+    "candidate_id": "cand_63f80e79a9",
+    "problem_id": "apps_3204",
+    "code": "import sys\n\ndef main():\n    import sys\n    import heapq\n    \n    def simulate_boats(arrival_times):\n        bridge_unavailable = 0\n        current_time = 0\n        boat_queue = []\n        bridge_status = 'lowered'  # 'lowered' or 'raised'\n        raise_time = 0\n        lower_time = 0\n        \n        for arrival_time in arrival_times:\n            # Move forward in time to the next event\n            if boat_queue:\n                next_event_time = min(boat_queue[0][0], arrival_time)\n            else:\n                next_event_time = arrival_time\n            \n            # Process all boats that have arrived up to the next event time\n            while boat_queue and boat_queue[0][0] <= next_event_time:\n                _, boat_id = heapq.heappop(boat_queue)\n                if bridge_status == 'lowered':\n                    # Raise the bridge\n                    bridge_status = 'raising'\n                    raise_time = next_event_time + 60\n                    bridge_unavailable += 60\n                # Boat passes through the bridge\n                current_time = max(current_time, next_event_time)\n                current_time += 20\n                bridge_unavailable += 20\n            \n            # If the bridge is raising and we've reached the raise time\n            if bridge_status == 'raising' and current_time >= raise_time:\n                bridge_status = 'raised'\n            \n            # If the bridge is raised and there are no boats waiting, lower it\n            if bridge_status == 'raised' and not boat_queue:\n                bridge_status = 'lowering'\n                lower_time = current_time + 60\n                bridge_unavailable += 60\n            \n            # If the bridge is lowering and we've reached the lower time\n            if bridge_status == 'lowering' and current_time >= lower_time:\n                bridge_status = 'lowered'\n            \n            # Add the current boat to the queue\n            heapq.heappush(boat_queue, (arrival_time, len(boat_queue)))\n        \n        # Process remaining boats in the queue\n        while boat_queue:\n            next_event_time = boat_queue[0][0]\n            if bridge_status == 'lowered':\n                # Raise the bridge\n                bridge_status = 'raising'\n                raise_time = next_event_time + 60\n                bridge_unavailable += 60\n            \n            # Process all boats that have arrived up to the next event time\n            while boat_queue and boat_queue[0][0] <= next_event_time:\n                _, boat_id = heapq.heappop(boat_queue)\n                # Boat passes through the bridge\n                current_time = max(current_time, next_event_time)\n                current_time += 20\n                bridge_unavailable += 20\n            \n            # If the bridge is raising and we've reached the raise time\n            if bridge_status == 'raising' and current_time >= raise_time:\n                bridge_status = 'raised'\n            \n            # If the bridge is raised and there are no boats waiting, lower it\n            if bridge_status == 'raised' and not boat_queue:\n                bridge_status = 'lowering'\n                lower_time = current_time + 60\n                bridge_unavailable += 60\n            \n            # If the bridge is lowering and we've reached the lower time\n            if bridge_status == 'lowering' and current_time >= lower_time:\n                bridge_status = 'lowered'\n        \n        return bridge_unavailable\n    \n    # Read input\n    N = int(sys.stdin.readline().strip())\n    arrival_times = [int(sys.stdin.readline().strip()) for _ in range(N)]\n    \n    # Simulate the bridge operations\n    result = simulate_boats(arrival_times)\n    \n    # Print the result\n    print(result)\n\nif __name__ == \"__main__\":\n    main()",
+    "code_hash": "987db2c0d48b61c0",
+    "language": "python",
+    "node_id": "n_6_f9ba0d",
+    "revision_id": "rev_n_6_f9ba0d_0",
+    "thought_path_snapshot": [
+      "Implement a dynamic programming solution where each state represents the optimal decision (raise or lower the bridge) given the current time and the number of boats that have arrived. This method would consider all possible scenarios to minimize bridge unavailability while adhering to the waiting limit.",
+      "Implement a simulation-based approach where the bridge's operations are simulated step by step according to the arrival times of the boats. This can help identify any edge cases or logical errors in the previous implementations."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 8
+  },
+  {
+    "candidate_id": "cand_4b21449997",
+    "problem_id": "apps_3204",
+    "code": "def operate_bridge(N, arrival_times):\n    # Initialize variables\n    current_time = 0\n    bridge_up = False\n    boats_waiting = []\n    total_bridge_unavailable = 0\n    \n    for arrival in arrival_times:\n        # Check if the bridge needs to be lowered\n        if bridge_up and boats_waiting and boats_waiting[0] <= arrival - 1800:\n            # Lower the bridge\n            current_time += 60\n            total_bridge_unavailable += 60\n            bridge_up = False\n            boats_waiting.pop(0)\n        \n        # If the bridge is not up and no boats are waiting, raise the bridge\n        if not bridge_up and not boats_waiting:\n            current_time += 60\n            total_bridge_unavailable += 60\n            bridge_up = True\n        \n        # Add the current boat to the waiting list\n        boats_waiting.append(arrival)\n        \n        # Process all boats that can pass through the bridge\n        while boats_waiting and boats_waiting[0] <= current_time:\n            current_time += 20\n            boats_waiting.pop(0)\n        \n        # Ensure the bridge remains up if there are still boats waiting\n        if boats_waiting:\n            bridge_up = True\n    \n    # Lower the bridge if it is still up after processing all boats\n    if bridge_up:\n        current_time += 60\n        total_bridge_unavailable += 60\n    \n    return total_bridge_unavailable\n\n# Read input\nimport sys\ninput = sys.stdin.read\ndata = input().split()\nN = int(data[0])\narrival_times = list(map(int, data[1:]))\n\n# Output the result\nprint(operate_bridge(N, arrival_times))",
+    "code_hash": "10b34980d54dfb9f",
+    "language": "python",
+    "node_id": "n_13_d0d9fd",
+    "revision_id": "rev_n_13_d0d9fd_0",
+    "thought_path_snapshot": [
+      "Implement a dynamic programming solution where each state represents the optimal decision (raise or lower the bridge) given the current time and the number of boats that have arrived. This method would consider all possible scenarios to minimize bridge unavailability while adhering to the waiting limit.",
+      "Implement a simulation-based approach where the bridge's operations are simulated step by step according to the arrival times of the boats. This can help identify any edge cases or logical errors in the previous implementations.",
+      "Implement a greedy algorithm that prioritizes minimizing bridge unavailability while ensuring no boat waits longer than 30 minutes. This could involve keeping the bridge raised for as long as possible without exceeding the waiting limit."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 9
+  },
+  {
+    "candidate_id": "cand_34f830b8f4",
+    "problem_id": "apps_3204",
+    "code": "def min_bridge_unavailability(N, arrival_times):\n    # Initialize variables\n    current_time = 0\n    bridge_up = False\n    bridge_up_time = 0\n    total_bridge_up_time = 0\n    boat_index = 0\n    \n    while boat_index < N:\n        # Get the arrival time of the current boat\n        arrival_time = arrival_times[boat_index]\n        \n        # If the bridge is up and the next boat arrives within 30 minutes\n        if bridge_up and arrival_time <= bridge_up_time + 1800:\n            # Move to the next boat\n            boat_index += 1\n            continue\n        \n        # If the bridge is down, raise it\n        if not bridge_up:\n            current_time = max(current_time, arrival_time)\n            current_time += 60  # Time to raise the bridge\n            bridge_up = True\n            bridge_up_time = current_time + 20  # Time when the first boat can pass\n            total_bridge_up_time += 60\n        \n        # Process all boats that can pass through before the next boat arrives\n        while boat_index < N and arrival_times[boat_index] <= bridge_up_time:\n            boat_index += 1\n            current_time += 20  # Time for each boat to pass\n        \n        # Lower the bridge\n        current_time += 60\n        bridge_up = False\n        total_bridge_up_time += 60\n    \n    return total_bridge_up_time\n\n# Read input\nimport sys\ninput = sys.stdin.read\ndata = input().split()\nN = int(data[0])\narrival_times = list(map(int, data[1:]))\n\n# Calculate and print the result\nprint(min_bridge_unavailability(N, arrival_times))",
+    "code_hash": "59f5ab9c9776279c",
+    "language": "python",
+    "node_id": "n_17_ba4341",
+    "revision_id": "rev_n_17_ba4341_0",
+    "thought_path_snapshot": [
+      "Implement a dynamic programming solution where each state represents the optimal decision (raise or lower the bridge) given the current time and the number of boats that have arrived. This method would consider all possible scenarios to minimize bridge unavailability while adhering to the waiting limit.",
+      "Consider a greedy algorithm that processes boats in order of their arrival times, deciding whether to raise or lower the bridge based on the next boat's arrival time and the 30-minute waiting limit. This approach might simplify the logic and reduce computational complexity.",
+      "Refine the greedy algorithm to include a lookahead mechanism. This would involve checking the arrival times of subsequent boats to decide whether to keep the bridge raised or lower it immediately after the current batch of boats has passed through. This approach aims to balance the waiting time for boats with the availability of the bridge for road traffic."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 10
+  },
+  {
+    "candidate_id": "cand_2254218268",
+    "problem_id": "apps_3204",
+    "code": "def operate_bridge(N, arrival_times):\n    # Initialize variables\n    bridge_up = False\n    current_time = 0\n    boats_waiting = []\n    total_bridge_unavailable = 0\n    \n    # Process each boat arrival\n    for arrival in arrival_times:\n        # Move forward in time to the boat's arrival\n        current_time = arrival\n        \n        # Check if the bridge needs to be lowered\n        if bridge_up and not boats_waiting:\n            bridge_up = False\n            total_bridge_unavailable += 60\n        \n        # Add the boat to the waiting list if the bridge is not up\n        if not bridge_up:\n            boats_waiting.append(arrival)\n        \n        # Raise the bridge if there are boats waiting\n        if boats_waiting:\n            if not bridge_up:\n                bridge_up = True\n                total_bridge_unavailable += 60\n            \n            # Process all waiting boats\n            while boats_waiting:\n                boat_arrival = boats_waiting.pop(0)\n                if current_time - boat_arrival > 1800:\n                    raise ValueError(\"A boat waited longer than 30 minutes.\")\n                current_time += 20\n    \n    # Final check to lower the bridge if it was up\n    if bridge_up:\n        total_bridge_unavailable += 60\n    \n    return total_bridge_unavailable\n\n# Read input\nimport sys\ninput = sys.stdin.read\ndata = input().split()\n\nN = int(data[0])\narrival_times = list(map(int, data[1:]))\n\n# Output the result\nprint(operate_bridge(N, arrival_times))",
+    "code_hash": "c8ad41c2f8de036f",
+    "language": "python",
+    "node_id": "n_14_7d7c0f",
+    "revision_id": "rev_n_14_7d7c0f_0",
+    "thought_path_snapshot": [
+      "Implement a dynamic programming solution where each state represents the optimal decision (raise or lower the bridge) given the current time and the number of boats that have arrived. This method would consider all possible scenarios to minimize bridge unavailability while adhering to the waiting limit.",
+      "Implement a simulation-based approach where the bridge's operations are simulated step by step according to the arrival times of the boats. This can help identify any edge cases or logical errors in the previous implementations.",
+      "Refactor the existing simulation-based approach to better handle the logic of bridge raising and lowering, especially focusing on the conditions under which the bridge should be kept raised to accommodate multiple boats arriving closely together."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 11
+  }
+]

@@ -1,0 +1,159 @@
+[
+  {
+    "candidate_id": "cand_51ac916afc",
+    "problem_id": "apps_3172",
+    "code": "import sys\nfrom collections import defaultdict\n\ndef max_fruits_sliced(n, fruits):\n    events = []\n    \n    for i, (x, y) in enumerate(fruits):\n        # Calculate the slope of the line passing through the center of the circle and perpendicular to the x-axis\n        slope = (y + 1) / (x + 1e-9)  # Avoid division by zero\n        # Calculate the intercept of the line\n        intercept = y - slope * x\n        # Create events for the start and end of the interval\n        events.append((intercept - slope, 1))  # Start of the interval\n        events.append((intercept + slope, -1))  # End of the interval\n    \n    # Sort events by intercept, and by type (start before end if same intercept)\n    events.sort()\n    \n    max_overlap = 0\n    current_overlap = 0\n    \n    for _, delta in events:\n        current_overlap += delta\n        max_overlap = max(max_overlap, current_overlap)\n    \n    return max_overlap\n\ndef main():\n    import sys\n    input = sys.stdin.read\n    data = input().split()\n    \n    n = int(data[0])\n    fruits = [(float(data[2*i+1]), float(data[2*i+2])) for i in range(n)]\n    \n    result = max_fruits_sliced(n, fruits)\n    print(result)\n\nif __name__ == \"__main__\":\n    main()",
+    "code_hash": "d03076383526e743",
+    "language": "python",
+    "node_id": "n_2_ed13fa",
+    "revision_id": "rev_n_2_ed13fa_0",
+    "thought_path_snapshot": [
+      "Utilize a geometric transformation to convert the problem into finding the maximum number of overlapping intervals on a line. This involves projecting the circles onto a line and counting overlaps efficiently."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 1
+  },
+  {
+    "candidate_id": "cand_cf7615f932",
+    "problem_id": "apps_3172",
+    "code": "import sys\nimport math\n\ndef distance(p1, p2):\n    return math.sqrt((p1[0] - p2[0]) ** 2 + (p1[1] - p2[1]) ** 2)\n\ndef point_to_line_distance(point, line_point1, line_point2):\n    x0, y0 = point\n    x1, y1 = line_point1\n    x2, y2 = line_point2\n    numerator = abs((y2 - y1) * x0 - (x2 - x1) * y0 + x2 * y1 - y2 * x1)\n    denominator = distance(line_point1, line_point2)\n    return numerator / denominator\n\ndef max_fruits_sliced(fruits):\n    n = len(fruits)\n    max_count = 0\n    \n    for i in range(n):\n        for j in range(i + 1, n):\n            count = 0\n            for fruit in fruits:\n                if point_to_line_distance(fruit, fruits[i], fruits[j]) <= 1.0:\n                    count += 1\n            max_count = max(max_count, count)\n    \n    return max_count\n\ndef main():\n    import sys\n    input = sys.stdin.read\n    data = input().split()\n    \n    n = int(data[0])\n    fruits = []\n    index = 1\n    for _ in range(n):\n        x = float(data[index])\n        y = float(data[index + 1])\n        fruits.append((x, y))\n        index += 2\n    \n    result = max_fruits_sliced(fruits)\n    print(result)\n\nif __name__ == \"__main__\":\n    main()",
+    "code_hash": "027df3e039d4cbff",
+    "language": "python",
+    "node_id": "n_1_26c3e9",
+    "revision_id": "rev_n_1_26c3e9_0",
+    "thought_path_snapshot": [
+      "Consider using a brute-force approach where we iterate over all pairs of points to determine the line passing through them and then check how many circles intersect this line. This approach is straightforward but computationally expensive."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 2
+  },
+  {
+    "candidate_id": "cand_83e2c34ec9",
+    "problem_id": "apps_3172",
+    "code": "import sys\nfrom typing import List, Tuple\n\ndef max_fruits_sliced(n: int, fruits: List[Tuple[float, float]]) -> int:\n    def orientation(p: Tuple[float, float], q: Tuple[float, float], r: Tuple[float, float]) -> float:\n        return (q[1] - p[1]) * (r[0] - q[0]) - (q[0] - p[0]) * (r[1] - q[1])\n\n    def count_circles_on_line(p: Tuple[float, float], q: Tuple[float, float]) -> int:\n        count = 0\n        for fruit in fruits:\n            if abs(orientation(p, q, fruit)) <= 1e-9:\n                count += 1\n        return count\n\n    def max_circles_in_half_plane(p: Tuple[float, float], q: Tuple[float, float]) -> int:\n        max_count = 0\n        for fruit in fruits:\n            if orientation(p, q, fruit) > 0:\n                max_count += 1\n        return max_count\n\n    def find_best_slice(start: int, end: int) -> int:\n        if start == end:\n            return 1\n        mid = (start + end) // 2\n        left_max = find_best_slice(start, mid)\n        right_max = find_best_slice(mid + 1, end)\n        max_cross = 0\n\n        left_points = sorted(fruits[start:mid + 1], key=lambda x: (x[0], x[1]))\n        right_points = sorted(fruits[mid + 1:end + 1], key=lambda x: (x[0], x[1]))\n\n        for i in range(len(left_points)):\n            for j in range(len(right_points)):\n                p, q = left_points[i], right_points[j]\n                count = count_circles_on_line(p, q)\n                max_cross = max(max_cross, count + max_circles_in_half_plane(p, q) + max_circles_in_half_plane(q, p))\n\n        return max(left_max, right_max, max_cross)\n\n    return find_best_slice(0, n - 1)\n\ndef main():\n    import sys\n    input = sys.stdin.read\n    data = input().split()\n    \n    n = int(data[0])\n    fruits = []\n    index = 1\n    for _ in range(n):\n        x = float(data[index])\n        y = float(data[index + 1])\n        fruits.append((x, y))\n        index += 2\n    \n    result = max_fruits_sliced(n, fruits)\n    print(result)\n\nif __name__ == \"__main__\":\n    main()",
+    "code_hash": "e91cbcd1e12e1c60",
+    "language": "python",
+    "node_id": "n_3_e9d5be",
+    "revision_id": "rev_n_3_e9d5be_0",
+    "thought_path_snapshot": [
+      "Apply a divide-and-conquer strategy to recursively divide the set of circles into smaller subsets, solve the problem for each subset, and then combine the results. This can potentially reduce the complexity compared to a brute-force approach."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 3
+  },
+  {
+    "candidate_id": "cand_f2b80809c3",
+    "problem_id": "apps_3172",
+    "code": "import sys\nimport math\n\ndef max_fruits_sliced(n, fruits):\n    def distance(p1, p2):\n        return math.sqrt((p1[0] - p2[0]) ** 2 + (p1[1] - p2[1]) ** 2)\n\n    def line_circle_intersection(line, center, radius):\n        # Line equation: Ax + By = C\n        A, B, C = line\n        x0, y0 = center\n        # Distance from center to line\n        d = abs(A * x0 + B * y0 - C) / math.sqrt(A ** 2 + B ** 2)\n        return d <= radius\n\n    max_count = 0\n    for i in range(n):\n        for j in range(i + 1, n):\n            x1, y1 = fruits[i]\n            x2, y2 = fruits[j]\n            # Line passing through (x1, y1) and (x2, y2)\n            if x1 == x2:\n                # Vertical line\n                A, B, C = 1, 0, x1\n            else:\n                m = (y2 - y1) / (x2 - x1)\n                c = y1 - m * x1\n                A, B, C = m, -1, c\n            count = 0\n            for k in range(n):\n                if line_circle_intersection((A, B, C), fruits[k], 1):\n                    count += 1\n            max_count = max(max_count, count)\n    return max_count\n\ndef main():\n    import sys\n    input = sys.stdin.read\n    data = input().split()\n    \n    n = int(data[0])\n    fruits = []\n    index = 1\n    for _ in range(n):\n        x = float(data[index])\n        y = float(data[index + 1])\n        fruits.append((x, y))\n        index += 2\n    \n    result = max_fruits_sliced(n, fruits)\n    print(result)\n\nif __name__ == \"__main__\":\n    main()",
+    "code_hash": "6d5e6ed7483b6b7d",
+    "language": "python",
+    "node_id": "n_4_53a78f",
+    "revision_id": "rev_n_4_53a78f_0",
+    "thought_path_snapshot": [
+      "Consider using a brute-force approach where we iterate over all pairs of points to determine the line passing through them and then check how many circles intersect this line. This approach is straightforward but computationally expensive.",
+      "Optimize the brute-force approach by using spatial partitioning techniques such as a quadtree to reduce the number of distance calculations. This could potentially improve performance without significantly increasing complexity."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 4
+  },
+  {
+    "candidate_id": "cand_c80973523f",
+    "problem_id": "apps_3172",
+    "code": "import sys\nfrom typing import List, Tuple\n\ndef max_fruits_sliced(n: int, fruits: List[Tuple[float, float]]) -> int:\n    def orientation(p: Tuple[float, float], q: Tuple[float, float], r: Tuple[float, float]) -> float:\n        return (q[1] - p[1]) * (r[0] - q[0]) - (q[0] - p[0]) * (r[1] - q[1])\n\n    def count_circles_on_line(p: Tuple[float, float], q: Tuple[float, float]) -> int:\n        count = 0\n        for fruit in fruits:\n            if abs(orientation(p, q, fruit)) <= 1e-9:\n                count += 1\n        return count\n\n    def max_fruits_recursive(fruits: List[Tuple[float, float]], start: int, end: int) -> int:\n        if start == end:\n            return 1\n        if start + 1 == end:\n            return 2 if orientation(fruits[start], fruits[start + 1], fruits[start]) == 0 else 1\n        \n        mid = (start + end) // 2\n        left_max = max_fruits_recursive(fruits, start, mid)\n        right_max = max_fruits_recursive(fruits, mid + 1, end)\n        \n        max_cross = 0\n        for i in range(start, mid + 1):\n            for j in range(mid + 1, end + 1):\n                max_cross = max(max_cross, count_circles_on_line(fruits[i], fruits[j]))\n        \n        return max(left_max, right_max, max_cross)\n\n    fruits.sort()\n    return max_fruits_recursive(fruits, 0, n - 1)\n\ndef main():\n    import sys\n    input = sys.stdin.read\n    data = input().split()\n    \n    n = int(data[0])\n    fruits = []\n    index = 1\n    for _ in range(n):\n        x = float(data[index])\n        y = float(data[index + 1])\n        fruits.append((x, y))\n        index += 2\n    \n    result = max_fruits_sliced(n, fruits)\n    print(result)\n\nif __name__ == \"__main__\":\n    main()",
+    "code_hash": "53422f81d7629681",
+    "language": "python",
+    "node_id": "n_8_756bb1",
+    "revision_id": "rev_n_8_756bb1_0",
+    "thought_path_snapshot": [
+      "Apply a divide-and-conquer strategy to recursively divide the set of circles into smaller subsets, solve the problem for each subset, and then combine the results. This can potentially reduce the complexity compared to a brute-force approach.",
+      "Optimize the sorting step by using a more efficient sorting algorithm or data structure that can handle the precision requirements of floating-point coordinates."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 5
+  },
+  {
+    "candidate_id": "cand_3717897506",
+    "problem_id": "apps_3172",
+    "code": "import sys\nimport math\nfrom collections import defaultdict\n\ndef max_fruits_sliced(n, fruits):\n    def project_circle(center, radius, angle):\n        x, y = center\n        cos_a = math.cos(angle)\n        sin_a = math.sin(angle)\n        return (x * cos_a + y * sin_a - radius, x * cos_a + y * sin_a + radius)\n\n    def count_overlaps(intervals):\n        events = []\n        for start, end in intervals:\n            events.append((start, 1))\n            events.append((end, -1))\n        events.sort()\n        max_overlap = 0\n        current_overlap = 0\n        for _, delta in events:\n            current_overlap += delta\n            max_overlap = max(max_overlap, current_overlap)\n        return max_overlap\n\n    max_slices = 0\n    for i in range(n):\n        for j in range(i + 1, n):\n            if fruits[i] == fruits[j]:\n                continue\n            x1, y1 = fruits[i]\n            x2, y2 = fruits[j]\n            dx = x2 - x1\n            dy = y2 - y1\n            if dx == 0:\n                angle = math.pi / 2\n            else:\n                angle = math.atan2(dy, dx)\n            intervals = []\n            for fruit in fruits:\n                proj_start, proj_end = project_circle(fruit, 1, angle)\n                intervals.append((proj_start, proj_end))\n            max_slices = max(max_slices, count_overlaps(intervals))\n\n    return max_slices\n\ndef main():\n    import sys\n    input = sys.stdin.read\n    data = input().split()\n    \n    n = int(data[0])\n    fruits = []\n    index = 1\n    for _ in range(n):\n        x = float(data[index])\n        y = float(data[index + 1])\n        fruits.append((x, y))\n        index += 2\n    \n    result = max_fruits_sliced(n, fruits)\n    print(result)\n\nif __name__ == \"__main__\":\n    main()",
+    "code_hash": "89029a5d4a97b9b5",
+    "language": "python",
+    "node_id": "n_10_139921",
+    "revision_id": "rev_n_10_139921_0",
+    "thought_path_snapshot": [
+      "Utilize a geometric transformation to convert the problem into finding the maximum number of overlapping intervals on a line. This involves projecting the circles onto a line and counting overlaps efficiently.",
+      "Re-evaluate the geometric transformation approach by considering different projection axes. The current approach projects circles onto a line using the slope calculated from the circle's center to the origin, which might not yield the optimal solution."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 6
+  },
+  {
+    "candidate_id": "cand_41a83fb094",
+    "problem_id": "apps_3172",
+    "code": "import sys\nfrom typing import List, Tuple\n\ndef max_fruits_sliced(n: int, fruits: List[Tuple[float, float]]) -> int:\n    def distance(p1: Tuple[float, float], p2: Tuple[float, float]) -> float:\n        return ((p1[0] - p2[0]) ** 2 + (p1[1] - p2[1]) ** 2) ** 0.5\n\n    def count_intersections(line: Tuple[Tuple[float, float], Tuple[float, float]]) -> int:\n        intersections = 0\n        for fruit in fruits:\n            d = abs((line[1][1] - line[0][1]) * fruit[0] - (line[1][0] - line[0][0]) * fruit[1] + line[1][0] * line[0][1] - line[1][1] * line[0][0]) / distance(line[0], line[1])\n            if d <= 1.0:\n                intersections += 1\n        return intersections\n\n    max_slices = 0\n    for i in range(n):\n        for j in range(i + 1, n):\n            max_slices = max(max_slices, count_intersections((fruits[i], fruits[j])))\n\n    return max_slices\n\ndef main():\n    import sys\n    input = sys.stdin.read\n    data = input().split()\n    \n    n = int(data[0])\n    fruits = []\n    index = 1\n    for _ in range(n):\n        x = float(data[index])\n        y = float(data[index + 1])\n        fruits.append((x, y))\n        index += 2\n    \n    result = max_fruits_sliced(n, fruits)\n    print(result)\n\nif __name__ == \"__main__\":\n    main()",
+    "code_hash": "eec3299271d7e4dc",
+    "language": "python",
+    "node_id": "n_11_970cc5",
+    "revision_id": "rev_n_11_970cc5_0",
+    "thought_path_snapshot": [
+      "Utilize a geometric transformation to convert the problem into finding the maximum number of overlapping intervals on a line. This involves projecting the circles onto a line and counting overlaps efficiently.",
+      "Implement a brute-force method to check every possible line segment between pairs of points and count how many circles intersect with it. This approach, while computationally expensive, could provide a correct solution to validate the results of the optimized approach."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 7
+  },
+  {
+    "candidate_id": "cand_428f19b4ee",
+    "problem_id": "apps_3172",
+    "code": "import sys\nfrom collections import defaultdict\nfrom math import sqrt\n\ndef max_fruits_sliced(n, fruits):\n    def distance(p1, p2):\n        return sqrt((p1[0] - p2[0]) ** 2 + (p1[1] - p2[1]) ** 2)\n\n    def angle(p1, p2):\n        dx = p2[0] - p1[0]\n        dy = p2[1] - p1[1]\n        return atan2(dy, dx)\n\n    events = []\n    for i in range(n):\n        for j in range(i + 1, n):\n            d = distance(fruits[i], fruits[j])\n            if d <= 2:\n                mid = ((fruits[i][0] + fruits[j][0]) / 2, (fruits[i][1] + fruits[j][1]) / 2)\n                ang1 = angle(mid, fruits[i])\n                ang2 = angle(mid, fruits[j])\n                events.append((ang1, 1))\n                events.append((ang2, -1))\n\n    events.sort()\n    max_overlap = 0\n    current_overlap = 0\n    for _, delta in events:\n        current_overlap += delta\n        max_overlap = max(max_overlap, current_overlap)\n\n    return max_overlap\n\ndef main():\n    import sys\n    input = sys.stdin.read\n    data = input().split()\n    \n    n = int(data[0])\n    fruits = [(float(data[2*i+1]), float(data[2*i+2])) for i in range(n)]\n    \n    result = max_fruits_sliced(n, fruits)\n    print(result)\n\nif __name__ == \"__main__\":\n    main()",
+    "code_hash": "e03a1c83da485e13",
+    "language": "python",
+    "node_id": "n_12_2d0a6a",
+    "revision_id": "rev_n_12_2d0a6a_0",
+    "thought_path_snapshot": [
+      "Utilize a geometric transformation to convert the problem into finding the maximum number of overlapping intervals on a line. This involves projecting the circles onto a line and counting overlaps efficiently.",
+      "Utilize a different geometric property: for each fruit, calculate the set of lines that can pass through its center and intersect the boundary of other circles. Then, find the intersection of these sets to determine the lines that maximize the number of intersected circles."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 8
+  },
+  {
+    "candidate_id": "cand_51dac50339",
+    "problem_id": "apps_3172",
+    "code": "import sys\nfrom typing import List, Tuple\nfrom math import sqrt\n\ndef distance(p1: Tuple[float, float], p2: Tuple[float, float]) -> float:\n    return sqrt((p1[0] - p2[0]) ** 2 + (p1[1] - p2[1]) ** 2)\n\ndef point_line_distance(point: Tuple[float, float], line_start: Tuple[float, float], line_end: Tuple[float, float]) -> float:\n    x0, y0 = point\n    x1, y1 = line_start\n    x2, y2 = line_end\n    numerator = abs((y2 - y1) * x0 - (x2 - x1) * y0 + x2 * y1 - y2 * x1)\n    denominator = distance(line_start, line_end)\n    return numerator / denominator\n\ndef max_fruits_sliced(fruits: List[Tuple[float, float]]) -> int:\n    n = len(fruits)\n    if n == 0:\n        return 0\n    if n == 1:\n        return 1\n    \n    max_count = 1\n    for i in range(n):\n        for j in range(i + 1, n):\n            count = 0\n            for fruit in fruits:\n                if point_line_distance(fruit, fruits[i], fruits[j]) <= 1.0:\n                    count += 1\n            max_count = max(max_count, count)\n    \n    return max_count\n\ndef main():\n    import sys\n    input = sys.stdin.read\n    data = input().split()\n    \n    n = int(data[0])\n    fruits = []\n    index = 1\n    for _ in range(n):\n        x = float(data[index])\n        y = float(data[index + 1])\n        fruits.append((x, y))\n        index += 2\n    \n    result = max_fruits_sliced(fruits)\n    print(result)\n\nif __name__ == \"__main__\":\n    main()",
+    "code_hash": "7a68911ef1b6cec9",
+    "language": "python",
+    "node_id": "n_5_c3b471",
+    "revision_id": "rev_n_5_c3b471_0",
+    "thought_path_snapshot": [
+      "Consider using a brute-force approach where we iterate over all pairs of points to determine the line passing through them and then check how many circles intersect this line. This approach is straightforward but computationally expensive.",
+      "Consider using a computational geometry library that provides efficient algorithms for solving problems involving geometric shapes, such as determining intersections between lines and circles."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 9
+  },
+  {
+    "candidate_id": "cand_f7ce97a6e5",
+    "problem_id": "apps_3172",
+    "code": "import sys\nimport math\n\ndef orientation(p, q, r):\n    val = (q[1] - p[1]) * (r[0] - q[0]) - (q[0] - p[0]) * (r[1] - q[1])\n    if val == 0:\n        return 0\n    return 1 if val > 0 else 2\n\ndef on_segment(p, q, r):\n    return (q[0] <= max(p[0], r[0]) and q[0] >= min(p[0], r[0]) and\n            q[1] <= max(p[1], r[1]) and q[1] >= min(p[1], r[1]))\n\ndef do_intersect(p1, q1, p2, q2):\n    o1 = orientation(p1, q1, p2)\n    o2 = orientation(p1, q1, q2)\n    o3 = orientation(p2, q2, p1)\n    o4 = orientation(p2, q2, q1)\n\n    if o1 != o2 and o3 != o4:\n        return True\n\n    if o1 == 0 and on_segment(p1, p2, q1):\n        return True\n    if o2 == 0 and on_segment(p1, q2, q1):\n        return True\n    if o3 == 0 and on_segment(p2, p1, q2):\n        return True\n    if o4 == 0 and on_segment(p2, q1, q2):\n        return True\n\n    return False\n\ndef distance(p1, p2):\n    return math.sqrt((p1[0] - p2[0]) ** 2 + (p1[1] - p2[1]) ** 2)\n\ndef count_fruits_on_line(fruits, p1, p2):\n    count = 0\n    for fruit in fruits:\n        center = (fruit[0], fruit[1])\n        if distance(p1, center) <= 1 or distance(p2, center) <= 1:\n            count += 1\n        elif do_intersect(p1, p2, (center[0] - 1, center[1]), (center[0] + 1, center[1])):\n            count += 1\n    return count\n\ndef max_fruits_sliced(fruits):\n    n = len(fruits)\n    if n < 2:\n        return n\n\n    max_count = 0\n    for i in range(n):\n        for j in range(i + 1, n):\n            p1 = (fruits[i][0], fruits[i][1])\n            p2 = (fruits[j][0], fruits[j][1])\n            count = count_fruits_on_line(fruits, p1, p2)\n            max_count = max(max_count, count)\n\n    return max_count\n\ndef main():\n    import sys\n    input = sys.stdin.read\n    data = input().split()\n    \n    n = int(data[0])\n    fruits = []\n    index = 1\n    for _ in range(n):\n        x = float(data[index])\n        y = float(data[index + 1])\n        fruits.append((x, y))\n        index += 2\n    \n    result = max_fruits_sliced(fruits)\n    print(result)\n\nif __name__ == \"__main__\":\n    main()",
+    "code_hash": "5ffbb67fcd9e9a8e",
+    "language": "python",
+    "node_id": "n_7_7c331c",
+    "revision_id": "rev_n_7_7c331c_0",
+    "thought_path_snapshot": [
+      "Apply a divide-and-conquer strategy to recursively divide the set of circles into smaller subsets, solve the problem for each subset, and then combine the results. This can potentially reduce the complexity compared to a brute-force approach.",
+      "Revisit the orientation function to ensure it correctly identifies when a fruit is intersected by the line. Consider edge cases where the line might be tangent to multiple fruits."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 10
+  }
+]

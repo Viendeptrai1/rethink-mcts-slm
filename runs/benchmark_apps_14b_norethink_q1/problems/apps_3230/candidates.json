@@ -1,0 +1,63 @@
+[
+  {
+    "candidate_id": "cand_e4bc7a880d",
+    "problem_id": "apps_3230",
+    "code": "import sys\nimport math\nfrom collections import defaultdict\n\ndef euclidean_distance(x1, y1, x2, y2):\n    return math.sqrt((x1 - x2) ** 2 + (y1 - y2) ** 2)\n\ndef count_explosions(R, C, tram):\n    passengers = []\n    seats = []\n    \n    for r in range(R):\n        for c in range(C):\n            if tram[r][c] == 'X':\n                passengers.append((r, c))\n            elif tram[r][c] == 'L':\n                seats.append((r, c))\n    \n    explosions = 0\n    \n    while passengers:\n        passenger_distances = defaultdict(list)\n        \n        for px, py in passengers:\n            min_distance = float('inf')\n            for sx, sy in seats:\n                distance = euclidean_distance(px, py, sx, sy)\n                if distance < min_distance:\n                    min_distance = distance\n                    passenger_distances[(px, py)] = [(distance, sx, sy)]\n                elif distance == min_distance:\n                    passenger_distances[(px, py)].append((distance, sx, sy))\n        \n        taken_seats = set()\n        for px, py in passengers:\n            if len(passenger_distances[(px, py)]) == 1:\n                _, sx, sy = passenger_distances[(px, py)][0]\n                if (sx, sy) not in taken_seats:\n                    taken_seats.add((sx, sy))\n                else:\n                    explosions += 1\n            else:\n                explosions += 1\n        \n        passengers = [p for p in passengers if p not in taken_seats]\n    \n    return explosions\n\ndef main():\n    import sys\n    input = sys.stdin.read\n    data = input().split()\n    \n    index = 0\n    R = int(data[index])\n    C = int(data[index + 1])\n    index += 2\n    \n    tram = []\n    for _ in range(R):\n        tram.append(data[index])\n        index += 1\n    \n    result = count_explosions(R, C, tram)\n    print(result)\n\nif __name__ == \"__main__\":\n    main()",
+    "code_hash": "ea72b2c295325924",
+    "language": "python",
+    "node_id": "n_1_61ec7f",
+    "revision_id": "rev_n_1_61ec7f_0",
+    "thought_path_snapshot": [
+      "Simulate the process step-by-step: For each 'X', calculate its Euclidean distance to every 'L'. Sort these distances and assign the seat to the closest 'X'. If there's a tie, increment the explosion counter and remove those 'X's from consideration."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 1
+  },
+  {
+    "candidate_id": "cand_20606d722f",
+    "problem_id": "apps_3230",
+    "code": "import heapq\nimport sys\n\ndef calculate_explosions(R, C, tram):\n    # Directions for moving up, down, left, right\n    directions = [(-1, 0), (1, 0), (0, -1), (0, 1)]\n    \n    # Priority queue to store (distance, row, col) tuples\n    pq = []\n    seats = set()\n    \n    # Find all 'L' positions and add them to the priority queue\n    for r in range(R):\n        for c in range(C):\n            if tram[r][c] == 'L':\n                heapq.heappush(pq, (0, r, c))\n                seats.add((r, c))\n    \n    # Find all 'X' positions\n    passengers = []\n    for r in range(R):\n        for c in range(C):\n            if tram[r][c] == 'X':\n                passengers.append((r, c))\n    \n    # Function to calculate Euclidean distance squared\n    def distance_squared(r1, c1, r2, c2):\n        return (r1 - r2) ** 2 + (c1 - c2) ** 2\n    \n    explosions = 0\n    \n    while passengers:\n        # Get the closest passenger\n        dist, pr, pc = heapq.heappop(pq)\n        \n        # Check if this passenger can sit\n        min_dist = float('inf')\n        closest_seat = None\n        for sr, sc in seats:\n            d = distance_squared(pr, pc, sr, sc)\n            if d < min_dist:\n                min_dist = d\n                closest_seat = (sr, sc)\n        \n        # If multiple passengers are equidistant to the same seat, it's an explosion\n        if any(distance_squared(pr, pc, sr, sc) == min_dist for sr, sc in seats if (sr, sc) != closest_seat):\n            explosions += 1\n        else:\n            # Assign the seat to the passenger\n            seats.remove(closest_seat)\n            passengers.remove((pr, pc))\n        \n        # Add neighboring seats to the priority queue\n        for dr, dc in directions:\n            nr, nc = pr + dr, pc + dc\n            if 0 <= nr < R and 0 <= nc < C and tram[nr][nc] == '.':\n                heapq.heappush(pq, (dist + 1, nr, nc))\n                seats.add((nr, nc))\n    \n    return explosions\n\n# Read input\ninput = sys.stdin.read\ndata = input().split()\n\nR = int(data[0])\nC = int(data[1])\ntram = data[2:]\n\n# Calculate and print the number of explosions\nprint(calculate_explosions(R, C, tram))",
+    "code_hash": "ed71111a05f1744b",
+    "language": "python",
+    "node_id": "n_2_d7a0cc",
+    "revision_id": "rev_n_2_d7a0cc_0",
+    "thought_path_snapshot": [
+      "Use a priority queue (min-heap) to manage the 'X's based on their distance to the nearest 'L'. Continuously extract the closest 'X' and assign it a seat, incrementing the explosion counter if there's a tie in distances."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 2
+  },
+  {
+    "candidate_id": "cand_e35b865715",
+    "problem_id": "apps_3230",
+    "code": "import sys\nimport heapq\n\ndef read_input():\n    import sys\n    return sys.stdin.read().splitlines()\n\ndef parse_input(lines):\n    R = int(lines[0].split()[0])\n    C = int(lines[0].split()[1])\n    grid = lines[1:]\n    return R, C, grid\n\ndef find_closest_seats(R, C, grid):\n    seats = []\n    passengers = []\n    \n    for r in range(R):\n        for c in range(C):\n            if grid[r][c] == 'L':\n                seats.append((r, c))\n            elif grid[r][c] == 'X':\n                passengers.append((r, c))\n    \n    return seats, passengers\n\ndef euclidean_distance(p1, p2):\n    return ((p1[0] - p2[0]) ** 2 + (p1[1] - p2[1]) ** 2) ** 0.5\n\ndef min_explosions(R, C, grid):\n    seats, passengers = find_closest_seats(R, C, grid)\n    pq = []\n    \n    for passenger in passengers:\n        distances = [(euclidean_distance(passenger, seat), seat) for seat in seats]\n        distances.sort()\n        heapq.heappush(pq, (distances[0][0], passenger, distances[0][1]))\n    \n    parent = {}\n    rank = {}\n    \n    def find(x):\n        if x != parent[x]:\n            parent[x] = find(parent[x])\n        return parent[x]\n    \n    def union(x, y):\n        rootX = find(x)\n        rootY = find(y)\n        if rootX != rootY:\n            if rank[rootX] > rank[rootY]:\n                parent[rootY] = rootX\n            elif rank[rootX] < rank[rootY]:\n                parent[rootX] = rootY\n            else:\n                parent[rootY] = rootX\n                rank[rootX] += 1\n    \n    for _ in range(len(passengers)):\n        dist, passenger, seat = heapq.heappop(pq)\n        if seat not in parent:\n            parent[seat] = seat\n            rank[seat] = 0\n        if passenger not in parent:\n            parent[passenger] = passenger\n            rank[passenger] = 0\n        \n        if find(passenger) != find(seat):\n            union(passenger, seat)\n        else:\n            return 1\n    \n    return 0\n\ndef main():\n    lines = read_input()\n    R, C, grid = parse_input(lines)\n    result = min_explosions(R, C, grid)\n    print(result)\n\nif __name__ == \"__main__\":\n    main()",
+    "code_hash": "60cd464855697017",
+    "language": "python",
+    "node_id": "n_3_512bd7",
+    "revision_id": "rev_n_3_512bd7_0",
+    "thought_path_snapshot": [
+      "Transform the problem into a graph where 'X's are nodes and edges represent distances to 'L's. Use a greedy algorithm to find the minimum spanning tree (MST) and count the number of cycles (explosions) formed during the MST construction."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 3
+  },
+  {
+    "candidate_id": "cand_885282e42f",
+    "problem_id": "apps_3230",
+    "code": "import sys\nimport math\nfrom collections import defaultdict\n\ndef calculate_distance(x1, y1, x2, y2):\n    return math.sqrt((x1 - x2) ** 2 + (y1 - y2) ** 2)\n\ndef count_explosions(R, C, tram_layout):\n    passengers = []\n    seats = []\n    \n    # Collect positions of passengers and seats\n    for r in range(R):\n        for c in range(C):\n            if tram_layout[r][c] == 'X':\n                passengers.append((r, c))\n            elif tram_layout[r][c] == 'L':\n                seats.append((r, c))\n    \n    explosions = 0\n    \n    while passengers:\n        passenger_distances = defaultdict(list)\n        \n        # Calculate distances from each passenger to each seat\n        for px, py in passengers:\n            for sx, sy in seats:\n                distance = calculate_distance(px, py, sx, sy)\n                passenger_distances[(px, py)].append((distance, sx, sy))\n        \n        # Sort distances for each passenger\n        for passenger, distances in passenger_distances.items():\n            distances.sort()\n        \n        # Assign seats or mark for explosion\n        assigned_seats = set()\n        new_passengers = []\n        \n        for px, py in passengers:\n            distances = passenger_distances[(px, py)]\n            min_distance, sx, sy = distances[0]\n            \n            if len(distances) > 1 and distances[1][0] == min_distance:\n                explosions += 1\n            else:\n                if (sx, sy) not in assigned_seats:\n                    assigned_seats.add((sx, sy))\n                else:\n                    explosions += 1\n        \n        # Filter out passengers who have been seated or exploded\n        for px, py in passengers:\n            if (px, py) not in passenger_distances or not passenger_distances[(px, py)]:\n                continue\n            min_distance, sx, sy = passenger_distances[(px, py)][0]\n            if (sx, sy) not in assigned_seats:\n                new_passengers.append((px, py))\n        \n        passengers = new_passengers\n    \n    return explosions\n\n# Read input\ninput = sys.stdin.read\ndata = input().split()\n\nR = int(data[0])\nC = int(data[1])\ntram_layout = data[2:]\n\n# Calculate and print the number of explosions\nprint(count_explosions(R, C, tram_layout))",
+    "code_hash": "7330f92d8bedfded",
+    "language": "python",
+    "node_id": "n_4_0678e6",
+    "revision_id": "rev_n_4_0678e6_0",
+    "thought_path_snapshot": [
+      "Simulate the process step-by-step: For each 'X', calculate its Euclidean distance to every 'L'. Sort these distances and assign the seat to the closest 'X'. If there's a tie, increment the explosion counter and remove those 'X's from consideration.",
+      "Optimize distance calculation by precomputing Euclidean distances for all pairs of 'X' and 'L'. This reduces repeated calculations and speeds up the assignment process."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 4
+  }
+]

@@ -1,0 +1,41 @@
+[
+  {
+    "candidate_id": "cand_bon_0_8673d0",
+    "problem_id": "apps_4080",
+    "code": "import sys\nimport heapq\n\ndef main():\n    import sys\n    import heapq\n    \n    def readints():\n        return list(map(int, sys.stdin.readline().split()))\n    \n    n, m = readints()\n    a = readints()\n    segments = [readints() for _ in range(m)]\n    \n    # Initialize the difference array\n    diff = [0] * (n + 1)\n    \n    # Apply the segments to the difference array\n    for l, r in segments:\n        diff[l - 1] += 1\n        diff[r] -= 1\n    \n    # Compute the prefix sum to get the effect of all segments\n    for i in range(1, n):\n        diff[i] += diff[i - 1]\n    \n    # Find the maximum and minimum values after applying the segments\n    max_val = max(a[i] + diff[i] for i in range(n))\n    min_val = min(a[i] + diff[i] for i in range(n))\n    \n    # Calculate the maximum difference\n    d = max_val - min_val\n    \n    # To find the segments that contribute to this maximum difference,\n    # we need to track which segments were used.\n    # We'll use a priority queue to keep track of the segments that contribute\n    # to the maximum and minimum values.\n    \n    # Priority queues for max and min values\n    max_heap = []\n    min_heap = []\n    \n    # Track the segments that contribute to the max and min values\n    max_segments = {}\n    min_segments = {}\n    \n    for i in range(n):\n        val = a[i] + diff[i]\n        if val == max_val:\n            heapq.heappush(max_heap, (-diff[i], i))\n            max_segments[i] = []\n        if val == min_val:\n            heapq.heappush(min_heap, (diff[i], i))\n            min_segments[i] = []\n    \n    # Trace back to find the segments that contributed to these values\n    for i in range(n):\n        if diff[i] != 0:\n            if i in max_segments:\n                for l, r in segments:\n                    if l <= i + 1 <= r:\n                        max_segments[i].append(l)\n            if i in min_segments:\n                for l, r in segments:\n                    if l <= i + 1 <= r:\n                        min_segments[i].append(l)\n    \n    # Now we need to find a subset of segments that maximizes the difference\n    # We can use a greedy approach to select segments that contribute to the max and min values\n    \n    used_segments = set()\n    for i in range(n):\n        if i in max_segments:\n            for seg in max_segments[i]:\n                used_segments.add(seg)\n        if i in min_segments:\n            for seg in min_segments[i]:\n                used_segments.add(seg)\n    \n    # Convert the set to a sorted list\n    used_segments = sorted(list(used_segments))\n    \n    # Output the result\n    print(d)\n    print(len(used_segments))\n    print(' '.join(map(str, used_segments)))\n\nif __name__ == \"__main__\":\n    main()",
+    "code_hash": "034914abe895435d",
+    "language": "python",
+    "node_id": null,
+    "revision_id": null,
+    "thought_path_snapshot": [],
+    "origin": "baseline",
+    "generation_record_id": null,
+    "created_sequence": 1
+  },
+  {
+    "candidate_id": "cand_bon_1_d8592b",
+    "problem_id": "apps_4080",
+    "code": "import sys\nimport heapq\n\ndef main():\n    import sys\n    import heapq\n    \n    def readints():\n        return list(map(int, sys.stdin.readline().split()))\n    \n    n, m = readints()\n    a = readints()\n    segments = [readints() for _ in range(m)]\n    \n    # Create a list of events\n    events = []\n    for i, (l, r) in enumerate(segments):\n        events.append((l-1, 1, i))\n        events.append((r, -1, i))\n    \n    # Sort events by position\n    events.sort()\n    \n    # Initialize variables\n    max_diff = 0\n    current_min = float('inf')\n    current_max = float('-inf')\n    active_segments = []\n    applied_segments = []\n    \n    # Process events\n    for pos, typ, idx in events:\n        if typ == 1:\n            heapq.heappush(active_segments, (-a[pos], pos, idx))\n        else:\n            while active_segments and active_segments[0][1] < pos:\n                _, p, i = heapq.heappop(active_segments)\n                applied_segments.append(i+1)\n        \n        if active_segments:\n            current_min = min(current_min, active_segments[0][0] + len(active_segments))\n            current_max = max(current_max, active_segments[0][0])\n            max_diff = max(max_diff, current_max - current_min)\n    \n    # Output the result\n    print(max_diff)\n    print(len(applied_segments))\n    print(*applied_segments)\n\nif __name__ == \"__main__\":\n    main()",
+    "code_hash": "8ee8c5d26230ae10",
+    "language": "python",
+    "node_id": null,
+    "revision_id": null,
+    "thought_path_snapshot": [],
+    "origin": "baseline",
+    "generation_record_id": null,
+    "created_sequence": 2
+  },
+  {
+    "candidate_id": "cand_bon_2_1d95c4",
+    "problem_id": "apps_4080",
+    "code": "import sys\nimport heapq\n\ndef main():\n    import sys\n    import heapq\n    \n    def readints():\n        return list(map(int, sys.stdin.readline().split()))\n    \n    n, m = readints()\n    a = readints()\n    segments = [readints() for _ in range(m)]\n    \n    # Create a list of events\n    events = []\n    for i, (l, r) in enumerate(segments):\n        events.append((l-1, 1, i))\n        events.append((r, -1, i))\n    \n    # Sort events by position, then by type (start before end)\n    events.sort()\n    \n    # Initialize variables\n    max_diff = 0\n    current_min = float('inf')\n    current_max = float('-inf')\n    active_segments = []\n    applied_segments = []\n    \n    # Process events\n    for pos, typ, idx in events:\n        if typ == 1:\n            heapq.heappush(active_segments, (-a[pos], idx))\n        else:\n            while active_segments and active_segments[0][1] != idx:\n                val, seg_idx = heapq.heappop(active_segments)\n                if -val > current_max:\n                    current_max = -val\n                if -val < current_min:\n                    current_min = -val\n            heapq.heappop(active_segments)\n        \n        if active_segments:\n            current_max = max(current_max, -active_segments[0][0])\n            current_min = min(current_min, -active_segments[0][0])\n        \n        diff = current_max - current_min\n        if diff > max_diff:\n            max_diff = diff\n            applied_segments = [idx]\n        elif diff == max_diff:\n            applied_segments.append(idx)\n    \n    # Output the result\n    print(max_diff)\n    print(len(applied_segments))\n    print(*applied_segments)\n\nif __name__ == \"__main__\":\n    main()",
+    "code_hash": "4f8405c6245a4735",
+    "language": "python",
+    "node_id": null,
+    "revision_id": null,
+    "thought_path_snapshot": [],
+    "origin": "baseline",
+    "generation_record_id": null,
+    "created_sequence": 3
+  }
+]

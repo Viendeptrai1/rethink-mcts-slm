@@ -1,0 +1,41 @@
+[
+  {
+    "candidate_id": "cand_bon_0_36c983",
+    "problem_id": "apps_3214",
+    "code": "import sys\nfrom collections import defaultdict\n\ndef normalize(word):\n    return ''.join(c.lower() for c in word if c.isalpha())\n\ndef generate_similar_words(word):\n    similar_words = set()\n    \n    # Deletion\n    for i in range(len(word)):\n        similar_words.add(word[:i] + word[i+1:])\n    \n    # Insertion\n    for i in range(len(word) + 1):\n        for c in 'abcdefghijklmnopqrstuvwxyz':\n            similar_words.add(word[:i] + c + word[i:])\n    \n    # Replacement\n    for i in range(len(word)):\n        for c in 'abcdefghijklmnopqrstuvwxyz':\n            if c != word[i]:\n                similar_words.add(word[:i] + c + word[i+1:])\n    \n    # Transposition\n    for i in range(len(word) - 1):\n        similar_words.add(word[:i] + word[i+1] + word[i] + word[i+2:])\n    \n    return similar_words\n\ndef main():\n    text = []\n    for line in sys.stdin:\n        if line.strip() == \"***\":\n            break\n        text.append(line)\n    \n    words = []\n    for line in text:\n        words.extend(normalize(word) for word in line.split())\n    \n    word_to_similar = defaultdict(set)\n    for word in words:\n        similar_words = generate_similar_words(word)\n        for similar_word in similar_words:\n            if similar_word != word:\n                word_to_similar[word].add(similar_word)\n                word_to_similar[similar_word].add(word)\n    \n    result = {}\n    for word, similars in word_to_similar.items():\n        if len(similars) > 1:\n            result[word] = sorted(similars - {word})\n    \n    if not result:\n        print(\"***\")\n    else:\n        for word in sorted(result.keys()):\n            print(f\"{word}: {' '.join(result[word])}\")\n\nif __name__ == \"__main__\":\n    main()",
+    "code_hash": "b773e7f3c707a908",
+    "language": "python",
+    "node_id": null,
+    "revision_id": null,
+    "thought_path_snapshot": [],
+    "origin": "baseline",
+    "generation_record_id": null,
+    "created_sequence": 1
+  },
+  {
+    "candidate_id": "cand_bon_1_856b25",
+    "problem_id": "apps_3214",
+    "code": "import sys\nfrom collections import defaultdict\n\ndef normalize(word):\n    return ''.join(c.lower() for c in word if c.isalpha())\n\ndef generate_similar_words(word):\n    similar_words = set()\n    \n    # Deletion\n    for i in range(len(word)):\n        similar_words.add(word[:i] + word[i+1:])\n    \n    # Insertion\n    for i in range(len(word) + 1):\n        for c in 'abcdefghijklmnopqrstuvwxyz':\n            similar_words.add(word[:i] + c + word[i:])\n    \n    # Replacement\n    for i in range(len(word)):\n        for c in 'abcdefghijklmnopqrstuvwxyz':\n            if c != word[i]:\n                similar_words.add(word[:i] + c + word[i+1:])\n    \n    # Transposition\n    for i in range(len(word) - 1):\n        similar_words.add(word[:i] + word[i+1] + word[i] + word[i+2:])\n    \n    return similar_words\n\ndef main():\n    input_text = []\n    for line in sys.stdin:\n        if line.strip() == \"***\":\n            break\n        input_text.append(line)\n    \n    word_cores = defaultdict(list)\n    \n    for line in input_text:\n        words = line.split()\n        for word in words:\n            core = normalize(word)\n            if core:\n                word_cores[core].append(core)\n    \n    similar_word_map = defaultdict(set)\n    \n    for core, occurrences in word_cores.items():\n        similar_words = generate_similar_words(core)\n        for similar_word in similar_words:\n            if similar_word in word_cores:\n                similar_word_map[core].update(word_cores[similar_word])\n    \n    result = []\n    for core, similar_words in similar_word_map.items():\n        if core in similar_words:\n            similar_words.remove(core)\n        if similar_words:\n            result.append((core, sorted(similar_words)))\n    \n    if result:\n        for core, similar_words in sorted(result):\n            print(f\"{core}: {' '.join(similar_words)}\")\n    else:\n        print(\"***\")\n\nif __name__ == \"__main__\":\n    main()",
+    "code_hash": "40b64b95c8cb31f6",
+    "language": "python",
+    "node_id": null,
+    "revision_id": null,
+    "thought_path_snapshot": [],
+    "origin": "baseline",
+    "generation_record_id": null,
+    "created_sequence": 2
+  },
+  {
+    "candidate_id": "cand_bon_2_419f66",
+    "problem_id": "apps_3214",
+    "code": "import sys\nfrom collections import defaultdict\n\ndef normalize(word):\n    return ''.join(c.lower() for c in word if c.isalpha())\n\ndef is_similar(word1, word2):\n    if len(word1) == len(word2):\n        # Check for replace or transpose\n        diff_count = sum(c1 != c2 for c1, c2 in zip(word1, word2))\n        if diff_count == 1:\n            return True\n        # Check for transpose\n        for i in range(len(word1) - 1):\n            if word1[i] == word2[i + 1] and word1[i + 1] == word2[i]:\n                return True\n    elif len(word1) == len(word2) + 1:\n        # Check for delete\n        for i in range(len(word1)):\n            if word1[:i] + word1[i+1:] == word2:\n                return True\n    elif len(word1) + 1 == len(word2):\n        # Check for insert\n        for i in range(len(word2)):\n            if word1 == word2[:i] + word2[i+1:]:\n                return True\n    return False\n\ndef find_similar_words(text):\n    words = []\n    for line in text.splitlines():\n        words.extend(normalize(word) for word in line.split())\n    \n    similar_words = defaultdict(set)\n    word_set = set(words)\n    \n    for word in word_set:\n        for candidate in word_set:\n            if word != candidate and is_similar(word, candidate):\n                similar_words[word].add(candidate)\n                similar_words[candidate].add(word)\n    \n    result = []\n    for word in sorted(similar_words.keys()):\n        if similar_words[word]:\n            result.append(f\"{word}: {' '.join(sorted(similar_words[word]))}\")\n    \n    return result if result else [\"***\"]\n\nif __name__ == \"__main__\":\n    input_text = sys.stdin.read()\n    output = find_similar_words(input_text)\n    for line in output:\n        print(line)",
+    "code_hash": "27f5c07dba99590e",
+    "language": "python",
+    "node_id": null,
+    "revision_id": null,
+    "thought_path_snapshot": [],
+    "origin": "baseline",
+    "generation_record_id": null,
+    "created_sequence": 3
+  }
+]

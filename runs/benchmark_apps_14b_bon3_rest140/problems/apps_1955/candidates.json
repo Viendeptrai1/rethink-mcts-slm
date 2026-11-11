@@ -1,0 +1,41 @@
+[
+  {
+    "candidate_id": "cand_bon_0_3e0316",
+    "problem_id": "apps_1955",
+    "code": "import sys\nimport heapq\n\ndef min_days_to_pass_exams(n, m, d, a):\n    # Create a list of available days for each exam\n    exam_days = [[] for _ in range(m + 1)]\n    for i in range(n):\n        if d[i] != 0:\n            exam_days[d[i]].append(i)\n    \n    # Priority queue to store the next available day to take each exam\n    pq = []\n    for i in range(1, m + 1):\n        if len(exam_days[i]) > 0:\n            heapq.heappush(pq, (exam_days[i][0], i))\n        else:\n            return -1\n    \n    # Array to keep track of the last day Vasiliy prepared for each exam\n    last_prepared = [-1] * (m + 1)\n    \n    # Variable to keep track of the current day\n    current_day = 0\n    \n    while pq:\n        # Get the exam with the next available day\n        next_day, exam = heapq.heappop(pq)\n        \n        # Calculate the number of days needed to prepare for this exam\n        if last_prepared[exam] == -1:\n            prepare_days = a[exam - 1]\n        else:\n            prepare_days = max(0, a[exam - 1] - (next_day - last_prepared[exam] - 1))\n        \n        # Check if there are enough days left to prepare and take the exam\n        if next_day + prepare_days >= n:\n            return -1\n        \n        # Update the current day\n        current_day = next_day + prepare_days\n        \n        # Mark the last day Vasiliy prepared for this exam\n        last_prepared[exam] = current_day\n        \n        # Find the next available day to take this exam\n        next_exam_day_index = bisect.bisect_right(exam_days[exam], current_day)\n        if next_exam_day_index < len(exam_days[exam]):\n            next_exam_day = exam_days[exam][next_exam_day_index]\n            heapq.heappush(pq, (next_exam_day, exam))\n    \n    return current_day + 1\n\n# Read input\ninput = sys.stdin.read\ndata = input().split()\nn = int(data[0])\nm = int(data[1])\nd = list(map(int, data[2:2+n]))\na = list(map(int, data[2+n:2+n+m]))\n\n# Output the result\nprint(min_days_to_pass_exams(n, m, d, a))",
+    "code_hash": "16fba88b56447316",
+    "language": "python",
+    "node_id": null,
+    "revision_id": null,
+    "thought_path_snapshot": [],
+    "origin": "baseline",
+    "generation_record_id": null,
+    "created_sequence": 1
+  },
+  {
+    "candidate_id": "cand_bon_1_8c686c",
+    "problem_id": "apps_1955",
+    "code": "import sys\nimport heapq\n\ndef min_days_to_pass_exams(n, m, d, a):\n    # Create a list of available days for each subject\n    available_days = [[] for _ in range(m + 1)]\n    for i in range(n):\n        if d[i] > 0:\n            available_days[d[i]].append(i)\n    \n    # Priority queue to store the next available day for each subject\n    pq = []\n    for i in range(1, m + 1):\n        if available_days[i]:\n            heapq.heappush(pq, (available_days[i][0], i))\n    \n    # Dictionary to keep track of the last preparation day for each subject\n    last_prep_day = {i: -1 for i in range(1, m + 1)}\n    \n    current_day = 0\n    \n    while pq:\n        next_day, subject = heapq.heappop(pq)\n        \n        # Calculate the number of days needed to prepare for the exam\n        prep_days_needed = a[subject - 1]\n        \n        # Find the earliest day we can start preparing for this exam\n        start_prep_day = max(next_day, last_prep_day[subject] + 1)\n        \n        # Check if we have enough days to prepare and take the exam\n        if start_prep_day + prep_days_needed <= next_day:\n            # Update the last preparation day for this subject\n            last_prep_day[subject] = start_prep_day + prep_days_needed - 1\n            # Move to the next available day for this subject\n            if len(available_days[subject]) > 1:\n                heapq.heappush(pq, (available_days[subject][1], subject))\n        else:\n            # If we don't have enough days, push back to the queue with the same day\n            heapq.heappush(pq, (next_day, subject))\n        \n        # Update the current day\n        current_day = max(current_day, next_day)\n    \n    # Check if all exams are passed\n    for i in range(1, m + 1):\n        if last_prep_day[i] == -1:\n            return -1\n    \n    return current_day + 1\n\n# Read input\ninput = sys.stdin.read\ndata = input().split()\nn = int(data[0])\nm = int(data[1])\nd = list(map(int, data[2:2+n]))\na = list(map(int, data[2+n:2+n+m]))\n\n# Output the result\nprint(min_days_to_pass_exams(n, m, d, a))",
+    "code_hash": "a2af41fbed58533e",
+    "language": "python",
+    "node_id": null,
+    "revision_id": null,
+    "thought_path_snapshot": [],
+    "origin": "baseline",
+    "generation_record_id": null,
+    "created_sequence": 2
+  },
+  {
+    "candidate_id": "cand_bon_2_9aaf0f",
+    "problem_id": "apps_1955",
+    "code": "import sys\nfrom collections import defaultdict, deque\n\ndef min_days_to_pass_exams(n, m, d, a):\n    # Create a graph where each node is a day and edges represent possible transitions\n    graph = defaultdict(list)\n    \n    # Create a list to store the last day each exam can be taken\n    last_day = [-1] * (m + 1)\n    \n    # Fill the last_day array\n    for i in range(n - 1, -1, -1):\n        if d[i] != 0:\n            last_day[d[i]] = i\n    \n    # Create a list to store the number of days needed to prepare for each exam\n    prepare_days = [0] * (m + 1)\n    for i in range(1, m + 1):\n        prepare_days[i] = a[i - 1]\n    \n    # Initialize the queue with the days when exams can be taken\n    queue = deque()\n    for i in range(n):\n        if d[i] != 0:\n            queue.append((i, d[i]))\n    \n    # Initialize the dp array where dp[i] is the minimum day to pass exam i\n    dp = [-1] * (m + 1)\n    \n    # Process the queue\n    while queue:\n        current_day, exam = queue.popleft()\n        \n        if dp[exam] != -1 and dp[exam] <= current_day:\n            continue\n        \n        dp[exam] = current_day\n        \n        # Check if we can take the exam on the next available day\n        if current_day + 1 < n and d[current_day + 1] == 0:\n            queue.append((current_day + 1, exam))\n    \n    # Calculate the minimum number of days to pass all exams\n    total_days = 0\n    for i in range(1, m + 1):\n        if dp[i] == -1 or dp[i] + prepare_days[i] > last_day[i]:\n            return -1\n        total_days = max(total_days, dp[i] + prepare_days[i])\n    \n    return total_days\n\n# Read input\nn, m = map(int, sys.stdin.readline().split())\nd = list(map(int, sys.stdin.readline().split()))\na = list(map(int, sys.stdin.readline().split()))\n\n# Output the result\nprint(min_days_to_pass_exams(n, m, d, a))",
+    "code_hash": "6b069f8b6884838c",
+    "language": "python",
+    "node_id": null,
+    "revision_id": null,
+    "thought_path_snapshot": [],
+    "origin": "baseline",
+    "generation_record_id": null,
+    "created_sequence": 3
+  }
+]
