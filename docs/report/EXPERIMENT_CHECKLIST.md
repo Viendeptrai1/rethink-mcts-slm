@@ -9,6 +9,36 @@ Ký hiệu:
 
 ---
 
+## 0. Kế hoạch chạy bổ sung sau kiểm tra artifact (07/11/2026) — chờ tài khoản Modal mới
+
+Kết luận kiểm tra: kết quả chính 14B APPS-300 (MCTS so với Direct) đã đủ vững, **không cần chạy lại**. Những mục dưới đây chỉ chạy khi có credit mới. Chi phí ước tính bằng `solve_wall_seconds` thực tế × giá L40S $1.95/giờ, chỉ để tham khảo.
+
+**Đã làm offline (0 GPU):**
+- [x] Chấm lại 14B APPS trên toàn bộ test (public + hidden), khớp protocol `all_tests` của 7B: [`scripts/alltests_rejudge_offline.py`](../../scripts/alltests_rejudge_offline.py) → `runs/*/all_tests_offline.json`.
+
+**Nên chạy (rẻ, làm sạch bảng chính):**
+- [ ] HumanEval-164 Direct và BoN-3 bằng code schema 2 hiện tại (các run cũ `runs/humaneval_{direct,bon3}_14b/` không có manifest). ~$1–3.
+- [ ] BoN-3 cho 140 bài APPS còn lại (40 Interview + 100 Competition) để đủ 300/300. ~$5.
+
+**Đáng chạy nhất nếu còn ngân sách:**
+- [ ] E4: không rethink (`--set search.max_rethinks_per_node=0`) trên APPS-300. Đây là cách duy nhất chứng minh đóng góp của rethink. ~$10–18.
+
+**Tùy chọn (có thể thành đóng góp riêng):**
+- [ ] Dừng sớm có điều kiện critic: chỉ dừng khi pass hết public và critic không chấm −1. Cần thêm chế độ `early_stop` mới. Chỉ 35 bài critic chấm −1 bị ảnh hưởng, nên có thể chạy riêng 35 bài này (chọn theo thông tin có lúc search, không dùng hidden).
+
+**Cần có để trả lời các RQ đã cam kết (chương 1 §1.4, Proposal §5.2–5.3):**
+- [ ] E5: Iterative Repair trên APPS-300 (RQ1, Proposal §5.2). Chưa có số đo chi phí.
+- [ ] E6: `--set feedback.mode=facts_only` trên APPS-300 (RQ2b, Proposal Ablation 1: CFG so với traceback thô); `trace` là tùy chọn. Tối đa ~$18/run.
+- [ ] E10: `--set search.backup=mean` trên APPS-300 (RQ2c, Proposal Ablation 2), hoặc bỏ mục này khỏi RQ2 và ghi rõ chưa thực hiện. Dự đoán "cây quá nhỏ nên không khác biệt" (2.79 vòng lặp/bài) chưa được đo. Tối đa ~$18.
+- [ ] Trọng số reward (Proposal Ablation 4): phải chạy với chế độ dừng khác `public_all_passed`, vì dưới chế độ này critic không ảnh hưởng đến lựa chọn.
+- [ ] Chạy 7B qua cùng pipeline `src/rethink_mcts` (RQ3). Đây là cách duy nhất để so sánh 7B và 14B mà không lẫn codebase, ngân sách và cách chia test.
+- [ ] 🧮 Đường cong theo $k$ chính xác (RQ4, chỉ tốn CPU): `candidates.json` có lưu code của mọi ứng viên, nên có thể chấm hidden cho ứng viên được chọn tại từng $k$ thay vì dùng cận dưới.
+
+**Không nên chạy:**
+- ~~E3 Test-only 14B với cấu hình hiện tại~~: với `early_stop=public_all_passed` và 2 public test, critic không làm đổi lựa chọn ở bài nào, nên kết quả sẽ trùng Dual.
+
+---
+
 ## I. Những hạng mục ĐÃ CÓ SẴN (Không cần chạy lại)
 
 - [x] **7B APPS-300 (`seed=2027`):** Direct (`14.00%`), MCTS Dual (`19.00%`), MCTS Test-only (`22.67%`) — [docs/results/7b/](../results/7b/)

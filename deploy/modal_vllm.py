@@ -19,6 +19,10 @@ MODEL_ID = os.environ.get("VLLM_MODEL_ID", "Qwen/Qwen2.5-Coder-14B-Instruct")
 GPU_TYPE = os.environ.get("VLLM_GPU", "L40S")  # L40S ($1.95/hr, 48GB VRAM), H200, A100-80GB
 MAX_MODEL_LEN = int(os.environ.get("VLLM_MAX_MODEL_LEN", "16384"))
 IDLE_SCALEDOWN_SECONDS = int(os.environ.get("MODAL_IDLE_SECONDS", "180"))  # Auto-shutdown after 3 mins of inactivity
+# Default "1" reproduces the original 14B runs; "0" enables CUDA graphs (faster decode).
+ENFORCE_EAGER = os.environ.get("VLLM_ENFORCE_EAGER", "1") != "0"
+# Requests one container accepts at once; vLLM batches them. The original runs sent 1 at a time.
+MAX_CONCURRENT_INPUTS = int(os.environ.get("MODAL_MAX_INPUTS", "32"))
 
 # 2. Container Environment & Persistent Cache
 app = modal.App(APP_NAME)
@@ -27,13 +31,18 @@ hf_cache_volume = modal.Volume.from_name("rethink-hf-cache", create_if_missing=T
 vllm_image = (
     modal.Image.debian_slim(python_version="3.11")
     .pip_install(
-        "vllm>=0.6.3",
+        # The Oct 2026 14B APPS runs resolved this to vllm 0.31.0; pin it with VLLM_PIP_SPEC=vllm==0.31.0.
+        os.environ.get("VLLM_PIP_SPEC", "vllm>=0.6.3"),
         "huggingface_hub",
         "fastapi",
     )
     .env({
         "VLLM_USE_FLASHINFER_SAMPLER": "0",
         "VLLM_LOGGING_LEVEL": "INFO",
+        # Bake the launch settings so the container sees the values chosen at deploy time.
+        "VLLM_MODEL_ID": MODEL_ID,
+        "VLLM_MAX_MODEL_LEN": str(MAX_MODEL_LEN),
+        "VLLM_ENFORCE_EAGER": "1" if ENFORCE_EAGER else "0",
     })
 )
 
@@ -50,6 +59,7 @@ vllm_image = (
     memory=32768,  # 32GB system RAM
     max_containers=1,
 )
+@modal.concurrent(max_inputs=MAX_CONCURRENT_INPUTS)
 @modal.web_server(port=8000, startup_timeout=600)
 def serve():
     """
@@ -63,8 +73,9 @@ def serve():
         "--gpu-memory-utilization", "0.90",
         "--max-model-len", str(MAX_MODEL_LEN),
         "--trust-remote-code",
-        "--enforce-eager",
     ]
+    if ENFORCE_EAGER:
+        cmd.append("--enforce-eager")
     print(f"Starting vLLM server with command: {' '.join(cmd)}")
     subprocess.Popen(cmd)
 

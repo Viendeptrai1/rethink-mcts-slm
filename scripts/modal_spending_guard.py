@@ -20,6 +20,9 @@ import modal.client
 PROFILE = os.environ.get("MODAL_PROFILE", "vienphanquoc-123")
 MAX_CREDIT_USAGE_DOLLARS = float(os.environ.get("MODAL_MAX_CREDIT", "27.00"))  # Hard safety cap at $27.00
 CHECK_INTERVAL_SECONDS = int(os.environ.get("MODAL_GUARD_INTERVAL", "60"))
+APP_TO_STOP = os.environ.get("MODAL_APP_NAME", "rethink-vllm")
+# Billing data can lag; also stop after this many hours of wall clock since the guard started.
+MAX_HOURS = float(os.environ.get("MODAL_MAX_HOURS", "0")) or None
 
 def log(msg: str):
     now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -42,10 +45,10 @@ def emergency_shutdown():
     log("🚨 EMERGENCY SHUTDOWN TRIGGERED! Stopping Modal apps and benchmark processes...")
     # Stop Modal app
     try:
-        subprocess.run(["modal", "app", "stop", "rethink-vllm"], 
+        subprocess.run(["modal", "app", "stop", APP_TO_STOP], 
                        env=dict(os.environ, MODAL_PROFILE=PROFILE),
                        capture_output=True, text=True, timeout=30)
-        log("✅ Modal app 'rethink-vllm' stopped.")
+        log(f"✅ Modal app '{APP_TO_STOP}' stopped.")
     except Exception as e:
         log(f"⚠️ Failed to stop modal app: {e}")
 
@@ -71,7 +74,12 @@ async def main():
     log(f"Starting Spending Guard for profile [{PROFILE}]...")
     log(f"Threshold: Max \${MAX_CREDIT_USAGE_DOLLARS:.2f} / \${30.00:.2f} free credits (Safety buffer: \${30.00 - MAX_CREDIT_USAGE_DOLLARS:.2f}).")
 
+    started = time.time()
     while True:
+        if MAX_HOURS and time.time() - started >= MAX_HOURS * 3600:
+            log(f"CRITICAL: wall-clock cap of {MAX_HOURS:.1f}h reached.")
+            emergency_shutdown()
+            break
         try:
             metered, billed, credit_used = await get_current_spend(creds)
             buffer_left = 30.0 - credit_used

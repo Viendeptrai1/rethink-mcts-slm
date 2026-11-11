@@ -1,294 +1,345 @@
 # Chương 4. Kết quả Thực nghiệm
 
-Ký hiệu: `✅` Đã có số liệu từ artifact · `⏳` Cần chạy thêm (tốn GPU) · `🧮` Có sẵn dữ liệu trong `runs/`, chỉ cần chạy script thống kê offline · `⚠️` Khác cohort hoặc khác cấu hình chi tiết.
+Chương này trình bày kết quả của nhánh 14B (`Qwen/Qwen2.5-Coder-14B-Instruct`, phục vụ bằng vLLM trên Modal) trên APPS-300 và HumanEval-164. Kết quả nhánh 7B được đặt cạnh để tham khảo. Mọi con số đều trích từ artifact trong `runs/` (đường dẫn ghi ở từng bảng) hoặc từ báo cáo gốc của nhánh 7B trong [`docs/results/7b/`](../results/7b/).
+
+Hai quy ước dùng xuyên suốt chương:
+
+- **Pass@1** là tỷ lệ bài mà chương trình được chọn (`selected.py`) vượt qua mọi test trong tập chấm. Mẫu số là toàn bộ cohort; bài lỗi hoặc không có ứng viên được tính là không đạt.
+- **Mean Pass Rate** là trung bình theo bài (macro average) của tỷ lệ test vượt qua.
+
+Mỗi cấu hình chỉ chạy **một seed**. Các khoảng tin cậy dưới đây phản ánh biến thiên do mẫu bài toán, không phản ánh biến thiên do lấy mẫu của mô hình.
 
 ---
 
-## 4.1. Kết quả trên APPS-300 Benchmark (100 Intro / 100 Inter / 100 Comp)
+## 4.1. Nguồn số liệu và mức độ tin cậy
 
-- **Nguồn 7B:** [BENCHMARK_7B_VS_14B_REPORT.md](../results/BENCHMARK_7B_VS_14B_REPORT.md), [rethinkmcts-apps-native-v2-w4-retry.md](../results/7b/rethinkmcts-apps-native-v2-w4-retry.md), [rethinkmcts-test-only-v1.md](../results/7b/rethinkmcts-test-only-v1.md).
-- **Nguồn 14B Dual:** [runs/benchmark_apps_14b_dual_unified/summary.json](../../runs/benchmark_apps_14b_dual_unified/summary.json).
-- **Nguồn 14B Direct:** [runs/benchmark_apps_14b_direct_300/summary.json](../../runs/benchmark_apps_14b_direct_300/summary.json).
+Không phải mọi run trong `runs/` đều có cùng mức kiểm chứng. Bảng 4.1 phân loại các run được dùng trong chương.
 
-### Bảng 4.1a. Tổng hợp Pass@1 (%) và Mean Hidden Pass Rate (%) trên APPS-300
+### Bảng 4.1. Phân loại các run thực nghiệm
 
-| Phương pháp | 7B Pass@1 | 7B Pass Rate | 14B Pass@1 | 14B Pass Rate | Trạng thái / Checklist |
-| :--- | :-: | :-: | :-: | :-: | :--- |
-| **Direct Generation** | ✅ 14.00% (42/300) | ✅ 30.51% | ✅ **25.33%** (76/300) | ✅ **38.41%** | Đã hoàn tất 300/300 bài [E1](EXPERIMENT_CHECKLIST.md) |
-| **Best-of-3 (BoN-3)** | — *(Không đo trên 7B)* | — | ✅ **35.62%** (57/160)<br>*(Intro: **50.00%**, Inter: **11.67%**)* | ✅ **49.85%** | Đã hoàn tất 160 bài [E2](EXPERIMENT_CHECKLIST.md) (100% Intro + 60% Inter) |
-| **Iterative Repair** | — *(Không đo trên 7B)* | — | ⏳ TODO | ⏳ TODO | Cần chạy [E5](EXPERIMENT_CHECKLIST.md) |
-| **RethinkMCTS (Test-only)** | ✅ **22.67%** (68/300) | ✅ **45.34%** | ⏳ TODO | ⏳ TODO | Cần chạy [E3](EXPERIMENT_CHECKLIST.md) |
-| **RethinkMCTS (Dual Reward)** | ✅ 19.00% (57/300) | ✅ 43.04% | ✅ **36.00%** (108/300) | ✅ **53.49%** | Đã hoàn tất 300/300 bài (14B) |
+| Run | Dữ liệu | Phương pháp | Manifest (schema 2) | Vai trò trong chương |
+| :--- | :--- | :--- | :-: | :--- |
+| [`benchmark_apps_14b_direct_300`](../../runs/benchmark_apps_14b_direct_300/summary.json) | APPS-300 | Direct | Có | **Kết quả chính** |
+| [`benchmark_apps_14b_dual_unified`](../../runs/benchmark_apps_14b_dual_unified/summary.json) | APPS-300 | RethinkMCTS | Có, ở 15 run thành phần (10 batch + 5 lượt chạy lại, cùng cấu hình trừ URL endpoint); thư mục gộp không có manifest riêng | **Kết quả chính** |
+| [`benchmark_apps_14b_bon3_300`](../../runs/benchmark_apps_14b_bon3_300/summary.json) | APPS, 160/300 bài | Best-of-3 | Có | Kết quả chính trên tập con 160 bài |
+| [`humaneval_mcts_dual_14b`](../../runs/humaneval_mcts_dual_14b/summary.json) | HumanEval-164 | RethinkMCTS | Có | **Kết quả chính** |
+| `humaneval_{direct,bon3,mcts}_14b` | HumanEval-164 | Direct / BoN-3 / MCTS | Không | Thăm dò (phiên bản code cũ) |
+| `apps_intro_{direct,bon3,mcts}_14b` | 100 bài `apps_4000`–`4099` | Direct / BoN-3 / MCTS | Không | Thăm dò (khác cohort) |
+| Báo cáo 7B | APPS-300, HumanEval-164 | Direct / MCTS Dual / Test-only | Codebase riêng | Tham khảo, không ghép cặp được |
 
-### Bảng 4.1b. Phân rã theo 3 Phân tầng Độ khó trên APPS-300
+Ba run APPS chính dùng cùng mã nguồn solver (`source_hash = 34544f8d08…` trong cả ba manifest), cùng prompt `native_v2`, cùng seed và cùng tập dữ liệu đã chuẩn bị. Vì vậy, so sánh giữa chúng là so sánh nội bộ đồng nhất.
 
-| Phân tầng (100 bài/tầng) | Chỉ số | 7B Direct | 7B MCTS Dual | 7B MCTS Test-only | 14B Direct | 14B MCTS Dual |
-| :--- | :--- | :-: | :-: | :-: | :-: | :-: |
-| **Introductory** | Pass@1 (%)<br>Pass Rate (%) | 31.00%<br>45.84% | 38.00%<br>56.70% | **41.00%**<br>61.14% | ✅ **42.00%** (42/100)<br>✅ **53.50%** | **53.00%** (53/100)<br>**71.26%** |
-| **Interview** | Pass@1 (%)<br>Pass Rate (%) | 7.00%<br>26.18% | 14.00%<br>42.36% | **18.00%**<br>45.46% | ✅ **13.00%** (13/100)<br>✅ **31.48%** | **27.00%** (27/100)<br>**50.13%** |
-| **Competition** | Pass@1 (%)<br>Pass Rate (%) | 4.00%<br>19.52% | 5.00%<br>30.07% | **9.00%**<br>29.42% | ✅ **21.00%** (21/100)<br>✅ **30.24%** | **28.00%** (28/100)<br>**39.08%** |
-| **Toàn bộ (300 bài)** | **Pass@1 (%)**<br>**Pass Rate (%)** | **14.00%**<br>**30.51%** | **19.00%**<br>**43.04%** | **22.67%**<br>**45.34%** | ✅ **25.33%** (76/300)<br>✅ **38.41%** | **36.00%** (108/300)<br>**53.49%** |
+Trong lượt chạy APPS-300 của RethinkMCTS, 80 bài gặp lỗi hạ tầng từ phía endpoint (tổng 81 lần lỗi: 79 `ModelNotFoundError` và 2 `ModelError`). Các bài này được chạy lại với cùng cấu hình và đều hoàn tất. Bản gộp cuối cùng có 300/300 bài hoàn tất, không có lỗi.
 
-### Bảng 4.1c. Phân tích Chi phí & Hành vi Tìm kiếm theo Phân tầng Độ khó trên 14B APPS-300 ✅
-*(Trích xuất chính xác từ 300/300 bài toán trong [runs/benchmark_apps_14b_dual_unified/summary.json](../../runs/benchmark_apps_14b_dual_unified/summary.json) và [runs/benchmark_apps_14b_direct_300/summary.json](../../runs/benchmark_apps_14b_direct_300/summary.json))*
+### Cấu hình hiệu lực của RethinkMCTS (trích từ manifest)
 
-| Phân tầng (100 bài/tầng) | Phương pháp (14B) | Pass@1 (%) | Mean Pass Rate (%) | Model Calls TB / bài | Tokens TB / bài | Thời gian Giải TB / bài | Rethink TB / bài | Ứng viên Code TB / bài | Vòng lặp MCTS TB / bài |
-| :--- | :--- | :-: | :-: | :-: | :-: | :-: | :-: | :-: | :-: |
-| **Introductory** | Direct | 42.00% (42/100) | 53.50% | 1.45 | 1,329.0 | 21.68s | 0.00 | 1.00 | 0.00 |
-| | **RethinkMCTS Dual** | **53.00%** (53/100) | **71.26%** | 11.18 | 25,539.6 | 80.70s | 2.29 | 4.21 | 2.20 |
-| **Interview** | Direct | 13.00% (13/100) | 31.48% | 1.18 | 1,355.2 | 24.08s | 0.00 | 1.00 | 0.00 |
-| | **RethinkMCTS Dual** | **27.00%** (27/100) | **50.13%** | 17.73 | 42,788.1 | 119.73s | 4.13 | 6.76 | 3.17 |
-| **Competition** | Direct | 21.00% (21/100) | 30.24% | 1.17 | 1,434.0 | 27.93s | 0.00 | 1.00 | 0.00 |
-| | **RethinkMCTS Dual** | **28.00%** (28/100) | **39.08%** | 16.96 | 43,810.6 | 125.60s | 3.93 | 6.51 | 2.99 |
-| **Toàn bộ APPS-300** | Direct | 25.33% (76/300) | 38.41% | 1.27 | 1,372.7 | 24.56s | 0.00 | 1.00 | 0.00 |
-| | **RethinkMCTS Dual** | **36.00%** (108/300) | **53.49%** | **15.29** | **37,759.3** | **108.70s** | **3.45** | **5.83** | **2.79** |
+| Tham số | APPS-300 | HumanEval-164 |
+| :--- | :--- | :--- |
+| Độ rộng / độ sâu cây | 3 / 4 | 3 / 4 |
+| P-UCB ($c_{\text{base}}$, $c$) | 10.0, 4.0 | 10.0, 4.0 |
+| Số rethink tối đa mỗi nút | 2 | 2 |
+| Phần thưởng $(a, b)$ | $(0.8,\ 0.2)$, critic trong $[-1, 1]$ | $(0.8,\ 0.2)$, critic trong $[0, 1]$ |
+| Feedback | `block` (CFG + phân tích khối bằng LLM) | `block` |
+| Dừng sớm | `public_all_passed` | `public_all_passed` |
+| Ngân sách mỗi bài | 16 lần sinh code, 64 lời gọi, 65.536 token, 900 s | 16 lần sinh code, 64 lời gọi, 65.536 token, 600 s |
+| Thực thi | `trusted_fixture`, 5 s/test | `trusted_fixture`, 4 s/test |
+| Prompt, seed | `native_v2`, 0 | `native_v2`, 42 |
 
-> **Quy luật thực nghiệm theo độ khó:**
-> 1. **Bài dễ (Introductory):** MCTS hội tụ nhanh nhất (chỉ 2.20 vòng lặp, 11.18 lời gọi), đạt tới **71.26% test ẩn** và hơn một nửa số bài pass tuyệt đối (53.00%).
-> 2. **Bài trung bình (Interview):** Là phân tầng chứng kiến **mức tăng trưởng ngoạn mục nhất (+14.00% Pass@1, tăng hơn gấp đôi từ 13% lên 27%)**. Tại đây, các lỗi thuật toán logic thường được cứu vãn thành công nhờ số lượt Rethink cao nhất (4.13 lượt/bài) và số vòng lặp MCTS cao nhất (3.17 vòng lặp).
-> 3. **Bài khó (Competition):** Direct chỉ đạt 21.00%, MCTS nâng lên 28.00% (+7.00%) với ngân sách token tương đương Interview (43.8K tokens/bài).
-
-### Bảng 4.1d. So sánh Đối đầu Trực diện: Direct Baseline vs Best-of-3 vs RethinkMCTS trên 160 Bài APPS ✅
-*(Trích xuất chính xác trên cùng tập 160 bài toán gồm 100 bài Introductory + 60 bài Interview đầu tiên từ [runs/benchmark_apps_14b_bon3_300/summary.json](../../runs/benchmark_apps_14b_bon3_300/summary.json))*
-
-| Phân tầng Khảo sát | Chỉ số | 14B Direct Baseline | 14B Best-of-3 (BoN-3) | 14B RethinkMCTS Dual | Mức Vượt trội của MCTS vs BoN-3 |
-| :--- | :--- | :-: | :-: | :-: | :---: |
-| **Introductory** (100/100 bài) | **Pass@1 (%)**<br>Mean Hidden Pass Rate | 42.00% (42/100)<br>53.50% | **50.00%** (50/100)<br>60.94% | **53.00%** (53/100)<br>**71.26%** | **+3.00% Pass@1**<br>*(+10.32% test ẩn)* |
-| **Interview** (60 bài đầu) | **Pass@1 (%)**<br>Mean Hidden Pass Rate | 8.33% (5/60)<br>26.70% | **11.67%** (7/60)<br>31.36% | **18.33%** (11/60)<br>**50.40%** | **+6.66% Pass@1**<br>*(+19.04% test ẩn)* |
-| **Tổng cộng (160 bài)** | **Pass@1 (%)**<br>**Mean Hidden Pass Rate** | **29.38%** (47/160)<br>**43.45%** | **35.62%** (57/160)<br>**49.85%** | **40.00%** (64/160)<br>**63.45%** | **+4.38% Pass@1**<br>*(+13.60% test ẩn)* |
-
-> **Quy luật Thực nghiệm Rút ra từ Bảng 4.1d:**
-> 1. **Hiệu ứng của việc Lấy mẫu Ngẫu nhiên (BoN-3 vs Direct):** Việc tăng ngân sách lấy mẫu ngẫu nhiên độc lập 3 lần giúp Pass@1 tăng từ 29.38% lên 35.62% (+6.24%), chứng minh nhiều bài toán 14B chỉ cần thêm cơ hội thử là giải được.
-> 2. **Sự Vượt trội của Tìm kiếm Cây có Định hướng (MCTS vs BoN-3):** Khi cùng sử dụng ngân sách tính toán tại thời điểm suy luận, **RethinkMCTS Dual đạt 40.00% Pass@1 (vượt BoN-3 +4.38%)** và đặc biệt là **Hidden Pass Rate đạt tới 63.45% (vượt xa BoN-3 tới +13.60%)**. Điều này chứng minh cơ chế phân tích CFG và sửa tư duy lá (Rethink) tạo ra mã nguồn có chất lượng thuật toán bền vững hơn hẳn so với việc chọn mò giữa 3 ứng viên sinh ngẫu nhiên.
-
-> **Ghi chú kỹ thuật minh bạch:**
-> 1. Ở nhánh 7B APPS: Dual có 295/300 bài sinh xong candidate (3 bài search timeout 900s, 2 bài lỗi cú pháp khi trace), Test-only có 297/300 bài (3 bài search timeout 900s); tất cả các bài thiếu candidate đều được gán điểm 0 vào mẫu số 300.
-> 2. Ở nhánh 14B APPS Dual: Hoàn tất 300/300 bài, không có lỗi hạ tầng.
-> 3. Khác biệt chính sách chia test giữa hai nhánh (`half` + `all_tests` trên 7B vs `first-2 public` + `disjoint hidden_suite` trên 14B) được nêu tại [Chương 3 §3.1](03_thiet_lap_thuc_nghiem.md).
+Trên APPS, public test là **2 test đầu tiên** của mỗi bài. Hidden suite là các test còn lại, sau khi đã loại các test trùng với public.
 
 ---
 
-## 4.2. Kết quả trên HumanEval Benchmark (164 Bài toán Chuẩn)
+## 4.2. Kết quả chính trên APPS-300
 
-- **Nguồn 7B:** [rethinkmcts-modal-humaneval-v1.md](../results/7b/rethinkmcts-modal-humaneval-v1.md), [rethinkmcts-test-only-v1.md](../results/7b/rethinkmcts-test-only-v1.md).
-- **Nguồn 14B:** [humaneval_direct_14b](../../runs/humaneval_direct_14b/summary.json), [humaneval_bon3_14b](../../runs/humaneval_bon3_14b/summary.json), [humaneval_mcts_14b](../../runs/humaneval_mcts_14b/summary.json), [humaneval_mcts_dual_14b](../../runs/humaneval_mcts_dual_14b/summary.json).
+Chúng tôi báo cáo hai cách chấm:
 
-### Bảng 4.2. So sánh trên HumanEval-164
+- **Chấm trên hidden** (protocol gốc của nhánh 14B): chỉ dùng các test không xuất hiện trong lúc tìm kiếm.
+- **Chấm trên toàn bộ test** (public + hidden): một chương trình chỉ được coi là đúng khi vượt qua mọi test của bài. Đây cũng là cách chấm `all_tests` của nhánh 7B.
 
-| Phương pháp | 7B Pass@1 (%) | 7B Số bài Pass | 14B Pass@1 (%) | 14B Số bài Pass | Calls TB/bài (14B) | Thời gian TB/bài (14B) |
-| :--- | :-: | :-: | :-: | :-: | :-: | :-: |
-| **Direct Generation** | ✅ 80.49% | 132/164 | ✅ 90.24% | 148/164 | ✅ 1.91 | ✅ 5.14s |
-| **Best-of-3 (BoN-3)** | — *(Không đo trên 7B)* | — | ✅ 91.46% | 150/164 | ✅ 5.77 | ✅ 24.04s |
-| **RethinkMCTS (Test-only)** | ✅ 89.63% | 147/164 | ✅ **93.29%** | **153/164** | ✅ **4.55** | ✅ **20.94s** |
-| **RethinkMCTS (Dual Reward)** | ✅ **91.46%** | **150/164** | ✅ **90.85%** | **149/164** | ✅ **4.64** | ✅ **25.26s** |
+Kết quả chấm trên toàn bộ test được ghép từ kết quả public và hidden đã lưu của chương trình được chọn, không thực thi lại code ([`scripts/alltests_rejudge_offline.py`](../../scripts/alltests_rejudge_offline.py), kết quả tại `runs/*/all_tests_offline.json`).
 
-> **Phát hiện khoa học quan trọng trên HumanEval-164:**
-> 1. **Bảng 4.2 đã hoàn thiện 100% số liệu thực nghiệm trên 14B:** Nhánh Dual Reward ([E9](EXPERIMENT_CHECKLIST.md)) vừa hoàn tất trọn vẹn 164/164 bài, đạt **90.85% (149/164)** với chi phí cực thấp: **4.64 lời gọi/bài** (tiết kiệm hơn BoN-3: 5.77 lời gọi/bài).
-> 2. **So sánh Test-only vs Dual Reward trên 14B:** Cấu hình **Test-only (93.29%, 153/164)** vượt **Dual Reward (90.85%, 149/164)** tới **+2.44% (+4 bài)**. Nguyên nhân do trên HumanEval, các bài toán chỉ có 1–3 test cases trong docstring; khi kích hoạt Critic tự chấm ($w_{\text{llm}} = 0.2$), điểm tự nghi ngờ của mô hình đã làm lệch việc chọn ứng viên ở 6 bài toán, trong khi Test-only dừng sớm và giữ vững mã đúng. Điều này tiếp tục khẳng định vai trò sống còn của cơ chế chọn trọng số hàm thưởng thích ứng theo lượng test công khai.
+### Bảng 4.2. Pass@1 và Mean Pass Rate của 14B trên APPS-300
+
+| Phân tầng (100 bài) | Cách chấm | Direct Pass@1 | RethinkMCTS Pass@1 | Direct Pass Rate | RethinkMCTS Pass Rate |
+| :--- | :--- | :-: | :-: | :-: | :-: |
+| Introductory | Hidden | 42.00% | **53.00%** | 53.50% | **71.26%** |
+| | Toàn bộ test | 38.00% | **50.00%** | 51.86% | **71.86%** |
+| Interview | Hidden | 13.00% | **27.00%** | 31.48% | **50.13%** |
+| | Toàn bộ test | 11.00% | **26.00%** | 30.49% | **52.93%** |
+| Competition | Hidden | 21.00% | **28.00%** | 30.24% | **39.08%** |
+| | Toàn bộ test | 8.00% | **23.00%** | 28.52% | **48.56%** |
+| **Toàn bộ (300)** | **Hidden** | 25.33% (76) | **36.00% (108)** | 38.41% | **53.49%** |
+| | **Toàn bộ test** | 19.00% (57) | **33.00% (99)** | 36.96% | **57.79%** |
+
+### Bảng 4.3. Kiểm định ghép cặp RethinkMCTS so với Direct (300 bài)
+
+| Cách chấm | Chỉ MCTS đúng | Chỉ Direct đúng | McNemar $\chi^2$ (hiệu chỉnh liên tục) | $p$ (chính xác) | $\Delta$ Pass@1 (bootstrap ghép cặp 95%) |
+| :--- | :-: | :-: | :-: | :-: | :-: |
+| Hidden | 42 | 10 | 18.48 | $9.1 \times 10^{-6}$ | **+10.67%** [+6.33; +15.33] |
+| Toàn bộ test | 45 | 3 | 35.02 | $1.3 \times 10^{-10}$ | **+14.00%** [+10.00; +18.33] |
+
+Bootstrap dùng 10.000 lần lấy mẫu lại theo bài, seed 2027.
+
+**Nhận xét.**
+
+1. RethinkMCTS vượt Direct ở cả ba phân tầng và theo cả hai cách chấm. Khác biệt có ý nghĩa thống kê, và khoảng tin cậy của $\Delta$ nằm hoàn toàn trên 0.
+2. Khi chấm trên toàn bộ test, khoảng cách còn **rộng hơn** (+14.00% so với +10.67%). Lý do là 19 chương trình của Direct đạt hidden nhưng không qua chính các public test (13 trong số đó ở Competition), còn RethinkMCTS chỉ có 9 trường hợp như vậy. Direct không dùng public test để chọn hoặc sửa, nên dễ "đúng tình cờ" trên một hidden suite rất nhỏ (xem §4.4).
+3. Mức tăng tuyệt đối lớn nhất nằm ở Interview: từ 13% lên 27% khi chấm trên hidden, từ 11% lên 26% khi chấm trên toàn bộ test.
 
 ---
 
-## 4.3. Kết quả Thăm dò trên Tập APPS Introductory-100 (`apps_4000`–`apps_4099`, 14B) ⚠️
+## 4.3. So sánh với Best-of-3 trên tập con 160 bài
 
-> Tập này chỉ trùng 15/100 bài với phần Introductory của APPS-300 và dùng cấu hình thăm dò giai đoạn đầu (`compact_v1`). Tuy nhiên, cả 3 phương pháp dưới đây đều chạy trên **chính xác cùng 100 bài toán**, cung cấp bằng chứng đối sánh trực tiếp giữa Direct, Best-of-3 và MCTS trên 14B:
+Run Best-of-3 dừng ở 160/300 bài (100 Introductory + 60 Interview đầu tiên) do hết credit. Tập con này không phải mẫu ngẫu nhiên của APPS-300: nó không có bài Competition. Vì vậy, kết quả chỉ so sánh trên chính 160 bài này.
 
-| Phương pháp (14B) | Pass@1 (%) | Mean Hidden Pass Rate (%) | Calls TB/bài | Code Attempts TB/bài | Rethink TB/bài | Thời gian TB/bài | Nguồn |
-| :--- | :-: | :-: | :-: | :-: | :-: | :-: | :--- |
-| **Direct Generation** | ✅ 21.00% (21/100) | ✅ 38.89% | ✅ 1.27 | 1.00 | 0.00 | 8.85s | [apps_intro_direct_14b](../../runs/apps_intro_direct_14b/summary.json) |
-| **Best-of-3 (BoN-3)** | ✅ 23.00% (23/100) | ✅ 44.87% | ✅ 3.79 | 3.00 | 0.00 | 23.53s | [apps_intro_bon3_14b](../../runs/apps_intro_bon3_14b/summary.json) |
-| **RethinkMCTS** | ✅ **30.00%** (30/100) | ✅ **49.88%** | ✅ 11.58 | 6.29 | 2.72 (73/100 bài) | 86.75s | [apps_intro_mcts_14b](../../runs/apps_intro_mcts_14b/summary.json) |
+### Bảng 4.4. Direct, Best-of-3 và RethinkMCTS trên cùng 160 bài
+
+| Cách chấm | Direct | Best-of-3 | RethinkMCTS | $\Delta$ MCTS − BoN-3 (95%) | McNemar MCTS so với BoN-3 |
+| :--- | :-: | :-: | :-: | :-: | :-: |
+| Hidden | 29.38% (47) | 35.62% (57) | **40.00% (64)** | +4.38% [0.00; +9.38] | 11 so với 4, $p = 0.118$ |
+| Toàn bộ test | 26.88% (43) | 30.62% (49) | **38.12% (61)** | +7.50% [+2.50; +12.50] | 14 so với 2, $p = 0.004$ |
+
+Mean Pass Rate trên hidden: Direct 43.45%, BoN-3 49.85%, RethinkMCTS 63.45%.
+
+**Nhận xét.** Best-of-3 tốt hơn Direct (hidden: 10 so với 0 bài, $p = 0.002$), tức là việc lấy thêm mẫu và chọn theo public test đã có ích. Khi chấm trên hidden, RethinkMCTS hơn Best-of-3 4.38 điểm nhưng chưa đạt ý nghĩa thống kê. Khi chấm trên toàn bộ test, khoảng cách là 7.50 điểm và có ý nghĩa ($p = 0.004$).
+
+Hai phương pháp **không dùng cùng ngân sách**: Best-of-3 dùng trung bình 4.07 lời gọi/bài, RethinkMCTS dùng 13.6 lời gọi/bài trên cùng tập con. Kết quả này cho thấy MCTS tốt hơn BoN-3 ở mức chi phí tương ứng của mỗi phương pháp, chưa phải so sánh với cùng ngân sách.
 
 ---
 
-## 4.4. Thống kê Chi phí Suy luận & Phân rã Token theo Vai trò (RQ4 — Paper Table 5)
+## 4.4. Ảnh hưởng của kích thước hidden suite
 
-### Bảng 4.4a. Phân rã Chi tiết Token & Lời gọi theo 5 Vai trò trên 14B RethinkMCTS Dual (APPS-300) ✅
-*(Trích xuất chính xác từ 300/300 bài trong [`runs/benchmark_apps_14b_dual_unified/summary.json`](../../runs/benchmark_apps_14b_dual_unified/summary.json))*
+Quy tắc "2 test đầu làm public, phần còn lại làm hidden" tạo ra hidden suite rất nhỏ ở nhiều bài, vì một số bài APPS chỉ có khoảng 3 test.
 
-| Vai trò (Role) | Tổng số Calls | Tỷ trọng Calls | Input Tokens | Output Tokens | Tổng Tokens | Tỷ trọng Tokens | Tokens TB / Bài |
-| :--- | :-: | :-: | :-: | :-: | :-: | :-: | :-: |
-| **1. Expansion** (Sinh nhánh tư duy) | 405 | 8.8% | 402,222 | 75,738 | 477,960 | 4.2% | 1,593.2 |
-| **2. Code Generation** (Sinh mã) | 1,748 | 38.1% | 1,264,598 | 974,962 | 2,239,560 | 19.8% | 7,465.2 |
-| **3. Block Analysis** (Phân tích CFG) | 1,208 | 26.3% | 5,717,479 | 126,250 | 5,843,729 | **51.6%** | **19,479.1** |
-| **4. Rethink** (Sửa tư duy tại lá) | 1,066 | 23.2% | 2,555,861 | 87,815 | 2,643,676 | 23.3% | 8,812.3 |
-| **5. Conditional Critic** (Tự chấm điểm) | 160 | **3.5%** | 121,251 | 1,606 | 122,857 | **1.1%** | **409.5** |
-| **TỔNG CỘNG (300 bài)** | **4,587** *(15.29/bài)* | **100%** | **10,061,411** | **1,266,371** | **11,327,782** | **100%** | **37,759.3** |
+### Bảng 4.5. Phân bố kích thước hidden suite và số bài đạt (chấm trên hidden) theo phân tầng
 
-- **Các chỉ số hành vi tìm kiếm trung bình trên mỗi bài (14B APPS-300):**
-  - Số vòng lặp tìm kiếm (`search_iterations`): **2.79** (tối đa 9).
-  - Số ứng viên mã sinh ra (`code_generation_attempts`): **5.83** (tối đa 16).
-  - Số lần kích hoạt sửa tư duy lá (`rethink_attempts`): **3.45** (tối đa 10).
-  - Thời gian giải trung bình (`solve_wall_seconds`): **108.7 giây/bài**.
+| Phân tầng | Số hidden test | Số bài | Direct đạt | RethinkMCTS đạt |
+| :--- | :-: | :-: | :-: | :-: |
+| Introductory | 1 | 24 | 14 | 19 |
+| | 2–5 | 21 | 10 | 12 |
+| | > 5 | 55 | 18 | 22 |
+| Interview | 1 | 13 | 5 | 7 |
+| | 2–5 | 10 | 1 | 3 |
+| | > 5 | 77 | 7 | 17 |
+| Competition | 1 | **48** | **19** | **19** |
+| | 2–5 | 11 | 1 | 4 |
+| | > 5 | 41 | 1 | 5 |
 
-> **Hai nhận xét đắt giá từ Bảng 4.4a:**
-> 1. **Hiệu quả của Conditional Critic (Trụ cột 4 trong Proposal):** Nhờ chỉ kích hoạt khi ứng viên vượt qua 100% public tests (160/300 bài), Critic chỉ chiếm **3.5% số lời gọi** và **1.1% tổng lượng token** (409.5 tokens/bài) — cực kỳ tiết kiệm.
-> 2. **Điểm nghẽn chi phí tại `block_analysis` (Khớp với Paper Appendix B):** Riêng bước phân tích khối lệnh CFG chiếm tới **51.6% tổng lượng token** (chủ yếu là input tokens chứa trạng thái biến trước/sau mỗi block: 5.72 triệu tokens). Đây chính là bằng chứng thực nghiệm trực tiếp giải thích vì sao cần cơ chế **chọn mức phản hồi thích ứng (Adaptive Feedback Selection - RQ2)**!
+**Nhận xét.**
 
-### Bảng 4.4b. So sánh Chi phí Tổng hợp giữa Direct Baseline và RethinkMCTS trên APPS-300 ✅
+1. Gần một nửa số bài Competition (48/100) chỉ có **một** hidden test. 19/21 bài Competition mà Direct giải được nằm trong nhóm này. Đây là lý do Direct đạt Pass@1 ở Competition (21%) cao hơn ở Interview (13%), trái với thứ tự độ khó.
+2. Trên các bài Competition có hơn 5 hidden test, Direct đạt 1/41 và RethinkMCTS đạt 5/41. Năng lực thực sự của 14B ở các bài thi đấu thấp hơn nhiều so với con số 21–28%.
+3. Mức tăng của RethinkMCTS tập trung ở các bài có hidden suite lớn hơn (Interview > 5 test: từ 7 lên 17 bài). Đây là bằng chứng mạnh hơn cho hiệu quả của tìm kiếm so với tổng Pass@1.
 
-| Phương pháp (14B) | Số bài | Pass@1 (%) | Mean Pass Rate (%) | Model Calls TB / bài | Tổng Tokens TB / bài | Thời gian Giải TB / bài | Tổng Chi phí GPU (300 bài) |
-| :--- | :-: | :-: | :-: | :-: | :-: | :-: | :-: |
-| **Direct Baseline** | 300 | 25.33% (76/300) | 38.41% | **1.27** | **1,372.7** | **24.56s** | ~$4.00 (Modal L40S) |
-| **RethinkMCTS Dual** | 300 | **36.00%** (108/300) | **53.49%** | 15.29 | 37,759.3 | 108.70s | ~$17.50 (Modal L40S) |
-| **Hệ số Mở rộng ($\times$)** | — | **+10.67%** (+32 bài) | **+15.08%** | **12.04 $\times$** | **27.51 $\times$** | **4.43 $\times$** | Đổi lại mức tăng trưởng vượt trội |
+Do đó, Pass@1 theo phân tầng Competition chấm trên hidden **không nên** dùng làm bằng chứng chính. Chúng tôi khuyến nghị dùng cách chấm trên toàn bộ test (Bảng 4.2) khi so sánh giữa các phân tầng và khi đối chiếu với nhánh 7B.
 
-### Bảng 4.4c. So sánh Chi phí và Phân rã Token trên HumanEval-164 ✅
+---
 
-| Phương pháp (14B) | Pass@1 (%) | Số bài Pass | Model Calls TB | Tokens TB / bài | Thời gian TB / bài | Cơ chế Dừng sớm (`early_stop`) |
+## 4.5. Kết quả trên HumanEval-164
+
+### Bảng 4.6. Kết quả 14B trên HumanEval-164
+
+| Phương pháp | Pass@1 | Số bài đạt | Lời gọi TB/bài | Token TB/bài | Thời gian giải TB/bài | Mức tin cậy |
 | :--- | :-: | :-: | :-: | :-: | :-: | :--- |
-| **Direct Generation** | 90.24% | 148 / 164 | **1.91** | ~1,200 | **5.14s** | Không tìm kiếm (1 rollout) |
-| **Best-of-3 (BoN-3)** | 91.46% | 150 / 164 | 5.77 | ~4,100 | 24.04s | Cố định 3 lần lấy mẫu |
-| **RethinkMCTS (Dual)** | 90.85% | 149 / 164 | **4.64** | 3,217.7 | 25.26s | Dừng sớm khi pass public + critic |
-| **RethinkMCTS (Test-only)** | **93.29%** | **153 / 164** | **4.55** | ~3,100 | **20.94s** | **Dừng ngay khi pass public tests** |
+| **RethinkMCTS** ([`humaneval_mcts_dual_14b`](../../runs/humaneval_mcts_dual_14b/summary.json)) | **90.85%** | **149/164** | 4.64 | 3.218 | 25.3 s | Kết quả chính (schema 2) |
+| Direct (`humaneval_direct_14b`) | 90.24% | 148/164 | 1.91 | — | 5.1 s | Thăm dò, code cũ |
+| Best-of-3 (`humaneval_bon3_14b`) | 91.46% | 150/164 | 5.77 | — | 24.0 s | Thăm dò, code cũ |
+| RethinkMCTS (`humaneval_mcts_14b`) | 93.29% | 153/164 | 4.55 | — | — | Thăm dò, code cũ, cấu hình không đồng nhất |
 
-- **Phân rã Token theo vai trò trên 14B HumanEval Dual (164 bài):**
-  - *Expansion:* 179 calls (92,576 tokens = 17.5%)
-  - *Code Generation:* 264 calls (114,752 tokens = 21.7%)
-  - *Block Analysis:* 87 calls (174,416 tokens = 33.1%)
-  - *Rethink:* 72 calls (94,311 tokens = 17.9%)
-  - *Critic:* 159 calls (51,641 tokens = **9.8%**)
-  - **Tổng cộng:** 761 calls (4.64 calls/bài), 527,696 tokens (3,217.7 tokens/bài).
+Ba run thăm dò được tạo trước khi có hệ thống manifest (schema 2), bằng phiên bản code cũ. Ở phiên bản đó, phần đếm lời gọi chưa tính block analysis và tổng token chưa được ghi.
 
----
+Riêng run `humaneval_mcts_14b`: 11 bài đầu (`python_0`–`python_10`) được lấy từ một lượt chạy trước với cấu hình khác (khoảng 20 lời gọi và 8 lần sinh code mỗi bài), 153 bài còn lại chạy ở một lượt sau. Run này **có bật critic**: trong [`evaluations.jsonl`](../../runs/humaneval_mcts_14b/evaluations.jsonl), cả 232 đánh giá qua hết public test đều có `self_eval_status = evaluated` và phần thưởng 0.97–0.99, đúng với $(a, b) = (0.8, 0.2)$. Vì vậy, đây không phải kết quả Test-only, và nhánh 14B hiện chưa có run Test-only nào trên HumanEval. Chúng tôi **không** so sánh run này với run RethinkMCTS chính, và không quy chênh lệch 93.29% − 90.85% cho bất kỳ thành phần cụ thể nào.
 
-## 4.5. Kiểm định Ý nghĩa Thống kê (Statistical Significance)
+**Nhận xét.**
 
-| Cặp đối sánh | Tập dữ liệu | Kiểm định | Kết quả chi tiết | Kết luận Khoa học |
-| :--- | :--- | :--- | :--- | :--- |
-| **14B MCTS Dual vs 14B Direct** | **APPS-300 (300 bài)** | McNemar ($\chi^2$) + Bootstrap CI 95% | **$\chi^2 = 18.4808, p = 1.72 \times 10^{-5}$** ($p \ll 0.001$)<br>Direct 95% CI: $[20.67\%, 30.33\%]$<br>MCTS 95% CI: $[30.67\%, 41.67\%]$<br>$\Delta = +10.67\%$ (95% CI: $[3.67\%, 18.00\%]$) | **Ý nghĩa thống kê vượt bậc** (MCTS cứu 42 bài Direct bó tay). |
-| **14B MCTS Test-only vs 14B Direct** | **HumanEval (164 bài)** | McNemar ($\chi^2$) + Bootstrap CI 95% | **$\chi^2 = 1.2308, p = 0.2673$**<br>Direct CI: $[85.37\%, 94.51\%]$<br>MCTS CI: $[89.63\%, 96.95\%]$<br>$\Delta = +3.05\%$ (95% CI: $[-1.22\%, +7.32\%]$) | MCTS giải đúng thêm 5 bài ròng (9 bài MCTS cứu vs 4 bài Direct hơn). |
-| **14B MCTS Test-only vs 14B BoN-3** | **HumanEval (164 bài)** | McNemar ($\chi^2$) + Bootstrap CI 95% | **$\chi^2 = 0.3636, p = 0.5465$**<br>$\Delta = +1.83\%$ (95% CI: $[-1.83\%, +6.10\%]$) | MCTS hơn BoN-3 3 bài ròng nhưng **tiết kiệm hơn 21% lời gọi mô hình** (4.55 vs 5.77). |
-| **14B MCTS Test-only vs 14B Dual** | **HumanEval (164 bài)** | McNemar ($\chi^2$) + Bootstrap CI 95% | **$\chi^2 = 1.1250, p = 0.2888$**<br>$\Delta = +2.44\%$ (95% CI: $[-0.61\%, +6.10\%]$) | Test-only cao hơn 4 bài do ít test công khai trên HumanEval. |
-| **14B MCTS vs 14B Direct** | **APPS Intro (100 bài)** | McNemar ($\chi^2$) + Bootstrap CI 95% | **$\chi^2 = 4.9231, p = 0.0265 < 0.05$**<br>$\Delta = +9.00\%$ (95% CI: $[+3.00\%, +16.00\%]$) | **Có ý nghĩa thống kê ($p < 0.05$)**, khoảng tin cậy 95% hoàn toàn dương. |
-| **14B MCTS vs 14B BoN-3** | **APPS Intro (100 bài)** | McNemar ($\chi^2$) + Bootstrap CI 95% | **$\chi^2 = 2.4000, p = 0.1213$**<br>$\Delta = +7.00\%$ (95% CI: $[+0.00\%, +15.00\%]$) | MCTS vượt trội +7.00% so với lấy mẫu ngẫu nhiên 3 lần. |
-
-### 4.5.1. Chi tiết Phân tích Cặp bài (Paired Contingency Table) trên 14B APPS-300:
-- **Cả hai cùng giải đúng (Both Pass):** 66 bài.
-- **Cả hai cùng giải sai (Both Fail):** 182 bài.
-- **Direct giải đúng, MCTS giải sai ($b$):** 10 bài.
-- **Direct giải sai, MCTS cứu thành công ($c$):** **42 bài**.
-- **Chênh lệch cứu bài thực tế:** MCTS giải cứu thành công $42 - 10 = +32$ bài toán hóc búa từ tay Direct.
-- **Ý nghĩa:** Kiểm định McNemar hiệu chỉnh liên tục cho giá trị $\chi^2 = 18.4808$ với $p = 1.7163 \times 10^{-5} \ll 0.001$, khẳng định mức vượt trội $+10.67\%$ của RethinkMCTS Dual so với Direct là có ý nghĩa thống kê vượt bậc, không phải do phương sai ngẫu nhiên. Khoảng tin cậy Bootstrap 95% cho độ chênh lệch $\Delta$ là $[3.67\%, 18.00\%]$, hoàn toàn nằm trên vùng dương.
-
-### 4.5.2. Chi tiết Phân tích Cặp bài trên HumanEval-164:
-- **MCTS Test-only (153 bài) vs Direct Baseline (148 bài):**
-  - Cả hai cùng pass: 144 bài.
-  - Cả hai cùng fail: 7 bài.
-  - Direct pass, MCTS fail: 4 bài.
-  - **Direct fail, MCTS cứu thành công:** **9 bài**.
-  - MCTS cứu được 9 bài toán mà Direct thất bại (ví dụ: các bài xử lý đệ quy lồng nhau và xâu ký tự phức tạp).
-- **MCTS Test-only (153 bài) vs BoN-3 (150 bài):**
-  - Cả hai cùng pass: 146 bài.
-  - BoN-3 pass, MCTS fail: 4 bài.
-  - **BoN-3 fail, MCTS cứu thành công:** **7 bài**.
-
-### 4.5.3. Chi tiết Phân tích Cặp bài trên APPS Introductory-100:
-- **MCTS (30 bài) vs Direct Baseline (21 bài):**
-  - Cả hai cùng pass: 19 bài | Cả hai cùng fail: 68 bài.
-  - Direct pass, MCTS fail: 2 bài.
-  - **Direct fail, MCTS cứu thành công:** **11 bài**.
-  - Kiểm định McNemar đạt $\chi^2 = 4.9231, p = 0.0265 < 0.05$ (đạt ngưỡng ý nghĩa thống kê chuẩn $5\%$). Bootstrap 95% CI cho độ chênh lệch là $[+3.00\%, +16.00\%]$.
+- HumanEval gần chạm trần với 14B. Ứng viên đầu tiên đã qua hết public test ở 147/164 bài; chỉ 17 bài phải dùng đến rethink.
+- Chênh lệch giữa các phương pháp chỉ 1–5 bài. Khi chưa chạy lại Direct và Best-of-3 bằng cùng phiên bản code, chưa thể kết luận phương pháp nào tốt hơn trên HumanEval.
 
 ---
 
-## 4.6. Phân loại Lỗi & Năng lực Giải cứu của Cơ chế Rethink (RQ1, RQ2 — Paper Table 4) ✅
-*(Trích xuất chính xác từ toàn bộ 300 bài toán trong [`runs/benchmark_apps_14b_dual_unified/`](../../runs/benchmark_apps_14b_dual_unified/))*
+## 4.6. Chi phí suy luận
 
-Để trả lời **RQ1 (Phản hồi thực thi giúp giải cứu mã nguồn như thế nào)** và đối chiếu với **Table 4 trong bài báo gốc RethinkMCTS**, chúng tôi theo dõi trạng thái lỗi của ứng viên mã đầu tiên (Rollout 0), động học sửa lỗi khi kích hoạt Rethink tại lá cây tìm kiếm, và tỷ lệ mã hợp lệ trên toàn bộ cây duyệt (`Tree Effective Code Rate`).
+### Bảng 4.7. Chi phí trung bình mỗi bài trên APPS-300 (14B)
 
-### Bảng 4.6. Phân tích Chi tiết Động học Sửa lỗi & Tỷ lệ Cứu vãn nhờ Rethink trên 14B APPS-300
+| Phân tầng | Phương pháp | Lời gọi | Token | Thời gian giải | Lần sinh code | Lần rethink | Vòng lặp tìm kiếm |
+| :--- | :--- | :-: | :-: | :-: | :-: | :-: | :-: |
+| Introductory | Direct | 1.45 | 1.329 | 21.7 s | 1.00 | 0 | 0 |
+| | RethinkMCTS | 11.18 | 25.540 | 80.7 s | 4.21 | 2.29 | 2.20 |
+| Interview | Direct | 1.18 | 1.355 | 24.1 s | 1.00 | 0 | 0 |
+| | RethinkMCTS | 17.73 | 42.788 | 119.7 s | 6.76 | 4.13 | 3.17 |
+| Competition | Direct | 1.17 | 1.434 | 27.9 s | 1.00 | 0 | 0 |
+| | RethinkMCTS | 16.96 | 43.811 | 125.6 s | 6.51 | 3.93 | 2.99 |
+| **Toàn bộ** | Direct | 1.27 | 1.373 | 24.6 s | 1.00 | 0 | 0 |
+| | **RethinkMCTS** | **15.29** | **37.759** | **108.7 s** | **5.83** | **3.45** | **2.79** |
 
-| Nhóm Chỉ số | Tham số Phân tích | Số lượng | Tỷ lệ (%) | Nhận xét & Ý nghĩa Thực nghiệm |
-| :--- | :--- | :-: | :-: | :--- |
-| **1. Kết quả Lần thử Đầu (Rollout 0)** | • Giải đúng 100% public tests ngay lần đầu | **84 / 300** | **28.0%** | Chỉ hơn 1/4 số bài được giải quyết mà không cần sửa lỗi. |
-| | • Thất bại lần đầu (kích hoạt MCTS & Rethink) | **216 / 300** | **72.0%** | **72% bài toán đòi hỏi cơ chế tìm kiếm và sửa sai.** |
-| **2. Phân loại Lỗi Ban đầu (Error Taxonomy)** | • Sai kết quả (Wrong Answer - WA) | 184 / 216 | **85.2%** | Lỗi thuật toán và logic điều kiện chiếm tuyệt đại đa số. |
-| | • Lỗi thời gian chạy (Runtime Error - RE) | 30 / 216 | **13.9%** | Lỗi tràn chỉ mục mảng (`IndexError`), đệ quy sâu hoặc chia cho 0. |
-| | • Quá giới hạn thời gian (Time Limit Exceeded - TLE) | 2 / 216 | **0.9%** | Rất ít bài bị lặp vô hạn nhờ cơ chế cắt nhánh sớm. |
-| | • Lỗi biên dịch / cú pháp (Syntax / Compilation Error) | **0 / 216** | **0.0%** | Qwen2.5-Coder-14B sinh cú pháp Python chuẩn xác tuyệt đối. |
-| **3. Hành vi & Năng lực Giải cứu của Rethink** | • Số bài kích hoạt Rethink (Search Iterations > 1) | **216 / 300** | 72.0% | Trung bình 3.45 lượt rethink/bài (tối đa 10 lượt). |
-| | • Số bài được Rethink cứu đạt 100% public tests | **77 / 216** | **35.6%** | **Hơn 1/3 số bài thất bại ban đầu đã được chuyển hóa thành pass public.** |
-| | • **Số bài được Rethink cứu pass 100% test ẩn** | **38 / 216** | **17.6%** | **Cứu ròng 38 bài toán giải đúng tuyệt đối** từ tay thất bại! |
-| | • **Đóng góp của Rethink vào tổng số bài Pass của 14B** | **38 / 108** | **35.2%** | **Hơn 1/3 (35.2%) tổng chiến thắng của MCTS là nhờ Rethink!** Không có Rethink, Pass@1 của 14B chỉ đạt ~23.33%. |
-| **4. Hiệu suất Cây Tìm kiếm (Search Tree Efficiency)** | • Tổng số ứng viên mã sinh ra trên cây | 1,748 code | — | Trung bình 5.83 code attempts / bài toán. |
-| | • Số ứng viên mã vượt qua 100% public tests | 161 code | — | Các ứng viên đủ điều kiện để kích hoạt Critic. |
-| | • **Tỷ lệ Ứng viên Mã Hợp lệ (`Tree Effective Code Rate`)** | **161 / 1,748** | **9.21%** | Tương đương con số 8.5% – 11.2% của GPT-4o-mini trong bài báo gốc (Paper Table 4). |
+Lời gọi của Direct lớn hơn 1 vì critic được gọi khi chương trình qua hết public test. Lời gọi này không ảnh hưởng đến việc chọn chương trình của Direct.
 
----
+### Bảng 4.8. Phân rã lời gọi và token theo vai trò (RethinkMCTS, APPS-300)
 
-## 4.7. Đường cong Mở rộng theo Ngân sách Thời gian Suy luận (Test-Time Scaling Curve — RQ4) ✅
-*(Trích xuất từ kết quả tích lũy theo ngân sách lần thử $k \in \{1, 2, 4, 8, 16\}$ trên 300 bài 14B APPS-300)*
+| Vai trò | Lời gọi | Tỷ trọng lời gọi | Token vào | Token ra | Tổng token | Tỷ trọng token |
+| :--- | :-: | :-: | :-: | :-: | :-: | :-: |
+| Mở rộng thought (expansion) | 405 | 8.8% | 402.222 | 75.738 | 477.960 | 4.2% |
+| Sinh code | 1.748 | 38.1% | 1.264.598 | 974.962 | 2.239.560 | 19.8% |
+| Phân tích khối CFG (block analysis) | 1.208 | 26.3% | 5.717.479 | 126.250 | 5.843.729 | **51.6%** |
+| Rethink | 1.066 | 23.2% | 2.555.861 | 87.815 | 2.643.676 | 23.3% |
+| Critic | 160 | 3.5% | 121.251 | 1.606 | 122.857 | 1.1% |
+| **Tổng** | **4.587** | 100% | 10.061.411 | 1.266.371 | **11.327.782** | 100% |
 
-Để kiểm chứng **Giả thuyết Mở rộng tại Thời điểm Suy luận (Test-Time Compute Scaling)** nêu tại **Mục 5.3 Đề cương (`Proposal.md`)** và **Figure 5 bài báo gốc**, chúng tôi khảo sát tỷ lệ giải đúng Pass@1 (trên test ẩn) và tỷ lệ vượt qua test công khai (Public Pass Rate) khi cho phép hệ thống tìm kiếm tích lũy tối đa $k$ ứng viên mã nguồn ($k \in \{1, 2, 4, 8, 16\}$).
+Có 3 bài (`apps_3149`, `apps_3869`, `apps_3946`) với tổng cộng 6 lời gọi không nhận được số token từ server, nên tổng token là cận dưới.
 
-### Bảng 4.7. Động thái Tăng trưởng Pass@1 theo Ngân sách Ứng viên $k$ trên 14B APPS-300
+**Nhận xét.**
 
-| Ngân sách Ứng viên ($k$) | Pass@1 trên Test Ẩn (%) | Số bài Pass Ẩn | Public Pass Rate (%) | Số bài Pass Public | Mức Tăng Biên ($\Delta$ Pass@1) | Nhận xét Hiệu quả Biên |
-| :---: | :---: | :---: | :---: | :---: | :---: | :--- |
-| **$k = 1$** | **22.00%** | 66 / 300 | 28.00% | 84 / 300 | — | Kết quả của ứng viên ban đầu tại nút gốc. |
-| **$k = 2$** | **26.67%** | 80 / 300 | 37.67% | 113 / 300 | **+4.67%** (+14 bài) | Hiệu quả bứt phá mạnh nhất nhờ lần Rethink đầu tiên. |
-| **$k = 4$** | **31.33%** | 94 / 300 | 45.33% | 136 / 300 | **+4.66%** (+14 bài) | Khám phá thêm các nhánh tư duy mới (Expansion). |
-| **$k = 8$** | **35.00%** | 105 / 300 | 50.67% | 152 / 300 | **+3.67%** (+11 bài) | Đạt 97.2% trần năng lực tối đa của cây tìm kiếm. |
-| **$k = 16$** (Toàn bộ) | **36.00%** | 108 / 300 | 53.67% | 161 / 300 | **+1.00%** (+3 bài) | Bắt đầu bão hòa; chi phí biên cho mỗi bài pass tăng cao. |
+1. RethinkMCTS tốn khoảng 12 lần lời gọi, 27.5 lần token và 4.4 lần thời gian so với Direct, để tăng Pass@1 thêm 10.67 điểm (chấm trên hidden).
+2. Phân tích khối CFG chiếm hơn một nửa số token, chủ yếu là token đầu vào chứa trạng thái biến trước và sau mỗi khối. Điều này khớp với nhận xét của bài báo gốc về chi phí của block-level analysis.
+3. **Ngân sách thực sự ràng buộc là token.** 161 bài dừng sớm vì đã qua hết public test. Trong 139 bài còn lại, 133 bài dừng vì chạm trần 65.536 token, chỉ 4 bài dừng vì đủ 16 lần sinh code (2 bài vì lý do khác). Số lần sinh code cao nhất ở một bài là 16, nhưng chương trình được chọn có thứ tự sinh cao nhất là 11.
 
-```
-Pass@1 (%)
- 40% ┤                                         ╭─── 36.00% (k=16)
-     │                                   ╭─────╯ 35.00% (k=8)
- 30% ┤                         ╭─────────╯ 31.33% (k=4)
-     │               ╭─────────╯ 26.67% (k=2)
- 20% ┤ ──────────────╯ 22.00% (k=1)
-     │
-  0% ┴──────┬─────────────┬─────────────┬─────────────┬─────────────
-           k=1           k=2           k=4           k=8          k=16
-```
-
-> **Phát hiện Khoa học:**
-> 1. **Quy luật Tăng trưởng Đơn điệu dạng Logarit:** Tỷ lệ Pass@1 tuân theo quy luật hàm logarit theo số lần thử $k$: $Pass@1(k) \approx a \cdot \ln(k) + b$.
-> 2. **Điểm Cân bằng Tối ưu Chi phí / Hiệu năng ($k = 8$):** Tại $k = 8$, mô hình đã gặt hái được **35.00% / 36.00% (97.2%)** số bài giải đúng toàn bộ, trong khi tiết kiệm được gần một nửa chi phí suy luận so với việc cho cây nở tối đa $k = 16$. Đây là tham số khuyến nghị cho các hệ thống ứng dụng thực tế.
+Chúng tôi không báo cáo chi phí GPU bằng tiền, vì artifact không ghi lại thời gian GPU tính phí của từng run.
 
 ---
 
-## 4.8. Năng lực Tự Thẩm định: Thí nghiệm Đối chứng Self-Critic vs Cross-Critic (RQ3) ✅
-*(Trích xuất từ kết quả thực nghiệm kiểm thử độc lập 161 ứng viên mã đạt $v_{\text{test}} = 1.0$ của APPS-300 tại [`runs/cross_critic_analysis_14b/`](../../runs/cross_critic_analysis_14b/))*
+## 4.7. Hành vi tìm kiếm và vai trò của rethink
 
-Để kiểm chứng câu hỏi khoa học: *"Liệu một mô hình độc lập bên ngoài (Cross-Critic) có khách quan và đáng tin cậy hơn mô hình tự sinh mã (Self-Critic) khi chấm điểm các ứng viên đã vượt qua bài kiểm thử công khai hay không?"*, chúng tôi cho mô hình mã nguồn chuyên biệt **Mistral Codestral (`codestral-latest`, 22 tỷ tham số)** đóng vai trò Cross-Critic thẩm định độc lập toàn bộ 161 ứng viên mã đã đạt $v_{\text{test}} = 1.0$ do `Qwen2.5-Coder-14B` sinh ra trên cùng một prompt hệ thống.
+### 4.7.1. Ứng viên đầu tiên và loại lỗi
 
-### Bảng 4.8. Bảng So sánh Năng lực Thẩm định: Self-Critic (Qwen-14B) vs Cross-Critic (Codestral-22B)
+Trên APPS-300, ứng viên đầu tiên của RethinkMCTS qua hết public test ở 84/300 bài (28.0%). Ở 216 bài còn lại, lỗi trên public test đầu tiên thất bại phân bố như sau:
 
-| Chỉ số Đánh giá Thống kê | Self-Critic (Qwen2.5-Coder-14B) | Cross-Critic (Mistral Codestral-22B) | Mức Chênh lệch | Ý nghĩa Thống kê & Thực nghiệm |
-| :--- | :---: | :---: | :---: | :--- |
-| **Hệ số Tương quan Hạng Spearman ($\rho$)** | **+0.2426** ($p = 0.0019$) | +0.0327 ($p = 0.6806$) | **+0.2099** | **Qwen-14B đạt ý nghĩa thống kê vượt trội ($p < 0.01$)**; Codestral không có tương quan với kết quả test ẩn. |
-| **Hệ số Tương quan Tuyến tính Pearson ($r$)** | **+0.1699** ($p = 0.0312$) | -0.0556 ($p = 0.4838$) | **+0.2255** | Qwen-14B đạt ngưỡng chuẩn ($p < 0.05$), Codestral bị nhiễu âm nhẹ do tập trung điểm 1.0. |
-| **Tương quan Point-Biserial ($r_{\text{pb}}$ với Hidden Pass)** | **+0.2391** ($p = 0.0023$) | -0.0417 ($p = 0.5997$) | **+0.2808** | Điểm tự chấm của Qwen-14B dự báo chuẩn xác khả năng pass 100% test ẩn của bài toán. |
-| **Phân phối Điểm Thẩm định ($v_{\text{llm}}$)** | **1.0:** 121 bài<br>**-1.0:** 35 bài<br>**Khác:** 5 bài | **1.0:** 145 bài (**90.1%**)<br>**-1.0:** 5 bài<br>**Khác:** 11 bài | — | **Codestral bị bão hòa trần nặng nề (Sycophancy):** Chấm điểm tuyệt đối 90.1% số lần, làm mất hoàn toàn tính phân loại. |
-| **Tỷ lệ Phê duyệt Sai trên 62 bài Quá khớp (Overfit)** | **64.52%** (Bắt đúng 22 bài sai) | **95.16%** (Bỏ sót 59 / 62 bài sai) | **-30.64%** | **Qwen-14B phát hiện lỗi quá khớp tốt hơn gấp 7.3 lần!** Codestral hầu như cho qua toàn bộ các ca mã lỗi. |
-| **Tỷ lệ Phê duyệt Đúng trên 99 bài Pass Ẩn** | 84.85% (84 / 99 bài) | 92.93% (92 / 99 bài) | -8.08% | Codestral đạt tỷ lệ duyệt cao thực chất chỉ do xu hướng cho điểm dễ dãi đồng loạt. |
+| Loại lỗi | Số bài | Tỷ lệ |
+| :--- | :-: | :-: |
+| Sai kết quả (WA) | 184 | 85.2% |
+| Lỗi runtime (RE) | 30 | 13.9% |
+| Quá thời gian (TLE) | 2 | 0.9% |
+| Lỗi cú pháp (CE) | 0 | 0.0% |
 
-> **Kết luận Thực nghiệm then chốt:**
-> - **Lợi thế Đồng bộ Không gian Suy luận (Internal Reasoning Alignment):** Qwen-14B khi tự đọc lại chuỗi tư duy của mình có khả năng phát hiện những giả định lỏng lẻo mà nó đã đưa ra, giúp chấm điểm phạt $-1.0$ chính xác ở 22 bài toán quá khớp test công khai.
-> - **Cảnh báo Hội chứng Cả tin Bề mặt (Surface-Level Sycophancy):** Một mô hình bên ngoài (kể cả có quy mô lớn hơn như 22B) khi chỉ nhìn vào đoạn mã trông sạch đẹp đã pass test công khai sẽ rất dễ bị đánh lừa và tin rằng mã đã đúng hoàn toàn.
+Lỗi chủ yếu là lỗi logic, không phải lỗi cú pháp. Đây là loại lỗi mà feedback dựa trên trạng thái thực thi được thiết kế để hỗ trợ.
+
+### 4.7.2. Nguồn gốc của các lời giải đúng
+
+Trong 108 bài RethinkMCTS giải đúng (chấm trên hidden), chương trình được chọn có nguồn gốc như sau:
+
+| Nguồn gốc chương trình được chọn | Introductory | Interview | Competition | Tổng |
+| :--- | :-: | :-: | :-: | :-: |
+| Sinh ra sau một lần rethink | 10 | 10 | 10 | **30 (27.8%)** |
+| Sinh trực tiếp từ một nút thought (initial) | 43 | 17 | 18 | 78 (72.2%) |
+
+Nhãn "initial" gồm cả ứng viên đầu tiên của bài và ứng viên ở các nhánh được mở rộng sau đó; các nhánh này cũng nhận feedback từ lần thất bại trước. Vì vậy, 30 bài là **cận dưới** của số bài mà rethink trực tiếp tạo ra lời giải, và không đo được đóng góp gián tiếp của rethink lên các nhánh khác.
+
+Muốn kết luận rethink đóng góp bao nhiêu điểm Pass@1, cần thí nghiệm triệt tiêu với `max_rethinks_per_node = 0` (E4 trong [EXPERIMENT_CHECKLIST.md](EXPERIMENT_CHECKLIST.md)). Thí nghiệm này chưa được chạy.
+
+### 4.7.3. Diễn biến theo số ứng viên đã sinh
+
+Bảng 4.9 cho biết, nếu dừng tìm kiếm sau $k$ ứng viên, có bao nhiêu bài đã có ít nhất một ứng viên qua hết public test, và bao nhiêu bài có chương trình được chọn cuối cùng nằm trong $k$ ứng viên đầu và đạt hidden.
+
+### Bảng 4.9. Số bài đạt theo số ứng viên $k$ (RethinkMCTS, APPS-300)
+
+| $k$ | Bài đã có ứng viên qua hết public | Bài đạt hidden (cận dưới) | Pass@1 hidden (cận dưới) |
+| :-: | :-: | :-: | :-: |
+| 1 | 84 | 66 | 22.00% |
+| 2 | 107 | 80 | 26.67% |
+| 4 | 133 | 94 | 31.33% |
+| 8 | 156 | 105 | 35.00% |
+| Toàn bộ (≤ 16) | 161 | 108 | 36.00% |
+
+Cột hidden là cận dưới, vì chỉ chương trình được chọn cuối cùng mới được chấm trên hidden. Nếu dừng sớm hơn, chương trình được chọn có thể là một ứng viên khác chưa từng được chấm.
+
+Phần lớn mức tăng đến trong 8 ứng viên đầu. Ở giai đoạn sau, nhiều bài đã chạm trần token (§4.6), nên không thể kết luận về hiệu quả biên của ngân sách lớn hơn.
+
+### 4.7.4. Tỷ lệ code hợp lệ trên cây
+
+Có 161 trong 1.748 ứng viên (9.21%) qua hết public test. Chỉ số này **không so sánh được** với Table 4 của bài báo gốc (15.60% trên APPS Introductory, 53.29% trên HumanEval):
+
+- Cơ chế dừng sớm kết thúc tìm kiếm ngay khi có ứng viên đầu tiên qua hết public test. Vì vậy, mỗi bài có tối đa một ứng viên như vậy, và tỷ lệ này bị giới hạn bởi cách dừng chứ không chỉ bởi chất lượng cây.
+- Bài báo gốc chạy đủ 16 rollout và tính riêng cho APPS Introductory.
 
 ---
 
-## 4.9. Phân tích So sánh Đối đầu giữa Hai Quy mô Mô hình 7B vs 14B (RQ3) ✅
-*(Kiểm định Khi-bình phương Pearson $\chi^2$ hiệu chỉnh liên tục Yates và Tỷ số Chênh lệch Odds Ratio trên 300 bài APPS và 164 bài HumanEval)*
+## 4.8. Vai trò của LLM critic
 
-Để trả lời **RQ3 (Quy mô mô hình tác động như thế nào đến hiệu quả của MCTS)**, chúng tôi thực hiện kiểm định giả thuyết thống kê về sự khác biệt giữa hai quy mô **Qwen2.5-Coder-7B** và **Qwen2.5-Coder-14B** trên từng tập benchmark và phân tầng độ khó.
+### 4.8.1. Critic không làm thay đổi chương trình được chọn
 
-### Bảng 4.9. Kiểm định Khi-bình phương ($\chi^2$) và Tỷ số Chênh (Odds Ratio) giữa 7B và 14B
+Phần thưởng kép dùng điểm critic $v_{\text{llm}}$ chỉ khi ứng viên qua hết public test. Trong cấu hình đã chạy, hai cơ chế khiến điểm này không ảnh hưởng đến kết quả:
 
-| Phép Đối sánh Thực nghiệm | Tập Dữ liệu | Tỷ lệ 7B | Tỷ lệ 14B | Mức Tăng ($\Delta$) | Thống kê $\chi^2$ (Yates) | Giá trị $p$ | Odds Ratio (14B vs 7B) | Ý nghĩa Khoa học |
-| :--- | :--- | :-: | :-: | :-: | :-: | :-: | :-: | :--- |
-| **Direct Baseline** | **APPS-300** | 14.00% (42/300) | **25.33%** (76/300) | **+11.33%** | $\chi^2 = 11.4881$ | **$7.00 \times 10^{-4} < 0.001$** | **2.08 $\times$** | Mô hình 14B có năng lực sinh mã gốc vượt trội có ý nghĩa thống kê so với 7B. |
-| **RethinkMCTS Dual** | **APPS-300** | 19.00% (57/300) | **36.00%** (108/300) | **+17.00%** | $\chi^2 = 20.8986$ | **$4.84 \times 10^{-6} \ll 0.001$** | **2.40 $\times$** | **Ý nghĩa thống kê vượt bậc:** MCTS trên 14B khuếch đại cơ hội giải đúng gấp 2.4 lần so với trên 7B. |
-| • *Introductory (Bài dễ)* | APPS (100 bài) | 38.00% (38/100) | **53.00%** (53/100) | **+15.00%** | $\chi^2 = 3.9520$ | **$0.0468 < 0.05$** | **1.84 $\times$** | Tăng trưởng có ý nghĩa ở mức 5%. |
-| • *Interview (Bài trung bình)* | APPS (100 bài) | 14.00% (14/100) | **27.00%** (27/100) | **+13.00%** | $\chi^2 = 4.4179$ | **$0.0356 < 0.05$** | **2.27 $\times$** | Tăng trưởng có ý nghĩa ở mức 5%, xác suất giải đúng tăng hơn gấp đôi. |
-| • *Competition (Bài khó)* | APPS (100 bài) | 5.00% (5/100) | **28.00%** (28/100) | **+23.00%** | $\chi^2 = 17.5649$ | **$2.78 \times 10^{-5} \ll 0.001$** | **7.39 $\times$** | **Bước nhảy vọt kiến trúc:** 14B MCTS tăng cơ hội giải đúng bài Olympic khó gấp **7.39 lần** so với 7B! |
-| **Direct Baseline** | **HumanEval-164** | 80.49% (132/164) | **90.24%** (148/164) | **+9.76%** | $\chi^2 = 5.4911$ | **$0.0191 < 0.05$** | **2.24 $\times$** | 14B Direct giải đúng thêm 16 bài chuẩn so với 7B Direct. |
-| **RethinkMCTS Dual** | **HumanEval-164** | 91.46% (150/164) | 90.85% (149/164) | -0.61% | $\chi^2 = 0.0000$ | $1.0000$ (n.s.) | 0.93 $\times$ | Cả hai đều chạm trần năng lực (> 90%), khác biệt không có ý nghĩa thống kê. |
-| **Cộng hưởng Vượt cấp (Cross-scale Synergy)** | **HumanEval-164** | **7B MCTS: 91.46%** | **14B Direct: 90.24%** | **+1.22%** | — | — | — | **Mô hình 7B gắn MCTS vượt qua mô hình 14B chạy Direct.** |
+1. **Dừng sớm:** tìm kiếm kết thúc ngay sau khi ứng viên đầu tiên qua hết public test và được critic chấm, nên điểm critic không còn được dùng để hướng dẫn tìm kiếm.
+2. **Chọn cuối cùng theo phần thưởng lớn nhất:** với 2 public test, $v_{\text{test}} \in \{0;\ 0.5;\ 1\}$. Ứng viên qua hết public test có phần thưởng ít nhất $0.8 \cdot 1 + 0.2 \cdot (-1) = 0.6 > 0.5$, nên luôn được chọn dù bị critic chấm thấp.
 
-> **Kết luận Quy luật Mở rộng (Scaling Law Insights):**
-> 1. **Hiệu ứng "Bệ phóng Năng lực":** MCTS không thể thay thế kiến thức nền tảng của mô hình. Ở các bài Competition, khi mô hình 7B không biết thuật toán nâng cao, MCTS chỉ đạt 5%. Nhưng khi mô hình 14B đã có tri thức tiềm ẩn, MCTS hoạt động như một bệ phóng khuếch đại đưa Pass@1 lên **28.00% (tăng gấp 7.39 lần)**.
-> 2. **Cộng hưởng Vượt cấp:** Trên các bài toán vừa sức như HumanEval, việc bổ sung cơ chế tìm kiếm MCTS giúp mô hình nhỏ 7B (91.46%) vượt mặt cả mô hình lớn hơn gấp đôi 14B Direct (90.24%), chứng minh tiềm năng to lớn của việc dùng tính toán suy luận (Test-time compute) thay vì chỉ mở rộng kích thước tham số.
+Kiểm tra trên artifact cho thấy, ở **toàn bộ 161 bài APPS và 159 bài HumanEval có ứng viên qua hết public test**, chương trình được chọn đều là ứng viên đầu tiên đạt điều kiện đó. Các bài còn lại không có ứng viên nào để critic chấm. Như vậy, trong các run này, RethinkMCTS với phần thưởng kép tương đương về hành vi với phiên bản chỉ dùng test, khác ở chỗ tốn thêm 160 lời gọi critic (1.1% token).
+
+Hệ quả cho thiết kế thí nghiệm: thí nghiệm triệt tiêu "Test-only" trên 14B với cấu hình này sẽ không đo được gì về vai trò của critic. Bài báo gốc chạy đủ 16 rollout, không dừng sớm, nên điểm critic tham gia vào việc chọn nhánh và chọn chương trình.
+
+### 4.8.2. Điểm critic có mang tín hiệu về độ đúng
+
+Dù không được dùng, điểm critic vẫn có liên hệ với kết quả trên hidden. Bảng 4.10 tính trên 161 chương trình được chọn đã qua hết public test.
+
+### Bảng 4.10. Điểm critic của Qwen-14B và kết quả trên hidden (APPS-300)
+
+| Điểm critic | Đạt hidden | Không đạt hidden | Tỷ lệ không đạt |
+| :-: | :-: | :-: | :-: |
+| 1.0 hoặc 0.8 (chấp nhận) | 84 | 40 | 32.3% |
+| 0.0 hoặc −1.0 (không chấp nhận) | 15 | 22 | **59.5%** |
+| **Tổng** | 99 | 62 | 38.5% |
+
+Tương quan hạng Spearman giữa điểm critic và tỷ lệ hidden đạt là $\rho = 0.243$ ($p = 0.002$); tương quan point-biserial với việc đạt toàn bộ hidden là $r_{pb} = 0.239$ ($p = 0.002$) ([`runs/cross_critic_analysis_14b/summary.json`](../../runs/cross_critic_analysis_14b/summary.json)).
+
+Khi critic không chấp nhận, xác suất chương trình sai trên hidden gần gấp đôi tỷ lệ nền. Đây là tín hiệu yếu đến vừa phải: critic vẫn chấp nhận 40/62 chương trình sai. Một hướng sử dụng tín hiệu này là chỉ cho dừng sớm khi critic chấp nhận (xem [EXPERIMENT_CHECKLIST.md](EXPERIMENT_CHECKLIST.md), mục 0).
+
+### 4.8.3. So sánh với một critic khác mô hình (Codestral)
+
+Chúng tôi cho `codestral-latest` (Mistral) chấm lại cùng 161 chương trình ([`scripts/cross_critic_benchmark.py`](../../scripts/cross_critic_benchmark.py)).
+
+| Chỉ số | Qwen-14B (tự chấm, trong lúc tìm kiếm) | Codestral (chấm lại sau) |
+| :--- | :-: | :-: |
+| Spearman $\rho$ với tỷ lệ hidden đạt | **+0.243** ($p = 0.002$) | +0.033 ($p = 0.68$) |
+| Point-biserial $r_{pb}$ với đạt toàn bộ hidden | **+0.239** ($p = 0.002$) | −0.042 ($p = 0.60$) |
+| Tỷ lệ chấm 1.0 | 121/161 (75.2%) | 145/161 (90.1%) |
+| Chấp nhận chương trình sai (trên 62) | 40 (64.5%) | 59 (95.2%) |
+| Chấp nhận chương trình đúng (trên 99) | 84 (84.8%) | 92 (92.9%) |
+
+Codestral gần như chấp nhận mọi chương trình đã qua public test, nên điểm của nó gần như không phân biệt được đúng sai.
+
+**Giới hạn của so sánh này:** hai critic **không** nhận cùng đầu vào. Trong lúc tìm kiếm, prompt critic của Qwen không chứa chuỗi thought (mục "Reasoning path" hiển thị "(none)"). Trong khi đó, script chấm lại đưa chuỗi thought của nút vào prompt cho Codestral. Ngoài ra, Codestral chỉ được chạy một lần trên 161 chương trình. Kết quả vì vậy chỉ cho thấy Codestral, với prompt này, không phân biệt tốt hơn Qwen-14B tự chấm. Nó chưa đủ để kết luận về ưu thế chung của self-critic.
+
+---
+
+## 4.9. Đối chiếu với nhánh 7B (tham khảo)
+
+Nhánh 7B (`qwen2.5-coder:7b-instruct`) dùng cùng cohort APPS-300 (đã kiểm tra trùng 300/300 ID) nhưng khác ở nhiều yếu tố ngoài kích thước mô hình:
+
+| Yếu tố | Nhánh 7B | Nhánh 14B |
+| :--- | :--- | :--- |
+| Codebase | `external/ReThinkMCTS` | `src/rethink_mcts` |
+| Public test trên APPS | Nửa đầu số test (`half`) | 2 test đầu |
+| Tập chấm APPS | Toàn bộ test | Hidden (và toàn bộ test, Bảng 4.2) |
+| Ngân sách tìm kiếm | 2 rollout (cộng các lần rethink) | Tối đa 16 lần sinh code, dừng sớm |
+| Prompt HumanEval MCTS Dual | `native_v1` (run cũ) | `native_v2` |
+| Dữ liệu từng bài trong repo | Không có | Có |
+
+Vì vậy, bảng dưới đây chỉ mang tính mô tả. Chúng tôi dùng cách chấm trên toàn bộ test cho 14B để khớp tập chấm của 7B. Chênh lệch giữa hai cột không thể quy riêng cho kích thước mô hình.
+
+### Bảng 4.11. Pass@1 trên APPS-300 khi chấm trên toàn bộ test
+
+| Phân tầng | 7B Direct | 7B MCTS Dual | 7B MCTS Test-only | 14B Direct | 14B RethinkMCTS |
+| :--- | :-: | :-: | :-: | :-: | :-: |
+| Introductory | 31.00% | 38.00% | 41.00% | 38.00% | 50.00% |
+| Interview | 7.00% | 14.00% | 18.00% | 11.00% | 26.00% |
+| Competition | 4.00% | 5.00% | 9.00% | 8.00% | 23.00% |
+| **Toàn bộ** | 14.00% | 19.00% | 22.67% | 19.00% | 33.00% |
+
+Nguồn 7B: [benchmark-v2-all-tests.md](../results/7b/benchmark-v2-all-tests.md), [rethinkmcts-apps-native-v2-w4-retry.md](../results/7b/rethinkmcts-apps-native-v2-w4-retry.md), [rethinkmcts-test-only-v1.md](../results/7b/rethinkmcts-test-only-v1.md).
+
+Trên HumanEval-164: 7B Direct 80.49%, 7B MCTS Dual 91.46% (prompt `native_v1`), 7B MCTS Test-only 89.63%. Phía 14B xem Bảng 4.6.
+
+**Nhận xét mô tả.**
+
+- Ở cả hai kích thước, tìm kiếm cây đều cải thiện so với Direct. Với 14B, mức cải thiện đã được kiểm định ghép cặp (Bảng 4.3). Với 7B, chưa kiểm định ghép cặp được vì không có dữ liệu từng bài trong repo.
+- Khi chấm trên toàn bộ test, khoảng cách giữa 14B Direct và 7B Direct ở Competition thu hẹp còn 8% so với 4%. Phần lớn con số 21% trước đây đến từ các bài chỉ có một hidden test (§4.4).
+- Trên 7B, Test-only cao hơn Dual (22.67% so với 19.00%). Báo cáo gốc của nhánh 7B lưu ý rằng hai run này khác nhau về độ phủ ứng viên và không nên quy chênh lệch riêng cho việc bỏ critic.
+
+---
+
+## 4.10. Tóm tắt
+
+1. Trên APPS-300, RethinkMCTS với 14B tăng Pass@1 so với Direct: +10.67 điểm khi chấm trên hidden (36.00% so với 25.33%) và +14.00 điểm khi chấm trên toàn bộ test (33.00% so với 19.00%). Cả hai khác biệt đều có ý nghĩa thống kê theo kiểm định ghép cặp.
+2. Trên 160 bài có Best-of-3, RethinkMCTS hơn Best-of-3 7.50 điểm khi chấm trên toàn bộ test ($p = 0.004$) và 4.38 điểm khi chấm trên hidden ($p = 0.118$), với chi phí lời gọi cao hơn khoảng 3 lần.
+3. Chi phí của RethinkMCTS chủ yếu nằm ở phân tích khối CFG (51.6% token). Trần 65.536 token là ràng buộc thực tế ở 133/300 bài.
+4. Trong cấu hình có dừng sớm, critic không làm thay đổi chương trình được chọn ở bất kỳ bài nào, dù điểm của nó có tương quan dương với độ đúng trên hidden.
+5. Cách chia "2 test đầu làm public" để lại một hidden test duy nhất ở 48% bài Competition. Kết quả theo phân tầng Competition chấm trên hidden cần được diễn giải thận trọng.
+6. HumanEval-164 gần chạm trần với 14B (RethinkMCTS 90.85%). Các run Direct và Best-of-3 trên HumanEval cần được chạy lại bằng cùng phiên bản code trước khi so sánh.
