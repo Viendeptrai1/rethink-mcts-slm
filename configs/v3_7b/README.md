@@ -40,7 +40,7 @@ Triển khai endpoint (**tốn credit**, chỉ chạy khi đã quyết định):
 
 ```bash
 MODAL_APP_NAME=rethink-qwen25c7b VLLM_MODEL_ID=Qwen/Qwen2.5-Coder-7B-Instruct VLLM_GPU=L40S \
-VLLM_PIP_SPEC=vllm==0.31.0 VLLM_ENFORCE_EAGER=0 MODAL_MAX_INPUTS=64 VLLM_MAX_MODEL_LEN=16384 \
+VLLM_PIP_SPEC=vllm==0.31.0 VLLM_ENFORCE_EAGER=0 MODAL_MAX_INPUTS=64 VLLM_MAX_MODEL_LEN=32768 \
 modal deploy deploy/modal_vllm.py
 # Song song: ngắt app khi chạm trần credit hoặc thời gian
 MODAL_APP_NAME=rethink-qwen25c7b MODAL_MAX_CREDIT=25 MODAL_MAX_HOURS=2 python3 scripts/modal_spending_guard.py

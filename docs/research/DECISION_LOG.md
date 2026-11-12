@@ -37,3 +37,9 @@ Quyết định (người dùng đồng ý ngày 12/11/2026):
 6. Pilot trên 20 bài APPS ngoài cohort; tiêu chí đạt ở [configs/v3_7b/README.md](../../configs/v3_7b/README.md). Sau pilot mới đóng băng protocol và chạy cohort thật.
 
 Còn mở: temperature của Best-of-16 (0,8 là đề xuất); có chạy ablation trên 300 bài hay tập con; có chạy lại nhánh 7B của HuyinCP theo v3 hay không.
+
+## D-007: Protocol v3.1, nâng giới hạn output (12/11/2026)
+
+Lý do: gate của Qwen3.5-9B (chạy với v3.0) fail vì 15/255 output bị cắt (5,9%, ngưỡng 5%). Bị cắt gồm expansion 6/64 (giới hạn 512), block analysis 6/29 (1.536), rethink 2/22 (256), code 1/153 (2.048). Các output này đều là lập luận hợp lệ viết dở, không phải lặp. Expansion bị cắt làm node bị đóng, analysis bị cắt làm feedback tụt xuống mức trace, nên model bị thiệt vì cấu hình chứ không vì năng lực. Seed-Coder-8B qua gate v3.0 nhưng cũng có 11/90 block analysis bị cắt. Nguồn: `colab_results/qwen35/`, `colab_results/seed_v30/`.
+
+Quyết định (người dùng đồng ý): nâng giới hạn **cho mọi model**: expansion 1.024, code 4.096, rethink 512, block analysis 3.072 (critic giữ 256); vLLM `max-model-len` 32.768 để prompt cộng output vẫn vừa ngữ cảnh. Với temperature 0, output nào trước đây không bị cắt thì giữ nguyên. `protocol_id` đổi thành `*_v3_1`. Chưa run cohort nào chạy xong với v3.0 (run MCTS của Seed-Coder bị dừng ngay khi vừa bắt đầu), nên mọi run báo cáo đều dùng v3.1. Pilot P1/P2 (v3.0) vẫn giữ làm bằng chứng về quy trình.

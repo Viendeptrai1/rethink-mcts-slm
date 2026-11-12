@@ -109,14 +109,14 @@ Máy phiên phát triển có Docker binary nhưng daemon không hoạt động;
 
 Đây là nền chạy và đo lường đã có kiểm thử offline; không phải xác nhận mọi hạng mục đặc tả cũ hoặc mọi điều kiện benchmark-production đã hoàn tất.
 
-## 8. Protocol v3, đóng băng ngày 12/11/2026
+## 8. Protocol v3.1, đóng băng ngày 12/11/2026 (v3.0 + giới hạn output lớn hơn, xem D-007)
 
 Áp dụng cho mọi run `runs/v3_*` (trừ `v3_pilot_*` và `v3_gate_*`, là pilot). Quyết định: [D-006](DECISION_LOG.md). Cấu hình: [configs/v3_7b](../../configs/v3_7b/README.md). Commit đóng băng được ghi trong `GIT_COMMIT` của gói code và trong `git_revision` của từng manifest.
 
 - **Thuật toán:** RethinkMCTS theo bài báo: 16 rollout, width 3, 1 rethink mỗi node, P-UCB (c = 4, c_base = 10), Max backup, reward 0,8·v_test + 0,2·v_llm với critic [-1, 1] chỉ gọi khi pass hết public, không dừng sớm, chọn chương trình có reward lớn nhất. Prompt `native_v3`, `strict_variables: true`.
 - **Baseline:** Direct (temperature 0) và Best-of-16 (temperature 0,8, top-p 0,95, chọn theo public pass rate, hòa thì lấy mẫu sinh trước). Cùng prompt sinh code.
 - **Dữ liệu:** APPS-300 (`data/cohorts/apps_benchmark_300.json`, `prepared/apps_half`: public là một nửa số test khác nhau, timeout 4 s/test); HumanEval-164 (`prepared/humaneval`, 3 s/test). Pilot và gate chỉ dùng bài APPS ngoài cohort; 3 bài HumanEval trong gate chỉ để kiểm tra định dạng, không chỉnh gì theo kết quả.
-- **Model:** Qwen2.5-Coder-7B-Instruct, Seed-Coder-8B-Instruct, Qwen3.5-9B (`enable_thinking: false`). vLLM 0.31.0, bf16, `max-model-len 16384`, `seed 0`, prefix caching.
+- **Model:** Qwen2.5-Coder-7B-Instruct, Seed-Coder-8B-Instruct, Qwen3.5-9B (`enable_thinking: false`). vLLM 0.31.0, bf16, `max-model-len 32768`, `seed 0`, prefix caching. Giới hạn output: expansion 1.024, code 4.096, rethink 512, critic 256, block analysis 3.072 token.
 - **Phần cứng và phần mềm:** Colab NVIDIA A100-SXM4-40GB (`setup.sh` từ chối GPU khác); solver, trace và sandbox chạy Python 3.11; 16 bài song song, `test_workers=4`, `max_test_processes=8`. Mọi phương pháp của một model chạy trên cùng loại GPU và cùng phiên bản vLLM.
 - **Gate trước khi chạy model mới:** `scripts/pilot_gate.py` trên 5 bài APPS ngoài cohort (MCTS, Direct) và 3 bài HumanEval (MCTS). Fail thì dừng phiên, không chạy cohort.
 - **Không được làm sau khi bắt đầu:** đổi config, prompt, code hay cohort. Nếu phải sửa, bỏ toàn bộ run của model đó và chạy lại trong thư mục mới, ghi vào DECISION_LOG.
