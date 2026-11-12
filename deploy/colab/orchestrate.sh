@@ -9,6 +9,7 @@
 #    the logs into <out-dir>, then stops the session so it stops consuming compute units.
 SESSION=$1; PLAN=$2; ARCHIVE=$3; OUT=$4
 GPU=${COLAB_GPU:-A100}; MAX_ALLOC_TRIES=${MAX_ALLOC_TRIES:-60}
+MAX_HOURS=${MAX_HOURS:-14}   # hard cap: after this the session is stopped whatever its state
 mkdir -p "$OUT"; LOG="$OUT/orchestrate.log"
 log(){ echo "$(date '+%F %T') [$SESSION] $*" | tee -a "$LOG"; }
 
@@ -31,8 +32,9 @@ finish(){
   exit 0
 }
 
-# 1. allocate
+# 1. allocate (REUSE_SESSION=1 skips this and uses an existing session of that name)
 for i in $(seq 1 "$MAX_ALLOC_TRIES"); do
+  [ "${REUSE_SESSION:-0}" = "1" ] && { log "reusing existing session"; break; }
   if colab new -s "$SESSION" --gpu "$GPU" >> "$LOG" 2>&1; then log "session ready ($GPU)"; break; fi
   log "allocation attempt $i failed; retrying in 120 s"
   [ "$i" = "$MAX_ALLOC_TRIES" ] && { log "GIVING UP: no $GPU capacity"; exit 1; }
@@ -42,14 +44,16 @@ done
 # 2. upload and start
 colab upload -s "$SESSION" "$ARCHIVE" /content/tlcn.tar.gz >> "$LOG" 2>&1 || finish "upload failed"
 colab upload -s "$SESSION" "$PLAN" /content/plan.txt >> "$LOG" 2>&1 || finish "plan upload failed"
-remote 'mkdir -p /content/tlcn /content/runs && tar xzf /content/tlcn.tar.gz -C /content/tlcn && chmod +x /content/tlcn/deploy/colab/*.sh
+remote 'pkill -f "[v]llm serve"; rm -rf /content/tlcn /content/tlcn2 /content/py311 /content/runs /content/QUEUE_DONE /content/QUEUE_FAILED /content/results.tar.gz /content/*.log
+mkdir -p /content/tlcn /content/runs && tar xzf /content/tlcn.tar.gz -C /content/tlcn && chmod +x /content/tlcn/deploy/colab/*.sh
 setsid nohup bash /content/tlcn/deploy/colab/run_plan.sh /content/plan.txt < /dev/null > /content/run_plan.out 2>&1 &
 sleep 2; cat /content/tlcn/GIT_COMMIT; nvidia-smi --query-gpu=name --format=csv,noheader' 120 >> "$LOG"
 log "queue started"
 
 # 3. keep the kernel busy and poll
-errors=0
+errors=0; started=$(date +%s)
 while true; do
+  [ $(( $(date +%s) - started )) -gt $(( MAX_HOURS * 3600 )) ] && finish "MAX_HOURS=$MAX_HOURS reached"
   out=$(python3 - <<'PY' | colab exec -s "$SESSION" --timeout 900 2>&1
 print('''import os, time, subprocess
 for _ in range(10):
