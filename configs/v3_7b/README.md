@@ -58,6 +58,10 @@ python3 scripts/run_benchmark_batch.py --config configs/v3_7b/apps_baseline.yaml
   --set sampling.code.temperature=0.8 --set sampling.code.top_p=0.95 --set model.base_url=$E --set model.model=$M
 ```
 
+**Chạy trên Colab:** `deploy/colab/` (`orchestrate.sh` chạy trên máy cá nhân: xin phiên A100, upload code, giữ kernel bận, tải kết quả về rồi tắt phiên; `run_plan.sh` chạy trên VM; kế hoạch sinh bằng `make_plans.py`). Thông số chạy song song (16 worker, `test_workers=4`, `max_test_processes=8`) đã kiểm chứng ở pilot P2b, xem [BENCHMARK_LEDGER.md](../../docs/results/BENCHMARK_LEDGER.md) mục 11.
+
+**Phiên bản Python:** solver, trace và sandbox phải chạy Python 3.11. Với Python 3.13, 3 test về trace fail: hàm đệ quy bị bỏ sót lượt chạy, làm block feedback thiếu dữ liệu mà không báo lỗi. vLLM là tiến trình riêng nên dùng Python nào cũng được. Trước mỗi đợt chạy, phải chạy `pytest` bằng đúng interpreter sẽ dùng.
+
 `--workers` là số bài chạy đồng thời trong một process. Kết quả không phụ thuộc vào giá trị này, nhưng thời gian mỗi bài thì có, vì các bài dùng chung CPU để chạy test. Nên đặt thấp hơn số nhân CPU (máy hiện tại có 8 nhân) và ghi lại giá trị đã dùng.
 
 ## Kế hoạch pilot

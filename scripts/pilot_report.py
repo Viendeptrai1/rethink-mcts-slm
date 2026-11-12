@@ -33,7 +33,8 @@ def depth_stats(search):
         return None, 0
     nodes = search['tree']['nodes']
     nodes = nodes.values() if isinstance(nodes, dict) else nodes
-    evaluated = [n for n in nodes if n.get('latest_evaluation_id')]
+    # Backup copies the evaluation id up to the root, so the root is excluded.
+    evaluated = [n for n in nodes if n.get('latest_evaluation_id') and n['node_id'] != search['tree']['root_id']]
     return (max((n['depth'] for n in evaluated), default=0), len(evaluated))
 
 

@@ -9,6 +9,8 @@ import subprocess
 import tempfile
 import os
 import signal
+import threading
+from concurrent.futures import ThreadPoolExecutor
 from typing import List, Optional
 from rethink_mcts.domain.candidate import (
     ProgramCandidate,
@@ -23,13 +25,44 @@ from rethink_mcts.adapters.execution.harnesses import wrap_code_for_execution
 from rethink_mcts.ports.execution import PublicExecutor
 
 
+_PROCESS_SLOTS = None
+_PROCESS_SLOTS_LOCK = threading.Lock()
+
+
+def process_slots(limit: Optional[int]):
+    """Process-wide cap on concurrently running test subprocesses (shared by all solvers
+    and benchmark workers in this Python process). None = no cap."""
+    global _PROCESS_SLOTS
+    if not limit:
+        return None
+    with _PROCESS_SLOTS_LOCK:
+        if _PROCESS_SLOTS is None or _PROCESS_SLOTS[0] != limit:
+            _PROCESS_SLOTS = (limit, threading.BoundedSemaphore(limit))
+        return _PROCESS_SLOTS[1]
+
+
 class TrustedFixtureExecutor(PublicExecutor):
     """
     Subprocess runner with syntax checking, output capping, timeout handling,
     and process cleanup.
+
+    test_workers > 1 runs the test cases of one candidate concurrently. Each case is still
+    its own subprocess with its own timeout and the results keep the test order, so verdicts
+    are the same as sequential execution; max_test_processes caps how many test subprocesses
+    run at once across the whole process, so the CPU is not oversubscribed (which could turn
+    a borderline case into a timeout).
     """
-    def __init__(self, python_executable: str = sys.executable):
+    def __init__(self, python_executable: str = sys.executable, test_workers: int = 1,
+                 max_test_processes: Optional[int] = None):
         self.python_executable = python_executable
+        self.test_workers = max(1, int(test_workers or 1))
+        self.slots = process_slots(max_test_processes)
+
+    def _run_case_with_slot(self, code, test, spec, limits, case_id):
+        if self.slots is None:
+            return self._run_single_case(code, test, spec, limits, case_id)
+        with self.slots:
+            return self._run_single_case(code, test, spec, limits, case_id)
 
     def evaluate(
         self,
@@ -55,10 +88,15 @@ class TrustedFixtureExecutor(PublicExecutor):
         case_results: List[SingleCaseResult] = []
         start_all = time.time()
 
-        for test in tests:
-            case_id = getattr(test, "case_id", f"case_{len(case_results)}")
-            res = self._run_single_case(candidate.code, test, spec, limits, case_id)
-            case_results.append(res)
+        case_ids = [getattr(test, "case_id", f"case_{i}") for i, test in enumerate(tests)]
+        if self.test_workers == 1 or len(tests) == 1:
+            for test, case_id in zip(tests, case_ids):
+                case_results.append(self._run_case_with_slot(candidate.code, test, spec, limits, case_id))
+        else:
+            with ThreadPoolExecutor(max_workers=min(self.test_workers, len(tests))) as pool:
+                case_results.extend(pool.map(
+                    lambda pair: self._run_case_with_slot(candidate.code, pair[0], spec, limits, pair[1]),
+                    zip(tests, case_ids)))
 
         elapsed = time.time() - start_all
         return ExecutionSummary.create(

@@ -239,3 +239,35 @@ def test_v3_repair_and_call_based_prompts_render_strictly(tmp_path):
     spec = ExecutionSpec(mode=ExecutionMode.ASSERTION_SUITE, entry_point='add')
     model.generate('Add two numbers', spec, ())
     assert 'Define `add`' in gateway.prompts('code')[-1]
+
+
+def test_parallel_test_execution_gives_identical_verdicts_and_respects_process_cap(monkeypatch):
+    from rethink_mcts.adapters.execution import trusted_fixture_executor as tfe
+    from rethink_mcts.domain.candidate import ProgramCandidate
+    from rethink_mcts.domain.problem import ProblemLimits
+    code = ("import time\nn = int(input())\n"
+            "if n == 3:\n    time.sleep(5)\n"
+            "print('even' if n % 2 == 0 else ('crash' if n == 5 and 1/0 else 'odd'))\n")
+    tests = tuple(StdinCase(f'{n}\n', ('even' if n % 2 == 0 else 'odd') + '\n', case_id=f'c{n}') for n in range(8))
+    candidate = ProgramCandidate('c', 'p', code, ProgramCandidate.compute_hash(code))
+    spec, limits = ExecutionSpec(mode=ExecutionMode.STDIN), ProblemLimits(timeout_seconds=1.0)
+    sequential = tfe.TrustedFixtureExecutor().evaluate(candidate, tests, spec, limits)
+
+    running, peak = [0], [0]
+    original = tfe.TrustedFixtureExecutor._run_single_case
+
+    def counting(self, *args):
+        running[0] += 1
+        peak[0] = max(peak[0], running[0])
+        try:
+            return original(self, *args)
+        finally:
+            running[0] -= 1
+
+    monkeypatch.setattr(tfe.TrustedFixtureExecutor, '_run_single_case', counting)
+    parallel = tfe.TrustedFixtureExecutor(test_workers=8, max_test_processes=3).evaluate(candidate, tests, spec, limits)
+    verdicts = lambda s: [(r.case_id, r.status) for r in s.case_results]
+    assert verdicts(parallel) == verdicts(sequential)
+    assert {r.status.value for r in sequential.case_results} >= {'AC', 'TLE', 'RE'}
+    assert (parallel.passed, parallel.total) == (sequential.passed, sequential.total)
+    assert 1 < peak[0] <= 3

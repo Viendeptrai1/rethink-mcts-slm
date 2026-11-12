@@ -27,7 +27,8 @@ def create_executor(config):
     if config.execution.backend == "docker":
         return DockerExecutor(image=config.execution.image, allow_host_fallback=False,
                               cpus=config.execution.cpus, pids_limit=config.execution.pids_limit)
-    return TrustedFixtureExecutor()
+    return TrustedFixtureExecutor(test_workers=config.execution.test_workers,
+                                  max_test_processes=config.execution.max_test_processes)
 
 
 def create_solver(config: AppConfig, solver_type="mcts", run_dir="runs/default", n=4):

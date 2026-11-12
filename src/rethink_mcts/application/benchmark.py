@@ -123,6 +123,9 @@ def prepare_run(config, solver='mcts', samples_n=3, problem_ids=None, difficulty
     manifest_id = digest(protocol)
     head = subprocess.run(['git','rev-parse','HEAD'], cwd=repo, capture_output=True, text=True).stdout.strip()
     dirty = subprocess.run(['git','status','--porcelain'], cwd=repo, capture_output=True, text=True).stdout
+    if not head and (repo/'GIT_COMMIT').exists():
+        # Code shipped as `git archive` (e.g. to Colab) has no .git; the archive records its commit.
+        head, dirty = (repo/'GIT_COMMIT').read_text().strip(), ''
     manifest = dict(protocol, manifest_id=manifest_id, git_revision=head, working_tree_dirty=bool(dirty))
     return problems, hidden_dir, manifest
 

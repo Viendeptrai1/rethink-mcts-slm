@@ -167,21 +167,41 @@ Best-of-k tính offline từ 16 mẫu của E3. Với mỗi k, lấy trung bình
 
 | Bước | Run (`runs/…`) | Model | Phương pháp | Bài | Nền tảng | Ngày | Trạng thái |
 |---|---|---|---|---|---|---|---|
-| P1 | `v3_pilot_apps_qwen25c7b_mcts_smoke` | qwen25c7b | MCTS | 3 | — | — | ⏳ |
-| P2 | `v3_pilot_apps_qwen25c7b_{mcts,bon16,direct}` | qwen25c7b | 3 phương pháp | 20 | — | — | ⏳ |
+| P1 | `v3_pilot_apps_qwen25c7b_mcts_smoke` | qwen25c7b | MCTS | 3 | Colab A100-SXM4-40GB | 12/11/2026 | ✅ |
+| P2 | `v3_pilot_apps_qwen25c7b_{mcts,bon16,direct}` | qwen25c7b | 3 phương pháp | 20 | Colab A100-SXM4-40GB | 12/11/2026 | ✅ |
+| P2b | `v3_pilot_apps_qwen25c7b_mcts_par` | qwen25c7b | MCTS, 16 worker, `test_workers=4`, `max_test_processes=8` | 20 | Colab A100-SXM4-40GB | 12/11/2026 | ✅ |
 | P3 | `v3_pilot_apps_{seedcoder8b,qwen35_9b}_{mcts,direct}` | 2 model | MCTS, Direct | 5 | — | — | ⏳ |
 | P3 | `v3_pilot_humaneval_{seedcoder8b,qwen35_9b}_mcts` | 2 model | MCTS (kiểm tra định dạng) | 3 | — | — | ⏳ |
 | P4 | `v3_pilot_apps_qwen25c7b_{direct,mcts}_l4` | qwen25c7b | Direct, MCTS trên L4 | 5 | — | — | ⏳ (tùy chọn) |
 
+**Môi trường Colab (P1, P2):** phiên `tlcn`, NVIDIA A100-SXM4-40GB, driver 580.82, CUDA 13.0, 12 vCPU, 83 GB RAM. vLLM 0.31.0 (torch 2.13.0+cu130) chạy trên Python 3.13 hệ thống, với các tham số `--dtype bfloat16 --max-model-len 16384 --gpu-memory-utilization 0.90 --seed 0`, prefix caching bật. Solver, trace và phần chạy test dùng **Python 3.11.17** (`/content/py311`). Code là `git archive` của commit `c325c19`, không có `.git` nên manifest không ghi được commit; `pilot_report.py` đã sửa sau P1 để bỏ node gốc khỏi phép đếm.
+
+**Phát hiện khi dựng môi trường:** với Python 3.13, 3 test về trace fail (`test_i17_recursion…`, `test_trace_invokes_actual_function_harness`): trace bỏ sót lượt chạy, hàm đệ quy chỉ bắt được 1 lượt. Với Python 3.11 cả 82 test pass. Từ đó quy ước: **solver và sandbox phải chạy Python 3.11**.
+
+**P1, số đo (3 bài):** input 90.390 / output 13.503 token TB mỗi bài; 75 lời gọi TB; 30,67 lần sinh code (16 initial + 14,67 rethink); wall TB 352 s, max 456 s với 3 worker; dừng vì hết 16 rollout (3/3).
+
+**P2, số đo (20 bài APPS interview ngoài cohort; không phải kết quả):**
+
+| Run | Input / output token TB/bài | Lời gọi TB | Wall TB / max (s) | Thời gian cả run |
+|---|---|---|---|---|
+| MCTS, 8 worker, test tuần tự | 127.650 / 15.588 | 75 | 429 / 1.736 | 32,4 phút |
+| MCTS, 16 worker, `test_workers=4`, `max_test_processes=8` (P2b) | 128.339 / 15.679 | 74,8 | 531 / 1.136 | **18,9 phút** |
+| Best-of-16 (temperature 0,8) | 8.834 / 3.413 | 16 | 196 / 1.501 | 25 phút |
+| Direct | 552 / 208 | 1 | 18 / 209 | 9 phút |
+
+Nguồn: `runs/v3_pilot_apps_qwen25c7b_*`, log ở `runs/colab_pilot_logs/`. Phân rã thời gian của P2 MCTS: 54% chờ model, khoảng 30% chờ test timeout (649 lần × 4 s); phần còn lại là khởi động tiến trình test.
+
+**Chạy test song song có làm sai verdict không:** chấm lại **tuần tự** đúng các test bị timeout trong P2b của `apps_18`, `apps_11`, `apps_41`, `apps_25`: 121/122 vẫn timeout. Vậy timeout đến từ code chậm thật, không phải do tranh CPU; chỉ 1 test sát ngưỡng. Kết luận: chốt cấu hình P2b cho run thật. Ngoài ra, giữa P2 và P2b có 2/18 bài đổi verdict hidden và token lệch từng bài, do vLLM với temperature 0 vẫn không tất định khi batch khác nhau. Đây là nhiễu giữa các lần chạy, phải ghi vào threats to validity.
+
 | Tiêu chí | Ngưỡng | P1 | P2 | P3 |
 |---|---|---|---|---|
-| Lỗi template (`strict_variables`) | 0 | — | — | — |
-| Bài lỗi kỹ thuật | ≤ 1/20 | — | — | — |
-| Analysis vào feedback | ≥ 90% | — | — | — |
-| Rollout TB / có bài sâu ≥ 3 | 16 / có | — | — | — |
-| Output bị cắt | ≤ 5% lời gọi | — | — | — |
-| `<think>` lọt ra | 0 | — | — | — |
-| Bài chạm 3600 s | 0 | — | — | — |
+| Lỗi template (`strict_variables`) | 0 | 0 ✅ | 0 ✅ | — |
+| Bài lỗi kỹ thuật | ≤ 1/20 | 0/3 ✅ | 0/80 lượt (4 run × 20) ✅ | — |
+| Analysis vào feedback | ≥ 90% | 61/61 = 100% ✅ | 100% (MCTS, MCTS song song) ✅ | — |
+| Rollout TB / có bài sâu ≥ 3 | 16 / có | 16 / độ sâu 3: 2 bài, 4: 1 bài ✅ | 16 / độ sâu 3: 19, 4: 1 (P2b: 14 / 6) ✅ | — |
+| Output bị cắt | ≤ 5% lời gọi | 0/225 ✅ | MCTS 7/1.500, BoN 0/320, Direct 0/20 ✅ | — |
+| `<think>` lọt ra | 0 | 0 ✅ | 0 ✅ | — |
+| Bài chạm 3600 s | 0 | 0 (max 456 s) ✅ | 0 (max 1.736 s, `apps_6` có 112 public test) ✅ | — |
 | GPU-giây/bài → chi phí ước tính 300 bài | trong credit còn lại | — | — | — |
 
 ---
@@ -258,7 +278,7 @@ Nguồn: `python3 scripts/pilot_report.py runs/benchmark_apps_14b_dual_unified` 
 | Chỉ số | Giá trị |
 |---|---|
 | Phân bố độ sâu tối đa | 1: 241 bài, 2: 59 bài |
-| Node được đánh giá TB | 3,27 |
+| Node được đánh giá TB | 2,27 (không tính node gốc) |
 | Lần sinh code TB / rethink TB | 5,83 / 3,45 |
 | Block analysis vào feedback | 0 / 1.203 (0%) |
 | Output bị cắt (length) | 194 / 4.587 lời gọi |

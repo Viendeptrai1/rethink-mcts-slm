@@ -116,6 +116,10 @@ class ExecutionConfig(StrictBaseModel):
     stderr_limit_bytes: int = 262144
     network: str = "none"
     python_time_multiplier: float = 2.5
+    # trusted_fixture only: test cases of one candidate run concurrently (verdicts unchanged),
+    # and at most max_test_processes test subprocesses run at once in the whole process.
+    test_workers: int = 1
+    max_test_processes: Optional[int] = None
 
 
 class DataConfig(StrictBaseModel):
@@ -195,6 +199,9 @@ class AppConfig(StrictBaseModel):
             raise ConfigurationError("budget.max_rollouts must be positive when set")
         if self.search.max_depth < 1 or self.search.max_rethinks_per_node < 0:
             raise ConfigurationError("Search depth must be positive; rethink count cannot be negative")
+        if self.execution.test_workers < 1 or (self.execution.max_test_processes is not None
+                                               and self.execution.max_test_processes < 1):
+            raise ConfigurationError("execution.test_workers and max_test_processes must be >= 1")
         if self.execution.backend not in ("trusted_fixture", "docker"):
             raise ConfigurationError("Unsupported execution backend")
         if self.model.transport not in ("mock", "openai_compatible"):
