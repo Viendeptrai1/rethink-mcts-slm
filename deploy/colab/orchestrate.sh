@@ -10,6 +10,7 @@
 SESSION=$1; PLAN=$2; ARCHIVE=$3; OUT=$4
 GPU=${COLAB_GPU:-A100}; MAX_ALLOC_TRIES=${MAX_ALLOC_TRIES:-60}
 MAX_HOURS=${MAX_HOURS:-14}   # hard cap: after this the session is stopped whatever its state
+DEADLINE=${DEADLINE:-0}      # optional absolute stop time (epoch seconds), e.g. $(date -j -f "%F %R" "2026-11-12 17:15" +%s)
 mkdir -p "$OUT"; LOG="$OUT/orchestrate.log"
 log(){ echo "$(date '+%F %T') [$SESSION] $*" | tee -a "$LOG"; }
 
@@ -24,6 +25,8 @@ PY
 
 finish(){
   log "collecting results"
+  # Re-pack now so problems finished in the current (unfinished) step are kept for resume.
+  remote 'cd /content && tar czf /content/results.tar.gz runs *.log 2>/dev/null; ls -l /content/results.tar.gz' 600 >> "$LOG"
   colab download -s "$SESSION" /content/results.tar.gz "$OUT/results.tar.gz" >> "$LOG" 2>&1 || log "download of results.tar.gz failed"
   for f in queue.log setup.log; do colab download -s "$SESSION" /content/$f "$OUT/$f" >> "$LOG" 2>&1; done
   log "stopping session"
@@ -35,6 +38,7 @@ finish(){
 # 1. allocate (REUSE_SESSION=1 skips this and uses an existing session of that name)
 for i in $(seq 1 "$MAX_ALLOC_TRIES"); do
   [ "${REUSE_SESSION:-0}" = "1" ] && { log "reusing existing session"; break; }
+  [ "$DEADLINE" -gt 0 ] && [ "$(date +%s)" -ge "$((DEADLINE - 3600))" ] && { log "less than 1 h before DEADLINE: not allocating"; exit 1; }
   if colab new -s "$SESSION" --gpu "$GPU" >> "$LOG" 2>&1; then log "session ready ($GPU)"; break; fi
   log "allocation attempt $i failed; retrying in 120 s"
   [ "$i" = "$MAX_ALLOC_TRIES" ] && { log "GIVING UP: no $GPU capacity"; exit 1; }
@@ -54,6 +58,7 @@ log "queue started"
 errors=0; started=$(date +%s)
 while true; do
   [ $(( $(date +%s) - started )) -gt $(( MAX_HOURS * 3600 )) ] && finish "MAX_HOURS=$MAX_HOURS reached"
+  [ "$DEADLINE" -gt 0 ] && [ "$(date +%s)" -ge "$DEADLINE" ] && finish "DEADLINE reached"
   out=$(python3 - <<'PY' | colab exec -s "$SESSION" --timeout 900 2>&1
 print('''import os, time, subprocess
 for _ in range(10):
