@@ -7,6 +7,7 @@ Nguồn sự thật cho mọi run là `runs/<run>/manifest.json` (trường `con
 | `benchmark_14b_batch_*`, `last_one`, `retry_*` → `benchmark_apps_14b_dual_unified` | `benchmark_apps_14b_dual.yaml` (hoặc `batches/*.yaml`) | Trùng manifest, chỉ khác `model.base_url` |
 | `benchmark_apps_14b_direct_300`, `benchmark_apps_14b_bon3_300` | `benchmark_apps_14b_direct.yaml` | Chạy với `--problem-ids`, nên `data.cohort_path` khác |
 | `humaneval_mcts_dual_14b` | `extra_14b/humaneval_14b_base.yaml` | Chép từ manifest |
+| Protocol v3 (nhiều model 7–9B, từ 11/2026) | `v3_7b/*.yaml` | Xem [v3_7b/README.md](v3_7b/README.md) |
 | Các run bổ sung tháng 11/2026 (`*_norethink_q*`, `*_repair_q*`, `*_bon3_rest140`, `humaneval_*_14b_v2`) | `extra_14b/*.yaml` + override trong `scripts/launch_extra_14b.sh` | `budget.max_wall_seconds=3600`, `model.request_timeout_seconds=600` |
 
 Không dùng để tái tạo kết quả:

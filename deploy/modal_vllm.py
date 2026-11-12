@@ -11,6 +11,7 @@ Usage:
 """
 
 import os
+import shlex
 import subprocess
 import modal
 
@@ -23,6 +24,8 @@ IDLE_SCALEDOWN_SECONDS = int(os.environ.get("MODAL_IDLE_SECONDS", "180"))  # Aut
 ENFORCE_EAGER = os.environ.get("VLLM_ENFORCE_EAGER", "1") != "0"
 # Requests one container accepts at once; vLLM batches them. The original runs sent 1 at a time.
 MAX_CONCURRENT_INPUTS = int(os.environ.get("MODAL_MAX_INPUTS", "32"))
+# Extra `vllm serve` flags for a specific model, e.g. "--dtype bfloat16 --seed 0".
+EXTRA_ARGS = os.environ.get("VLLM_EXTRA_ARGS", "")
 
 # 2. Container Environment & Persistent Cache
 app = modal.App(APP_NAME)
@@ -43,6 +46,7 @@ vllm_image = (
         "VLLM_MODEL_ID": MODEL_ID,
         "VLLM_MAX_MODEL_LEN": str(MAX_MODEL_LEN),
         "VLLM_ENFORCE_EAGER": "1" if ENFORCE_EAGER else "0",
+        "VLLM_EXTRA_ARGS": EXTRA_ARGS,
     })
 )
 
@@ -76,6 +80,7 @@ def serve():
     ]
     if ENFORCE_EAGER:
         cmd.append("--enforce-eager")
+    cmd.extend(shlex.split(EXTRA_ARGS))
     print(f"Starting vLLM server with command: {' '.join(cmd)}")
     subprocess.Popen(cmd)
 

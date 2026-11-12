@@ -1,0 +1,71 @@
+# RethinkMCTS v3, paper-faithful settings (arXiv:2409.09584 + upstream SIMONLQY/RethinkMCTS).
+# One file for every model: set the model with --set model.model=... and the endpoint with
+# --set model.base_url=...; thinking models also need --set model.extra_body=... (see README.md).
+# Deviations from the paper are listed under experiment.deviations and in README.md.
+schema_version: 1
+profile: small_model
+algorithm_spec_version: '1.0'
+model:
+  transport: openai_compatible
+  base_url: http://REPLACE_ME/v1
+  model: REPLACE_ME
+  api_key_env: null
+  request_timeout_seconds: 600.0
+  max_transport_retries: 3
+  require_exact_token_count: true
+  extra_body: {}
+prompts:
+  bundle: native_v3
+  strict_variables: true
+sampling:            # paper/upstream: temperature 0 for every call
+  expansion: {temperature: 0.0, top_p: 1.0, max_output_tokens: 512}
+  code: {temperature: 0.0, top_p: 1.0, max_output_tokens: 2048}
+  rethink: {temperature: 0.0, top_p: 1.0, max_output_tokens: 256}
+  critic: {temperature: 0.0, top_p: 1.0, max_output_tokens: 256}
+  block_analysis: {temperature: 0.0, top_p: 1.0, max_output_tokens: 1536}
+search:
+  width: 3
+  max_depth: 16              # upstream has no explicit depth limit; 16 rollouts cannot exceed it
+  max_rethinks_per_node: 1   # upstream max_think_times=2: initial generation + one regeneration
+  c_base: 10.0
+  c: 4.0
+  backup: max
+  early_stop: none           # upstream break on reward 1 is commented out; early stop is recomputed offline
+  final_selection: max_reward
+reward:
+  policy: dual
+  test_weight: 0.8
+  llm_weight: 0.2
+  critic_score_min: -1.0     # paper Table 11 prompt: score in [-1, 1]
+  critic_score_max: 1.0
+feedback:
+  mode: block
+  max_prompt_blocks: 32
+  max_feedback_tokens: 2048
+  trace_timeout_seconds: 5.0
+budget:
+  max_rollouts: 16           # paper --rollout 16; rethink regenerations are not counted
+  max_code_generations: 64   # safety net only (16 rollouts x 2 generations = 32 at most)
+  max_search_iterations: 400
+  max_model_calls: 400
+  max_total_tokens: 4000000  # safety net only; the paper has no token cap
+  max_wall_seconds: 3600.0   # safety net; report how many problems hit it
+  max_sandbox_runs: 20000
+execution:
+  backend: trusted_fixture
+data:
+  adapter: apps_half
+  prepared_public_path: prepared/apps_half/public/problems.jsonl
+  judge_suites_dir: prepared/apps_half/judge/suites
+  cohort_path: data/cohorts/apps_benchmark_300.json
+  split: test
+experiment:
+  seed: 0
+  stage: exploratory
+  protocol_id: apps_paper_v3
+  deviations:
+  - open_weight_7b_models_bf16_vllm
+  - public_split_half_of_distinct_tests
+  - trace_prompt_capped_at_32_block_visits
+  - safety_caps_wall_3600s_tokens_4M
+  - sandbox_trusted_fixture_host_subprocess

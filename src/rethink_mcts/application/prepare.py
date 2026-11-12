@@ -50,13 +50,16 @@ def serialize_test_case(c: TestCase) -> Dict[str, Any]:
 
 
 def serialize_public_problem(p: PublicProblem) -> Dict[str, Any]:
+    spec = {
+        "mode": p.execution_spec.mode.value if hasattr(p.execution_spec.mode, "value") else str(p.execution_spec.mode),
+        "entry_point": p.execution_spec.entry_point
+    }
+    if p.execution_spec.starter_code:
+        spec["starter_code"] = p.execution_spec.starter_code
     return {
         "problem_id": p.problem_id,
         "statement": p.statement,
-        "execution_spec": {
-            "mode": p.execution_spec.mode.value if hasattr(p.execution_spec.mode, "value") else str(p.execution_spec.mode),
-            "entry_point": p.execution_spec.entry_point
-        },
+        "execution_spec": spec,
         "public_tests": [serialize_test_case(c) for c in p.public_tests],
         "limits": {
             "timeout_seconds": p.limits.timeout_seconds,
@@ -91,7 +94,8 @@ def prepare_dataset(
     dataset_name: str,
     raw_path: Optional[str] = None,
     output_dir: Optional[str] = None,
-    limit: Optional[int] = None
+    limit: Optional[int] = None,
+    public_split: str = "first_two"
 ) -> Dict[str, Any]:
     """
     Prepares dataset and writes separated public and judge stores.
@@ -159,7 +163,7 @@ def prepare_dataset(
     public_count = hidden_count = 0
     with open(public_jsonl_path, "w", encoding="utf-8") as pub_out:
         for item in records:
-            pub_prob, hid_prob = parser_fn(item)
+            pub_prob, hid_prob = parser_fn(item, public_split) if dataset_name == "apps" else parser_fn(item)
             pub_out.write(json.dumps(serialize_public_problem(pub_prob)) + "\n")
 
             # Save hidden suite
@@ -182,7 +186,9 @@ def prepare_dataset(
         "adapter_sha256": hashlib.sha256(Path(inspect.getfile(parser_fn)).read_bytes()).hexdigest(),
         "public_case_count": public_count,
         "hidden_case_count": hidden_count,
-        "protocol": "first_two_public_remove_cross_split_duplicates" if dataset_name == "apps" else "adapter_public_hidden",
+        "protocol": ("first_two_public_remove_cross_split_duplicates" if public_split == "first_two"
+                     else f"{public_split}_of_distinct_tests_public") if dataset_name == "apps" else "adapter_public_hidden",
+        "public_split": public_split if dataset_name == "apps" else None,
         "provenance": "Locally prepared source; protocol equivalence to paper is not asserted"
     }
 

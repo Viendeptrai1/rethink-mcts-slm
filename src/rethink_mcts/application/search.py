@@ -100,7 +100,8 @@ class SearchEngine:
                     statement=problem.statement,
                     active_thoughts=(),
                     width=self.width,
-                    feedback=None
+                    feedback=None,
+                    execution_spec=problem.execution_spec
                 )
             except (InvalidModelOutputError, GenerationTruncatedError) as exc:
                 logger.warning("Root proposal failed or truncated: %s", exc)
@@ -154,7 +155,8 @@ class SearchEngine:
                             statement=problem.statement,
                             active_thoughts=active_thoughts,
                             width=self.width,
-                            feedback=feedback_by_node.get(node.node_id)
+                            feedback=feedback_by_node.get(node.node_id),
+                            execution_spec=problem.execution_spec
                         )
                     except (InvalidModelOutputError, GenerationTruncatedError) as exc:
                         logger.warning("Expansion failed or truncated for node %s: %s", node.node_id, exc)
@@ -175,7 +177,9 @@ class SearchEngine:
                     node.status = NodeStatus.EVALUATING
                     active_thoughts = tree.get_active_thought_path(node.node_id)
 
-                    # Generate code
+                    # Generate code. One rollout = the first evaluation of a new node;
+                    # rethink regenerations below belong to the same rollout.
+                    budget.record_rollout()
                     budget.record_code_generation_attempt()
                     logger.info("Generating candidate code for node %s with thoughts: %s", node.node_id, active_thoughts)
                     try:

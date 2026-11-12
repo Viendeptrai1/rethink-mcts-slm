@@ -4,6 +4,7 @@ Budget tracking and reservation domain models.
 
 import time
 from dataclasses import dataclass, field
+from typing import Optional
 from rethink_mcts.domain.errors import BudgetExceededError
 
 
@@ -15,6 +16,9 @@ class BudgetLimits:
     max_total_tokens: int = 65536
     max_wall_seconds: float = 900.0
     max_sandbox_runs: int = 1000
+    # Paper-style budget: number of search rollouts (initial evaluations of new tree nodes).
+    # Rethink regenerations inside a rollout do not count. None = no rollout limit.
+    max_rollouts: Optional[int] = None
 
 
 @dataclass
@@ -28,6 +32,7 @@ class Usage:
     })
     tokens_by_role: dict = field(default_factory=dict)
     search_iterations: int = 0
+    rollouts: int = 0
     missing_token_calls: int = 0
     transport_attempts: int = 0
     code_generation_attempts: int = 0
@@ -54,6 +59,7 @@ class Usage:
         return {
             "tokens_by_role": {role: {k: (None if data["missing_calls"] and k in ("input", "output") else v) for k, v in data.items()} for role, data in self.tokens_by_role.items()},
             "search_iterations": self.search_iterations,
+            "rollouts": self.rollouts,
             "token_usage_complete": self.missing_token_calls == 0,
             "missing_token_calls": self.missing_token_calls,
             "total_model_calls": self.total_model_calls,
@@ -90,6 +96,8 @@ class BudgetManager:
         elapsed = self.update_wall_time()
         if self.usage.search_iterations >= self.limits.max_search_iterations:
             return True, "Search iteration limit reached"
+        if self.limits.max_rollouts is not None and self.usage.rollouts >= self.limits.max_rollouts:
+            return True, f"Rollout limit reached ({self.usage.rollouts} >= {self.limits.max_rollouts})"
         if elapsed >= self.limits.max_wall_seconds:
             return True, f"Wall time limit reached ({elapsed:.1f}s >= {self.limits.max_wall_seconds}s)"
         if self.usage.code_generation_attempts >= self.limits.max_code_generations:
@@ -144,6 +152,9 @@ class BudgetManager:
         if self.usage.code_generation_attempts >= self.limits.max_code_generations or not self.can_call_model():
             raise BudgetExceededError("Code generation or model budget exhausted")
         self.usage.code_generation_attempts += 1
+
+    def record_rollout(self) -> None:
+        self.usage.rollouts += 1
 
     def record_rethink_attempt(self) -> None:
         self.usage.rethink_attempts += 1

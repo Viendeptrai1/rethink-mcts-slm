@@ -137,18 +137,19 @@ class FeedbackService:
                     if budget and not budget.can_call_model(1 + reserved_model_calls):
                         logger.info("Budget limit: cannot call block analyzer (need 1 + %d reserved calls)", reserved_model_calls)
                         raise BudgetExceededError("Reserved regeneration calls take priority")
+                    analysis_kwargs = dict(statement=problem.statement, candidate_code=candidate.code,
+                                           facts=facts, trace=trace_result,
+                                           execution_spec=problem.execution_spec,
+                                           active_thoughts=tuple(candidate.thought_path_snapshot or ()))
                     if budget:
                         analysis = invoke_model(budget, self.block_analyzer, "analyze", "block_analysis",
-                            statement=problem.statement, candidate_code=candidate.code, facts=facts, trace=trace_result)
+                                                **analysis_kwargs)
                     else:
-                        analysis = self.block_analyzer.analyze(
-                            statement=problem.statement,
-                            candidate_code=candidate.code,
-                            facts=facts,
-                            trace=trace_result
-                        )
+                        analysis = self.block_analyzer.analyze(**analysis_kwargs)
                     if analysis and analysis.assessments:
                         logger.info("Block analysis succeeded with %d assessments", len(analysis.assessments))
+                    elif analysis and analysis.raw_text:
+                        logger.info("Block analysis not parsed; raw text kept in feedback")
                 except Exception as exc:
                     logger.warning("Block analysis skipped/failed: %s", exc)
                     analysis = None

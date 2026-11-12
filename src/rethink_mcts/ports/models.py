@@ -51,7 +51,8 @@ class ThoughtProposer(Protocol):
         statement: str,
         active_thoughts: tuple[str, ...],
         width: int,
-        feedback: Optional[VerbalFeedback] = None
+        feedback: Optional[VerbalFeedback] = None,
+        execution_spec: Optional[ExecutionSpec] = None
     ) -> ProposalBatch:
         ...
 
@@ -90,7 +91,8 @@ class CodeCritic(Protocol):
     def assess(
         self,
         statement: str,
-        candidate_code: str
+        candidate_code: str,
+        active_thoughts: tuple[str, ...] = ()
     ) -> float:
         ...
 
@@ -103,6 +105,8 @@ class BlockAnalyzer(Protocol):
         statement: str,
         candidate_code: str,
         facts: ExecutionFacts,
-        trace: TraceResult
+        trace: TraceResult,
+        execution_spec: Optional[ExecutionSpec] = None,
+        active_thoughts: tuple[str, ...] = ()
     ) -> BlockAnalysis:
         ...

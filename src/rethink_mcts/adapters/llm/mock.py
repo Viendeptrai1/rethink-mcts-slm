@@ -44,7 +44,8 @@ class ScenarioMockLLM(
         statement: str,
         active_thoughts: tuple[str, ...],
         width: int,
-        feedback: Optional[VerbalFeedback] = None
+        feedback: Optional[VerbalFeedback] = None,
+        execution_spec: Optional[ExecutionSpec] = None
     ) -> ProposalBatch:
         self.propose_calls += 1
         proposals: List[ThoughtProposal] = []
@@ -116,7 +117,8 @@ class ScenarioMockLLM(
     def assess(
         self,
         statement: str,
-        candidate_code: str
+        candidate_code: str,
+        active_thoughts: tuple[str, ...] = ()
     ) -> float:
         self.critic_calls += 1
         return self.default_critic_score
@@ -126,7 +128,9 @@ class ScenarioMockLLM(
         statement: str,
         candidate_code: str,
         facts: ExecutionFacts,
-        trace: TraceResult
+        trace: TraceResult,
+        execution_spec: Optional[ExecutionSpec] = None,
+        active_thoughts: tuple[str, ...] = ()
     ) -> BlockAnalysis:
         self.analyze_calls += 1
         assessments = []

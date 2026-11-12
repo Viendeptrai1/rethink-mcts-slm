@@ -2,16 +2,19 @@
 SemanticPromptedLLM implementing semantic model ports using Jinja2 templates and ModelGateway.
 """
 
+import json
+import logging
 import os
+import re
 import uuid
 from dataclasses import replace
 from rethink_mcts.config import SamplingConfig
 from rethink_mcts.application.model_calls import complete_request
 from typing import Optional
-from jinja2 import Environment, FileSystemLoader
+from jinja2 import Environment, FileSystemLoader, StrictUndefined, Undefined
 
 from rethink_mcts.domain.problem import ExecutionSpec
-from rethink_mcts.domain.tree import ProposalBatch, ThoughtProposal
+from rethink_mcts.domain.tree import ProposalBatch
 from rethink_mcts.domain.feedback import (
     ExecutionFacts,
     TraceResult,
@@ -36,6 +39,96 @@ from rethink_mcts.adapters.llm.parsing import (
 )
 from rethink_mcts.policies.prior import PriorPolicy
 
+logger = logging.getLogger(__name__)
+
+
+def interface_context(execution_spec: Optional[ExecutionSpec]) -> dict:
+    """Variables describing the execution interface, passed to every template."""
+    if execution_spec is None:
+        return dict(mode=None, entry_point=None, starter_code=None)
+    mode = execution_spec.mode.value if hasattr(execution_spec.mode, "value") else str(execution_spec.mode)
+    return dict(mode=mode, entry_point=execution_spec.entry_point, starter_code=execution_spec.starter_code)
+
+
+def format_failed_test(facts: ExecutionFacts) -> str:
+    """Human-readable description of the first failed public test."""
+    parts = [f"Result: {facts.failure_kind} ({facts.public_passed}/{facts.public_total} public tests passed)",
+             f"Input:\n{facts.input_snippet}",
+             f"Expected output:\n{facts.expected_output_snippet}",
+             f"Actual output:\n{facts.actual_output_snippet}"]
+    if facts.traceback_snippet:
+        parts.append(f"Error:\n{facts.traceback_snippet}")
+    return "\n".join(parts)
+
+
+def _verdict(item: dict) -> BlockVerdict:
+    if "correct" in item:
+        value = item["correct"]
+        if isinstance(value, bool):
+            return BlockVerdict.CORRECT if value else BlockVerdict.INCORRECT
+        text = str(value).strip().lower()
+        if text in ("true", "1", "yes"):
+            return BlockVerdict.CORRECT
+        if text in ("false", "0", "no"):
+            return BlockVerdict.INCORRECT
+        return BlockVerdict.UNKNOWN
+    text = str(item.get("verdict", "unknown")).strip().lower()
+    return BlockVerdict.CORRECT if text == "correct" else (
+        BlockVerdict.INCORRECT if text == "incorrect" else BlockVerdict.UNKNOWN)
+
+
+def parse_block_analysis(content: str) -> tuple[tuple[BlockAssessment, ...], str]:
+    """Parse a block-analysis response.
+
+    Accepts a single object ``{block, correct, explanation}`` (what the prompt asks for),
+    a list of such objects, or a wrapper with ``assessments``/``blocks``/``analysis``.
+    Returns (assessments, summary). Raises ValueError if no JSON can be read; the caller
+    then keeps the raw text, as upstream RethinkMCTS does.
+    """
+    cleaned = content.strip()
+    match = re.search(r"```(?:json)?\s*([\s\S]*?)\s*```", cleaned)
+    if match:
+        cleaned = match.group(1).strip()
+    try:
+        data = json.loads(cleaned)
+    except json.JSONDecodeError:
+        # The paper's example answer is a sequence of objects, not a list: decode them one by one.
+        decoder, values, pos = json.JSONDecoder(), [], 0
+        while True:
+            starts = [i for i in (cleaned.find("{", pos), cleaned.find("[", pos)) if i >= 0]
+            if not starts:
+                break
+            try:
+                value, pos = decoder.raw_decode(cleaned, min(starts))
+            except json.JSONDecodeError:
+                pos = min(starts) + 1
+                continue
+            values.extend(value if isinstance(value, list) else [value])
+        if not values:
+            raise ValueError("no JSON object in block analysis output")
+        data = values
+    summary = ""
+    if isinstance(data, list):
+        items = data
+    elif isinstance(data, dict):
+        summary = str(data.get("summary", ""))
+        if any(k in data for k in ("assessments", "blocks", "analysis")):
+            items = data.get("assessments", data.get("blocks", data.get("analysis", [])))
+        elif any(k in data for k in ("block", "block_id")):
+            items = [data]
+        else:
+            items = []
+    else:
+        raise ValueError("block analysis JSON is neither an object nor a list")
+    assessments = []
+    for item in items if isinstance(items, list) else []:
+        if not isinstance(item, dict):
+            continue
+        block_id = str(item.get("block_id", item.get("block", "")))
+        explanation = str(item.get("explanation", item.get("reason", "")))
+        assessments.append(BlockAssessment(block_id=block_id, verdict=_verdict(item), explanation=explanation))
+    return tuple(assessments), summary
+
 
 class SemanticPromptedLLM(
     ThoughtProposer,
@@ -46,13 +139,16 @@ class SemanticPromptedLLM(
 ):
     """
     Renders prompts from Jinja2 templates, calls ModelGateway, and parses structured output.
+    With strict_variables=True a template that references a variable the code does not
+    pass raises an error instead of silently rendering an empty string.
     """
     def __init__(
         self,
         gateway: ModelGateway,
         prompts_dir: str = "prompts/compact_v1",
         prior_policy: Optional[PriorPolicy] = None,
-        sampling=None, seed=None, critic_min=0.0, critic_max=1.0, max_prompt_blocks=32, require_exact_token_count=False
+        sampling=None, seed=None, critic_min=0.0, critic_max=1.0, max_prompt_blocks=32,
+        require_exact_token_count=False, strict_variables=False
     ):
         self.gateway = gateway
         self.sampling = sampling or SamplingConfig()
@@ -70,29 +166,32 @@ class SemanticPromptedLLM(
             base = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
             self.prompts_dir = os.path.join(base, prompts_dir)
 
-        self.env = Environment(loader=FileSystemLoader(self.prompts_dir))
+        self.env = Environment(loader=FileSystemLoader(self.prompts_dir),
+                               undefined=StrictUndefined if strict_variables else Undefined)
+
+    def _render(self, name: str, **variables) -> str:
+        return self.env.get_template(name).render(**variables)
 
     def propose(
         self,
         statement: str,
         active_thoughts: tuple[str, ...],
         width: int,
-        feedback: Optional[VerbalFeedback] = None
+        feedback: Optional[VerbalFeedback] = None,
+        execution_spec: Optional[ExecutionSpec] = None
     ) -> ProposalBatch:
-        template = self.env.get_template("expand.jinja")
-        prompt = template.render(
+        prompt = self._render("expand.jinja",
             statement=statement,
             active_thoughts=list(active_thoughts),
             width=width,
-            feedback_text=feedback.format_as_text() if feedback else ""
+            feedback_text=feedback.format_as_text() if feedback else "",
+            **interface_context(execution_spec)
         )
 
         req = GenerationRequest(
             request_id=f"req_exp_{uuid.uuid4().hex[:8]}",
             role="expansion",
             prompt=prompt,
-            temperature=0.6,
-            max_output_tokens=384,
             response_contract="json"
         )
         resp = self._complete(req)
@@ -113,21 +212,17 @@ class SemanticPromptedLLM(
         active_thoughts: tuple[str, ...],
         public_examples_str: str = ""
     ) -> str:
-        template = self.env.get_template("generate_code.jinja")
-        prompt = template.render(
+        prompt = self._render("generate_code.jinja",
             statement=statement,
             active_thoughts=list(active_thoughts),
-            mode=execution_spec.mode.value if hasattr(execution_spec.mode, "value") else str(execution_spec.mode),
-            entry_point=execution_spec.entry_point or "solution",
-            public_examples=public_examples_str
+            public_examples=public_examples_str,
+            **interface_context(execution_spec)
         )
 
         req = GenerationRequest(
             request_id=f"req_gen_{uuid.uuid4().hex[:8]}",
             role="code",
-            prompt=prompt,
-            temperature=0.2,
-            max_output_tokens=1536
+            prompt=prompt
         )
         resp = self._complete(req)
         return extract_python_code(resp.content)
@@ -141,21 +236,20 @@ class SemanticPromptedLLM(
         candidate_code: str,
         feedback: VerbalFeedback
     ) -> str:
-        template = self.env.get_template("rethink.jinja")
-        prompt = template.render(
+        prompt = self._render("rethink.jinja",
             statement=statement,
             parent_thoughts=list(parent_thoughts),
             erroneous_thought=erroneous_thought,
+            active_thoughts=[*parent_thoughts, erroneous_thought],
             candidate_code=candidate_code,
-            feedback_text=feedback.format_as_text()
+            feedback_text=feedback.format_as_text(),
+            **interface_context(execution_spec)
         )
 
         req = GenerationRequest(
             request_id=f"req_reth_{uuid.uuid4().hex[:8]}",
             role="rethink",
-            prompt=prompt,
-            temperature=0.3,
-            max_output_tokens=256
+            prompt=prompt
         )
         resp = self._complete(req)
         return resp.content.strip()
@@ -163,12 +257,13 @@ class SemanticPromptedLLM(
     def assess(
         self,
         statement: str,
-        candidate_code: str
+        candidate_code: str,
+        active_thoughts: tuple[str, ...] = ()
     ) -> float:
-        template = self.env.get_template("self_eval.jinja")
-        prompt = template.render(
+        prompt = self._render("self_eval.jinja",
             statement=statement,
             candidate_code=candidate_code,
+            active_thoughts=list(active_thoughts),
             score_min=self.critic_min,
             score_max=self.critic_max
         )
@@ -177,8 +272,6 @@ class SemanticPromptedLLM(
             request_id=f"req_crit_{uuid.uuid4().hex[:8]}",
             role="critic",
             prompt=prompt,
-            temperature=0.0,
-            max_output_tokens=64,
             response_contract="json"
         )
         resp = self._complete(req)
@@ -189,9 +282,10 @@ class SemanticPromptedLLM(
         statement: str,
         candidate_code: str,
         facts: ExecutionFacts,
-        trace: TraceResult
+        trace: TraceResult,
+        execution_spec: Optional[ExecutionSpec] = None,
+        active_thoughts: tuple[str, ...] = ()
     ) -> BlockAnalysis:
-        template = self.env.get_template("analyze_block.jinja")
         trace_snippets = []
         for v in trace.block_visits[:self.max_prompt_blocks]:
             before_str = ", ".join(f"{k}={val}" for k, val in v.locals_before.items()) if v.locals_before else "none"
@@ -200,79 +294,39 @@ class SemanticPromptedLLM(
             trace_snippets.append(
                 f"[{v.block_id}{exit_note}]\n# Locals before: {before_str}\n{v.source_snippet.strip()}\n# Locals after: {after_str}"
             )
+        if trace.omitted_visits_count:
+            trace_snippets.append(f"... ({trace.omitted_visits_count} later block visits omitted)")
+        failed_test = format_failed_test(facts)
 
-        prompt = template.render(
+        prompt = self._render("analyze_block.jinja",
             statement=statement,
             candidate_code=candidate_code,
-            facts_text=f"{facts.failure_kind}: expected {facts.expected_output_snippet}, got {facts.actual_output_snippet}",
-            trace_text="\n\n".join(trace_snippets)
+            active_thoughts=list(active_thoughts),
+            failed_test=failed_test,
+            facts_text=failed_test,
+            trace_text="\n\n".join(trace_snippets),
+            **interface_context(execution_spec)
         )
 
         req = GenerationRequest(
             request_id=f"req_anlz_{uuid.uuid4().hex[:8]}",
             role="block_analysis",
             prompt=prompt,
-            temperature=0.0,
-            max_output_tokens=512,
             response_contract="json"
         )
         resp = self._complete(req)
-        # Parse JSON structure
+        raw_text = resp.content.strip()
         try:
-            import json
-            import re
-            cleaned = resp.content.strip()
-            match = re.search(r"```(?:json)?\s*([\s\S]*?)\s*```", cleaned)
-            if match:
-                cleaned = match.group(1).strip()
-            elif cleaned.startswith("```"):
-                lines = cleaned.splitlines()
-                if lines and lines[0].strip().startswith("```"):
-                    lines = lines[1:]
-                if lines and lines[-1].strip().startswith("```"):
-                    lines = lines[:-1]
-                cleaned = "\n".join(lines).strip()
-            data = json.loads(cleaned)
-
-            raw_items = []
-            summary = ""
-            if isinstance(data, list):
-                raw_items = data
-            elif isinstance(data, dict):
-                summary = str(data.get("summary", ""))
-                raw_items = data.get("assessments", data.get("blocks", data.get("analysis", [])))
-
-            assessments = []
-            for item in raw_items:
-                if not isinstance(item, dict):
-                    continue
-                bid = str(item.get("block_id", item.get("block", "")))
-                if "correct" in item:
-                    c_val = item["correct"]
-                    if isinstance(c_val, bool):
-                        verdict = BlockVerdict.CORRECT if c_val else BlockVerdict.INCORRECT
-                    else:
-                        c_str = str(c_val).strip().lower()
-                        verdict = BlockVerdict.CORRECT if c_str in ("true", "1", "yes") else (BlockVerdict.INCORRECT if c_str in ("false", "0", "no") else BlockVerdict.UNKNOWN)
-                else:
-                    v_str = str(item.get("verdict", "unknown")).strip().lower()
-                    verdict = BlockVerdict.CORRECT if v_str == "correct" else (BlockVerdict.INCORRECT if v_str == "incorrect" else BlockVerdict.UNKNOWN)
-                expl = str(item.get("explanation", item.get("reason", "")))
-                assessments.append(BlockAssessment(block_id=bid, verdict=verdict, explanation=expl))
-
-            return BlockAnalysis(
-                analysis_id=str(uuid.uuid4()),
-                assessments=tuple(assessments),
-                summary_explanation=summary
-            )
-        except Exception as exc:
-            import logging
-            logging.getLogger(__name__).warning("Failed to parse block analysis output: %s. Raw: %r", exc, resp.content)
-            return BlockAnalysis(
-                analysis_id=str(uuid.uuid4()),
-                assessments=(),
-                summary_explanation=f"Failed to parse block analysis output: {exc}"
-            )
+            assessments, summary = parse_block_analysis(raw_text)
+        except (ValueError, json.JSONDecodeError) as exc:
+            logger.warning("Block analysis is not valid JSON (%s); keeping raw text", exc)
+            assessments, summary = (), ""
+        return BlockAnalysis(
+            analysis_id=str(uuid.uuid4()),
+            assessments=assessments,
+            summary_explanation=summary,
+            raw_text=raw_text
+        )
 
     def _complete(self, request):
         role = getattr(self.sampling, request.role)
@@ -286,9 +340,9 @@ class SemanticPromptedLLM(
         return response
 
     def repair(self, statement, execution_spec, candidate_code, feedback):
-        prompt = self.env.get_template("repair_code.jinja").render(
+        prompt = self._render("repair_code.jinja",
             statement=statement, candidate_code=candidate_code,
-            feedback_text=feedback.format_as_text(), entry_point=execution_spec.entry_point)
+            feedback_text=feedback.format_as_text(), **interface_context(execution_spec))
         response = self._complete(GenerationRequest(
             request_id=f"req_repair_{uuid.uuid4().hex[:8]}", role="code", prompt=prompt))
         return extract_python_code(response.content)

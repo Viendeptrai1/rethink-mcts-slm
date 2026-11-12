@@ -23,3 +23,17 @@ APPS v2 vẫn dùng first-two-public như một adaptation công khai, loại hi
 ## D-005 — Cách hiểu chi phí
 
 Model call là logical request; transport retries được báo riêng. Token usage thiếu được ghi null; không giả lập 0. Token cap và wall cap được kiểm tra ở ranh giới thao tác; chưa phải bảo đảm cứng không vượt trong một request/evaluation đang chạy. Main protocol để transport retries=0, đòi token usage thật và báo realized compute. Không suy chi phí GPU hoặc USD từ số calls.
+
+## D-006 — Chuyển sang protocol v3 và nhiều model 7–9B (12/11/2026)
+
+Lý do: review code 11–12/11/2026 cho thấy bản 14B v1 chưa chạy đúng hai cơ chế cốt lõi. Block analysis bị bỏ (0/1.203 lần vào feedback). Rethink không thấy thought cần sửa. Critic không có tác dụng vì dừng sớm. Ngân sách tính cả rethink nên cây chỉ sâu tối đa 2. Ngoài ra MCTS chưa được so với baseline cùng chi phí. Chi tiết: [prompts/README.md](../../prompts/README.md), [configs/v3_7b/README.md](../../configs/v3_7b/README.md).
+
+Quyết định (người dùng đồng ý ngày 12/11/2026):
+1. Giữ tên đề tài trong [Proposal.md](../../Proposal.md). Vấn đề cụ thể: tái hiện và kiểm chứng RethinkMCTS trên nhiều model mở 7–9B, so với baseline cùng ngân sách.
+2. Model: Qwen2.5-Coder-7B-Instruct, Seed-Coder-8B-Instruct, Qwen3.5-9B (tắt thinking; dự phòng Granite-4.2-8B). Tắt thinking cho mọi phương pháp. Kết quả 14B v1 chỉ vào phụ lục; 14B v3 chỉ chạy nếu còn credit.
+3. Thiết lập v3 theo bài báo: 16 rollout, 1 rethink/node, không dừng sớm (tính lại offline), temperature 0, critic [-1, 1], public = một nửa số test khác nhau. Token và lời gọi chỉ có giới hạn an toàn.
+4. Baseline: Direct (temperature 0) và Best-of-16 (temperature 0,8, chọn theo public test). BO3 v1 không còn là baseline chính.
+5. Phần cứng: Modal L40S, bf16, không nén trọng số. L4 chỉ để so tốc độ ở pilot (P4).
+6. Pilot trên 20 bài APPS ngoài cohort; tiêu chí đạt ở [configs/v3_7b/README.md](../../configs/v3_7b/README.md). Sau pilot mới đóng băng protocol và chạy cohort thật.
+
+Còn mở: temperature của Best-of-16 (0,8 là đề xuất); có chạy ablation trên 300 bài hay tập con; có chạy lại nhánh 7B của HuyinCP theo v3 hay không.

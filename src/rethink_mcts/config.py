@@ -26,11 +26,16 @@ class ModelConfig(StrictBaseModel):
     structured_output: str = "auto"
     require_exact_token_count: bool = False
     revision: Optional[str] = None
+    # Extra fields merged into every chat/completions payload, e.g.
+    # {"chat_template_kwargs": {"enable_thinking": false}} to disable thinking mode.
+    extra_body: dict = Field(default_factory=dict)
 
 
 class PromptConfig(StrictBaseModel):
     bundle: str = "compact_v1"
     language: str = "en"
+    # Raise if a template references a variable the code does not pass (native_v3 onwards).
+    strict_variables: bool = False
 
 
 class SamplingRoleConfig(StrictBaseModel):
@@ -94,6 +99,9 @@ class BudgetConfig(StrictBaseModel):
     max_total_tokens: int = 65536
     max_wall_seconds: float = 900.0
     max_sandbox_runs: int = 1000
+    # Paper budget (rollouts). Rethink regenerations are not counted. None keeps the v1 behaviour,
+    # where max_code_generations (including rethink regenerations) is the binding limit.
+    max_rollouts: Optional[int] = None
 
 
 class ExecutionConfig(StrictBaseModel):
@@ -183,6 +191,8 @@ class AppConfig(StrictBaseModel):
         for name in ("max_search_iterations", "max_model_calls", "max_total_tokens", "max_wall_seconds", "max_sandbox_runs"):
             if getattr(self.budget, name) <= 0:
                 raise ConfigurationError(f"budget.{name} must be positive")
+        if self.budget.max_rollouts is not None and self.budget.max_rollouts <= 0:
+            raise ConfigurationError("budget.max_rollouts must be positive when set")
         if self.search.max_depth < 1 or self.search.max_rethinks_per_node < 0:
             raise ConfigurationError("Search depth must be positive; rethink count cannot be negative")
         if self.execution.backend not in ("trusted_fixture", "docker"):

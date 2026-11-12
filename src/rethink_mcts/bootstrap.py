@@ -40,12 +40,14 @@ def create_solver(config: AppConfig, solver_type="mcts", run_dir="runs/default",
     else:
         api_key = os.environ.get(config.model.api_key_env, "") if config.model.api_key_env else "ollama"
         gateway = HttpModelGateway(config.model.base_url, config.model.model, api_key,
-                                   config.model.request_timeout_seconds, config.model.max_transport_retries)
+                                   config.model.request_timeout_seconds, config.model.max_transport_retries,
+                                   extra_body=config.model.extra_body)
         model = SemanticPromptedLLM(gateway=gateway, prompts_dir=prompts_dir,
             prior_policy=PriorPolicy(config.search.prior_fallback), sampling=config.sampling,
             seed=config.experiment.seed, critic_min=config.reward.critic_score_min,
             critic_max=config.reward.critic_score_max, max_prompt_blocks=config.feedback.max_prompt_blocks,
-            require_exact_token_count=config.model.require_exact_token_count)
+            require_exact_token_count=config.model.require_exact_token_count,
+            strict_variables=config.prompts.strict_variables)
     evaluator = CandidateEvaluator(create_executor(config),
         model if config.reward.policy == "dual" else None,
         PaperDualRewardPolicy(config.reward.test_weight, config.reward.llm_weight,

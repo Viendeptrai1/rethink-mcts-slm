@@ -46,13 +46,15 @@ class HttpModelGateway(ModelGateway):
         model_name: str,
         api_key: Optional[str] = None,
         timeout_seconds: float = 120.0,
-        max_retries: int = 2
+        max_retries: int = 2,
+        extra_body: Optional[dict] = None
     ):
         self.base_url = normalize_base_url(base_url)
         self.model_name = model_name
         self.api_key = api_key or "ollama"
         self.timeout_seconds = timeout_seconds
         self.max_retries = max_retries
+        self.extra_body = dict(extra_body or {})
         self.endpoint = f"{self.base_url}/chat/completions"
 
     def complete(self, request: GenerationRequest) -> GenerationResponse:
@@ -79,6 +81,8 @@ class HttpModelGateway(ModelGateway):
 
         if request.response_contract == "json":
             payload["response_format"] = {"type": "json_object"}
+
+        payload.update(self.extra_body)
 
         last_err: Optional[Exception] = None
         start_time = time.time()

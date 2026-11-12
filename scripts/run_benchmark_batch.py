@@ -16,6 +16,8 @@ def main():
     parser.add_argument('--problem-ids')
     parser.add_argument('--difficulty')
     parser.add_argument('--dry-run', action='store_true')
+    parser.add_argument('--workers', type=int, default=1,
+                        help='Problems solved concurrently in this process (keep below the CPU core count)')
     parser.add_argument('--set', dest='overrides', action='append', default=[])
     args = parser.parse_args()
     overrides = []
@@ -46,7 +48,7 @@ def main():
     result = run_benchmark(config, args.output_dir, args.solver, args.samples_n,
                           args.dry_run, not args.no_resume,
                           problem_ids,
-                          args.difficulty, args.limit)
+                          args.difficulty, args.limit, workers=args.workers)
     if args.dry_run:
         print(f"Validated {len(result['manifest']['problem_ids'])} problems; no model calls or writes")
     else:

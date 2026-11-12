@@ -242,7 +242,8 @@ def cmd_prepare(args):
         dataset_name=args.dataset,
         raw_path=args.raw_path,
         output_dir=args.output,
-        limit=args.limit
+        limit=args.limit,
+        public_split=args.public_split
     )
     console.print(f"[bold green]✓ Prepared {manifest['total_problems']} problems[/bold green]")
     console.print(f"  Public problems: [cyan]{manifest['public_problems_path']}[/cyan]")
@@ -259,6 +260,8 @@ def main():
     p_prep.add_argument("--raw-path", type=str, default=None, help="Path to raw source file (optional)")
     p_prep.add_argument("--output", type=str, default=None, help="Output directory (default: prepared/<dataset>)")
     p_prep.add_argument("--limit", type=int, default=None, help="Maximum problems to prepare")
+    p_prep.add_argument("--public-split", type=str, default="first_two", choices=["first_two", "half", "half_min2"],
+                        help="APPS only: which leading tests are public (half = upstream RethinkMCTS)")
 
     # doctor
     p_doc = subparsers.add_parser("doctor", help="Check config, model connectivity, and sandbox")
@@ -290,13 +293,15 @@ def main():
     p_bench.add_argument("--samples-n", type=int, default=3)
     p_bench.add_argument("--dry-run", action="store_true", help="Local validation only; no model calls or writes")
     p_bench.add_argument("--set", dest="overrides", action="append", default=[], metavar="SECTION.FIELD=VALUE")
+    p_bench.add_argument("--workers", type=int, default=1, help="Problems solved concurrently (keep below CPU core count)")
 
     args = parser.parse_args()
 
     if args.subcommand == "benchmark":
         from rethink_mcts.application.benchmark import load_config, run_benchmark
         config = load_config(args.config, args.overrides)
-        result = run_benchmark(config, args.output_dir, args.solver, args.samples_n, args.dry_run)
+        result = run_benchmark(config, args.output_dir, args.solver, args.samples_n, args.dry_run,
+                               workers=args.workers)
         if args.dry_run:
             console.print(f"Validated {len(result['manifest']['problem_ids'])} problems; no model calls or writes")
             console.print(f"Protocol fingerprint: {result['manifest']['manifest_id']}")

@@ -59,9 +59,11 @@ class CandidateEvaluator:
             try:
                 if budget is not None:
                     raw_score = invoke_model(budget, self.critic, "assess", "critic",
-                                             statement=problem.statement, candidate_code=candidate.code)
+                                             statement=problem.statement, candidate_code=candidate.code,
+                                             active_thoughts=tuple(candidate.thought_path_snapshot or ()))
                 else:
-                    raw_score = self.critic.assess(statement=problem.statement, candidate_code=candidate.code)
+                    raw_score = self.critic.assess(statement=problem.statement, candidate_code=candidate.code,
+                                                   active_thoughts=tuple(candidate.thought_path_snapshot or ()))
                 v_llm = max(self.reward_policy.critic_min, min(self.reward_policy.critic_max, float(raw_score)))
                 self_eval_status = SelfEvalStatus.EVALUATED
             except Exception:

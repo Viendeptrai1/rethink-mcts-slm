@@ -9,7 +9,9 @@ import importlib.metadata
 import json
 import platform
 import subprocess
+import threading
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import asdict
 from pathlib import Path
 
@@ -64,7 +66,9 @@ def prepare_run(config, solver='mcts', samples_n=3, problem_ids=None, difficulty
     ids = list(source.list_problem_ids())
     if config.data.cohort_path:
         cohort = json.loads(Path(config.data.cohort_path).read_text())
-        cohort = cohort['problem_ids'] if isinstance(cohort, dict) else cohort
+        if isinstance(cohort, dict):
+            cohort = (cohort['problem_ids'] if 'problem_ids' in cohort else
+                      [x.strip() for x in cohort['problem_ids_csv'].split(',') if x.strip()])
         if len(cohort) != len(set(cohort)):
             raise ValueError('Duplicate problem IDs in cohort')
         missing = set(cohort) - set(ids)
@@ -167,8 +171,75 @@ def _summary(root, manifest, results):
     return data
 
 
+def _load_completed(root, manifest, problem):
+    marker = root/'problems'/problem.problem_id/'completed.json'
+    if not marker.exists():
+        return None
+    record = json.loads(marker.read_text())
+    selected = marker.parent/'selected.py'
+    if record['manifest_id'] != manifest['manifest_id'] or (record.get('code_hash') and
+            (not selected.exists() or ProgramCandidate.compute_hash(selected.read_text()) != record['code_hash'])):
+        raise ValueError(f'Corrupted resume artifact: {problem.problem_id}')
+    core = {k:v for k,v in record.items() if k != 'record_hash'}
+    if digest(core) != record.get('record_hash'):
+        raise ValueError(f'Corrupted completion marker: {problem.problem_id}')
+    return record
+
+
+def _run_problem(config, root, manifest, hidden_dir, problem, solver, samples_n):
+    """Solve, persist and judge one problem. Self-contained, so it can run in a worker thread."""
+    marker = root/'problems'/problem.problem_id/'completed.json'
+    started = time.monotonic()
+    record = dict(problem_id=problem.problem_id, manifest_id=manifest['manifest_id'], status='error')
+    engine = None
+    try:
+        # A fresh solver (model adapter, executor, budget) per problem: no state is shared across threads.
+        engine, _ = create_solver(config, solver, str(root), samples_n)
+        result = engine.solve(problem)
+        record['solve_wall_seconds'] = time.monotonic()-started
+        pdir = _persist_search(root, result, config)
+        record['usage'] = result.usage.to_dict()
+        if result.selected_candidate is None:
+            record.update(status='no_candidate', all_hidden_passed=False)
+        else:
+            # Only now open hidden test contents for judging the frozen selection.
+            raw = json.loads((hidden_dir/f'{problem.problem_id}.json').read_text())
+            suite = raw['hidden_suite']
+            hidden = HiddenProblem(problem.problem_id,
+                HiddenSuite(tuple(parse_case_dict(c) for c in suite['cases']),
+                    suite.get('suite_id','hidden'), tuple(parse_case_dict(c) for c in suite.get('generated_cases',[]))),
+                JudgeSpec(**raw.get('judge_spec',{})))
+            judge_start = time.monotonic()
+            judged = HiddenJudge(create_executor(config)).judge(result.selected_candidate, hidden,
+                                                                 execution_spec=problem.execution_spec)
+            if any(c.status == CandidateVerdict.INFRA_ERROR for c in judged.execution_summary.case_results):
+                raise RuntimeError('Hidden judging infrastructure failure')
+            atomic_json(pdir/'judge_results.json', asdict(judged))
+            record.update(status='completed', code_hash=judged.code_hash,
+                all_hidden_passed=judged.all_hidden_passed, hidden_pass_rate=judged.hidden_pass_rate,
+                generated_pass_rate=(judged.generated_execution_summary.pass_rate if judged.generated_execution_summary else None),
+                judge_wall_seconds=time.monotonic()-judge_start)
+        record['record_hash'] = digest(record)
+        atomic_json(marker, record)
+    except Exception as exc:
+        if engine is not None and hasattr(engine, 'last_budget'):
+            engine.last_budget.update_wall_time()
+            record['usage'] = engine.last_budget.usage.to_dict()
+            if config.storage.save_raw_model_responses:
+                atomic_json(root/'problems'/problem.problem_id/'requests.json', engine.last_budget.requests)
+        record.update(error_type=type(exc).__name__, error=str(exc))
+        atomic_json(root/'problems'/problem.problem_id/'error.json', record)
+    return record
+
+
 def run_benchmark(config, output_dir, solver='mcts', samples_n=3, dry_run=False,
-                  resume=True, problem_ids=None, difficulty=None, limit=None):
+                  resume=True, problem_ids=None, difficulty=None, limit=None, workers=1):
+    """Run (or resume) a benchmark. workers > 1 solves that many problems concurrently in one
+    process; each problem still has its own solver and output directory. Results do not depend
+    on workers, but per-problem wall time can (shared CPU for test execution), so keep workers
+    below the number of CPU cores and report it."""
+    if workers < 1:
+        raise ValueError('workers must be >= 1')
     problems, hidden_dir, manifest = prepare_run(config, solver, samples_n, problem_ids, difficulty, limit)
     if dry_run:
         return dict(dry_run=True, manifest=manifest)
@@ -184,60 +255,30 @@ def run_benchmark(config, output_dir, solver='mcts', samples_n=3, dry_run=False,
         raise ValueError('Nonempty directory has no v2 manifest; legacy results are read-only')
     else:
         atomic_json(manifest_path, manifest)
-    results = []
+    order = [p.problem_id for p in problems]
+    done = {}
+    lock = threading.Lock()
+
+    def record_result(pid, record):
+        with lock:
+            done[pid] = record
+            _summary(root, manifest, [done[i] for i in order if i in done])
+
+    pending = []
     for problem in problems:
-        marker = root/'problems'/problem.problem_id/'completed.json'
-        if marker.exists():
-            record = json.loads(marker.read_text())
-            selected = marker.parent/'selected.py'
-            if record['manifest_id'] != manifest['manifest_id'] or (record.get('code_hash') and
-                    (not selected.exists() or ProgramCandidate.compute_hash(selected.read_text()) != record['code_hash'])):
-                raise ValueError(f'Corrupted resume artifact: {problem.problem_id}')
-            core = {k:v for k,v in record.items() if k != 'record_hash'}
-            if digest(core) != record.get('record_hash'):
-                raise ValueError(f'Corrupted completion marker: {problem.problem_id}')
-            results.append(record)
-            _summary(root, manifest, results)
-            continue
-        started = time.monotonic()
-        record = dict(problem_id=problem.problem_id, manifest_id=manifest['manifest_id'], status='error')
-        engine = None
-        try:
-            engine, _ = create_solver(config, solver, str(root), samples_n)
-            result = engine.solve(problem)
-            record['solve_wall_seconds'] = time.monotonic()-started
-            pdir = _persist_search(root, result, config)
-            record['usage'] = result.usage.to_dict()
-            if result.selected_candidate is None:
-                record.update(status='no_candidate', all_hidden_passed=False)
-            else:
-                # Only now open hidden test contents for judging the frozen selection.
-                raw = json.loads((hidden_dir/f'{problem.problem_id}.json').read_text())
-                suite = raw['hidden_suite']
-                hidden = HiddenProblem(problem.problem_id,
-                    HiddenSuite(tuple(parse_case_dict(c) for c in suite['cases']),
-                        suite.get('suite_id','hidden'), tuple(parse_case_dict(c) for c in suite.get('generated_cases',[]))),
-                    JudgeSpec(**raw.get('judge_spec',{})))
-                judge_start = time.monotonic()
-                judged = HiddenJudge(create_executor(config)).judge(result.selected_candidate, hidden,
-                                                                     execution_spec=problem.execution_spec)
-                if any(c.status == CandidateVerdict.INFRA_ERROR for c in judged.execution_summary.case_results):
-                    raise RuntimeError('Hidden judging infrastructure failure')
-                atomic_json(pdir/'judge_results.json', asdict(judged))
-                record.update(status='completed', code_hash=judged.code_hash,
-                    all_hidden_passed=judged.all_hidden_passed, hidden_pass_rate=judged.hidden_pass_rate,
-                    generated_pass_rate=(judged.generated_execution_summary.pass_rate if judged.generated_execution_summary else None),
-                    judge_wall_seconds=time.monotonic()-judge_start)
-            record['record_hash'] = digest(record)
-            atomic_json(marker, record)
-        except Exception as exc:
-            if engine is not None and hasattr(engine, 'last_budget'):
-                engine.last_budget.update_wall_time()
-                record['usage'] = engine.last_budget.usage.to_dict()
-                if config.storage.save_raw_model_responses:
-                    atomic_json(root/'problems'/problem.problem_id/'requests.json', engine.last_budget.requests)
-            record.update(error_type=type(exc).__name__, error=str(exc))
-            atomic_json(root/'problems'/problem.problem_id/'error.json', record)
-        results.append(record)
-        _summary(root, manifest, results)
-    return _summary(root, manifest, results)
+        record = _load_completed(root, manifest, problem)
+        if record is not None:
+            record_result(problem.problem_id, record)
+        else:
+            pending.append(problem)
+    if workers == 1:
+        for problem in pending:
+            record_result(problem.problem_id,
+                          _run_problem(config, root, manifest, hidden_dir, problem, solver, samples_n))
+    else:
+        with ThreadPoolExecutor(max_workers=workers) as pool:
+            futures = {pool.submit(_run_problem, config, root, manifest, hidden_dir, p, solver, samples_n): p
+                       for p in pending}
+            for future in as_completed(futures):
+                record_result(futures[future].problem_id, future.result())
+    return _summary(root, manifest, [done[i] for i in order if i in done])

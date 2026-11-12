@@ -59,6 +59,8 @@ class BlockAnalysis:
     analysis_id: str
     assessments: tuple[BlockAssessment, ...] = field(default_factory=tuple)
     summary_explanation: str = ""
+    # Verbatim model output. Used in feedback when nothing could be parsed (as upstream does).
+    raw_text: str = ""
 
 
 @dataclass(frozen=True)
@@ -102,13 +104,16 @@ class VerbalFeedback:
                 trace_parts.append(f"... ({self.trace.omitted_visits_count} loop visits omitted)")
             parts.append("\n".join(trace_parts))
 
-        if self.level == "block" and self.analysis and self.analysis.assessments:
+        if self.level == "block" and self.analysis:
             analysis_parts = ["[BLOCK ANALYSIS]"]
             for a in self.analysis.assessments:
                 analysis_parts.append(f"Block {a.block_id}: {a.verdict.value.upper()} - {a.explanation}")
             if self.analysis.summary_explanation:
                 analysis_parts.append(f"Summary: {self.analysis.summary_explanation}")
-            parts.append("\n".join(analysis_parts))
+            if not self.analysis.assessments and not self.analysis.summary_explanation and self.analysis.raw_text:
+                analysis_parts.append(self.analysis.raw_text)
+            if len(analysis_parts) > 1:
+                parts.append("\n".join(analysis_parts))
 
         text = "\n\n".join(parts)
         return text if len(text) <= self.max_text_chars else text[:self.max_text_chars] + "\n[feedback truncated]"
