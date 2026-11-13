@@ -2,7 +2,7 @@
 
 ## E-001 — Rà soát nền cũ (23/09/2026)
 
-Nguồn: [repository review](../repository_review_2026-09-23.md), code/artifacts trước `88aa774`. Các bảng cũ là exploratory, không đo controller adaptive hiện tại. Review cũ được giữ nguyên để truy vết; thông tin đã bị phát hiện thiếu hoặc thay đổi được ghi ở các entry sau.
+Nguồn: repository review 23/09/2026 (đã lưu trữ ở tag `archive/pre-v3-2026-11-13`), code/artifacts trước `88aa774`. Các bảng cũ là exploratory, không đo controller adaptive hiện tại. Review cũ được giữ nguyên để truy vết; thông tin đã bị phát hiện thiếu hoặc thay đổi được ghi ở các entry sau.
 
 ## E-002 — Public/hidden overlap APPS
 

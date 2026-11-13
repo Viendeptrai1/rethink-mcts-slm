@@ -1,5 +1,5 @@
 #!/bin/bash
-# Like orchestrate.sh, but after starting the queue it hands over to watch_ls.sh, which keeps the
+# Like the archived orchestrate.sh, but after starting the queue it hands over to watch_ls.sh, which keeps the
 # kernel busy with one long cell and polls only through the contents API (robust to websocket drops).
 # usage: deploy/colab/orchestrate_ls.sh <session-name> <plan-file> <code-archive.tar.gz> <out-dir>
 SESSION=$1; PLAN=$2; ARCHIVE=$3; OUT=$4
@@ -27,7 +27,7 @@ done
 
 colab upload -s "$SESSION" "$ARCHIVE" /content/tlcn.tar.gz >> "$LOG" 2>&1 || { log "upload failed"; colab stop -s "$SESSION"; exit 1; }
 colab upload -s "$SESSION" "$PLAN" /content/plan.txt >> "$LOG" 2>&1 || { log "plan upload failed"; colab stop -s "$SESSION"; exit 1; }
-# SEED_RUNS=<partial.tar.gz from guard.sh>: restore its runs/ so the batch runner resumes the
+# SEED_RUNS=<partial.tar.gz from guard_dl.sh>: restore its runs/ so the batch runner resumes the
 # completed problems of a lost session (only runs/ is restored, never queue.log or markers).
 SEED_CMD=true
 if [ -n "$SEED_RUNS" ]; then

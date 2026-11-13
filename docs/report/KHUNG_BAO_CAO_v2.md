@@ -53,7 +53,7 @@ Các giả thuyết dưới đây là **giả thuyết cần kiểm chứng**, c
 | RQ3b | Block feedback có tốt hơn chỉ dùng thông tin thực thi không? (Qwen2.5-Coder-7B) | H3b: `block` > `facts_only`. | E6 | B5.1 |
 | RQ3c | Critic có chọn được lời giải tốt hơn Test-only không, và khác nhau giữa các model không? | H3c: Dual > Test-only khi có nhiều ứng viên pass public. | E1 (chọn lại offline) | B5.2 |
 | RQ4 | Chi phí và đường cong hiệu năng theo ngân sách ra sao? | — (mô tả) | E1, E3 | B4.5, H4.1 |
-| RQ5 | Cài đặt v1 lệch bài báo ở đâu, và ảnh hưởng thế nào? | — (mô tả, so v1 với v3 nếu có 14B v3) | v1 (+ E7) | B5.3, Phụ lục A |
+| RQ5 | Cài đặt v1 lệch bài báo ở đâu, và ảnh hưởng thế nào? | — (mô tả, so v1 với v3 nếu có 14B v3) | v1 (+ E7) | B5.3; số liệu v1 ở tag `archive/pre-v3-2026-11-13` |
 
 ## 3. Mục lục nháp
 
@@ -123,7 +123,7 @@ Các giả thuyết dưới đây là **giả thuyết cần kiểm chứng**, c
 | B5.2 | Dual và Test-only (chọn lại offline) × 3 model | E1 | 🧮 sau E1 |
 | B5.3 | v1 và v3 | v1 (+ E7) | 🧮 / ⏳ |
 | B5.4 | Độ sâu cây, nguồn gốc lời giải đúng, dừng sớm offline | E1 | 🧮 sau E1 |
-| B5.5 | Tham khảo: 7B HuyinCP, 14B v1 | [docs/results/7b](../results/7b/rethinkmcts-apps-native-v2-w4-retry.md), [runs/analysis_extra_14b](../../runs/analysis_extra_14b/summary.json) | ⚠️ |
+| B5.5 | Tham khảo: 7B HuyinCP, 14B v1 | Đã lưu trữ ở tag `archive/pre-v3-2026-11-13` (không dùng cho kết luận) | ⚠️ |
 
 ## 5. Ma trận thực nghiệm
 

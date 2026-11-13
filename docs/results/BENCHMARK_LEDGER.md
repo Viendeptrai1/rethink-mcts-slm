@@ -6,11 +6,11 @@ Cập nhật lần cuối: 13/11/2026. Đã xong E1–E4 cho `qwen25c7b` và `se
 
 ## Quy ước
 
-- **Không trộn protocol.** Mỗi mục chỉ chứa run của một protocol: v3 (mục 1–10), pilot v3 (mục 11, không phải kết quả), 14B v1 (phụ lục A), 7B HuyinCP (phụ lục B).
+- **Không trộn protocol.** Sổ này chỉ chứa protocol v3.1 (mục 1–10, 12) và pilot v3.0 (mục 11, không phải kết quả).
 - Mọi con số phải có nguồn là một artifact trong `runs/` hoặc `docs/results/`. Ô chưa có số thì để `—`.
 - Trạng thái: `⏳` chưa chạy · `▶` đang chạy · `✅` xong và đã đối chiếu artifact · `⚠️` xong nhưng có vấn đề (ghi chú) · `✗` hủy.
 - **Pass@1 (hidden):** tỷ lệ bài mà chương trình được chọn pass toàn bộ hidden test, mẫu số là cả cohort (bài lỗi hoặc không có candidate tính 0). **Pass rate:** trung bình theo bài của tỷ lệ hidden test pass.
-- Số liệu v3 lấy bằng `scripts/pilot_report.py` (search, chi phí) và một script phân tích ghép cặp kiểu [analyze_extra_14b.py](../../scripts/analyze_extra_14b.py) (sẽ viết cho v3).
+- Số liệu v3 lấy bằng `scripts/pilot_report.py` (search, chi phí) và [analyze_v3.py](../../scripts/analyze_v3.py) (phân tích ghép cặp, chọn lại offline, Best-of-k).
 - Tên ngắn của model: `qwen25c7b` = Qwen2.5-Coder-7B-Instruct · `seedcoder8b` = Seed-Coder-8B-Instruct · `qwen35_9b` = Qwen3.5-9B (tắt thinking) · `granite42_8b` = Granite-4.2-8B (dự phòng) · `qwen25c14b` = Qwen2.5-Coder-14B-Instruct.
 
 ---
@@ -241,103 +241,6 @@ Nguồn: `runs/v3_pilot_apps_qwen25c7b_*`, log ở `runs/colab_pilot_logs/`. Ph�
 
 ---
 
-## Phụ lục A. 14B v1 (Qwen2.5-Coder-14B, có lỗi đã biết, không dùng cho kết luận)
+## Phụ lục: kết quả trước v3
 
-Lỗi đã biết của v1:
-- Kết quả block analysis không vào feedback (0/1.203 lần ở MCTS).
-- Rethink không thấy thought cần sửa.
-- Dừng khi pass public.
-- Ngân sách tính cả rethink, cây sâu tối đa 2.
-- Public là 2 test đầu.
-
-Chi tiết: [prompts/README.md](../../prompts/README.md), [configs/README.md](../../configs/README.md). Mọi số ở đây lấy từ [runs/analysis_extra_14b/summary.json](../../runs/analysis_extra_14b/summary.json) (số từng bài: [per_problem.json](../../runs/analysis_extra_14b/per_problem.json)).
-
-### A.1. Run và cấu hình
-
-| Phương pháp | Run (`runs/…`) | Prompt | Ngân sách chính | GPU |
-|---|---|---|---|---|
-| Direct | `benchmark_apps_14b_direct_300` | native_v2 | 1 lần sinh code (+ critic) | L40S |
-| Best-of-3 | `benchmark_apps_14b_bon3_300` (160 bài) + `benchmark_apps_14b_bon3_rest140` | native_v2 | 3 lần sinh code | L40S |
-| RethinkMCTS | `benchmark_apps_14b_dual_unified` | native_v2 | 16 lần sinh code (gồm rethink), 64 lời gọi, 65.536 token, 2 rethink/node, dừng khi pass public, 900 s | H200 |
-| MCTS tắt rethink | `benchmark_apps_14b_norethink_q1..q4` | native_v2 | như MCTS, `max_rethinks_per_node=0`, 3600 s | L40S |
-| Iterative Repair | `benchmark_apps_14b_repair_q1..q4` | native_v2 | như MCTS, 3600 s | L40S |
-| HE Direct / BO3 | `humaneval_direct_14b_v2`, `humaneval_bon3_14b_v2` | native_v2 | 1 / 3 lần sinh code | L40S |
-| HE RethinkMCTS | `humaneval_mcts_dual_14b` | native_v2 | như MCTS, 600 s | L40S |
-
-Nguồn của cột GPU là billing Modal (ghi nhận 11/2026), không phải artifact trong `runs/`.
-
-### A.2. APPS-300, Pass@1 trên hidden test (%)
-
-Mỗi ô ghi "P@1 hidden / P@1 khi chấm trên toàn bộ test (public + hidden)".
-
-| Phương pháp | Intro | Inter | Comp | **Overall** | Overall pass rate (hidden) | Token TB/bài | Lời gọi TB/bài |
-|---|---|---|---|---|---|---|---|
-| Direct | 42,0 / 38,0 | 13,0 / 11,0 | 21,0 / 8,0 | **25,33 / 19,00** | 38,41 | 1.373 | 1,27 |
-| Best-of-3 | 50,0 / 42,0 | 17,0 / 14,0 | 25,0 / 13,0 | **30,67 / 23,00** | 44,06 | 4.065 | 3,83 |
-| RethinkMCTS | 53,0 / 50,0 | 27,0 / 26,0 | 28,0 / 23,0 | **36,00 / 33,00** | 53,49 | 37.379 | 15,29 |
-| MCTS tắt rethink | 55,0 / 51,0 | 32,0 / 29,0 | 25,0 / 17,0 | **37,33 / 32,33** | 52,93 | 26.212 | 12,33 |
-| Iterative Repair | 56,0 / 49,0 | 24,0 / 21,0 | 25,0 / 16,0 | **35,00 / 28,67** | 49,56 | 42.452 | 11,79 |
-
-Cả 5 phương pháp đều có 300/300 bài hoàn tất. Có 8 bài MCTS tắt rethink chạy quá 900 s (giới hạn của run này là 3600 s). Lời gọi của Direct và BO3 gồm cả critic, vì các run này dùng config dual.
-
-### A.3. APPS-300, kiểm định ghép cặp (hidden; n = 300)
-
-| A vs B | a-only | b-only | p exact | Δ P@1 (điểm %) | 95% CI |
-|---|---|---|---|---|---|
-| MCTS vs Direct | 42 | 10 | 9,06e-6 | +10,67 | [6,33; 15,33] |
-| MCTS vs Best-of-3 | 26 | 10 | 0,0113 | +5,33 | [1,67; 9,33] |
-| MCTS vs MCTS tắt rethink | 13 | 17 | 0,585 | −1,33 | [−5,00; 2,33] |
-| MCTS vs Iterative Repair | 21 | 18 | 0,749 | +1,00 | [−3,00; 5,33] |
-| Iterative Repair vs Direct | 36 | 7 | 8,96e-6 | +9,67 | [5,67; 14,00] |
-| MCTS tắt rethink vs Direct | 51 | 15 | 1,01e-5 | +12,00 | [7,00; 17,33] |
-| Best-of-3 vs Direct | 20 | 4 | 0,00154 | +5,33 | [2,33; 8,67] |
-
-### A.4. HumanEval-164
-
-| Phương pháp | Pass@1 % | Số bài pass | Token TB/bài | Lời gọi TB/bài |
-|---|---|---|---|---|
-| Direct | 85,37 | 140 | 633 | 1,90 |
-| Best-of-3 | 86,59 | 142 | 1.913 | 5,73 |
-| RethinkMCTS | 90,85 | 149 | 3.218 | 4,64 |
-
-| A vs B | a-only | b-only | p exact | Δ (điểm %) | 95% CI |
-|---|---|---|---|---|---|
-| MCTS vs Direct | 12 | 3 | 0,0352 | +5,49 | [1,22; 10,37] |
-| MCTS vs Best-of-3 | 10 | 3 | 0,0923 | +4,27 | [0,00; 8,54] |
-| Best-of-3 vs Direct | 2 | 0 | 0,5 | +1,22 | [0,00; 3,05] |
-
-### A.5. Search của RethinkMCTS v1 (APPS-300)
-
-Nguồn: `python3 scripts/pilot_report.py runs/benchmark_apps_14b_dual_unified` (12/11/2026).
-
-| Chỉ số | Giá trị |
-|---|---|
-| Phân bố độ sâu tối đa | 1: 241 bài, 2: 59 bài |
-| Node được đánh giá TB | 2,27 (không tính node gốc) |
-| Lần sinh code TB / rethink TB | 5,83 / 3,45 |
-| Block analysis vào feedback | 0 / 1.203 (0%) |
-| Output bị cắt (length) | 194 / 4.587 lời gọi |
-| Lý do dừng | Dừng sớm vì pass public 161; hết ngân sách (sinh code, lời gọi, token hoặc thời gian) 139 |
-| Input / output token TB/bài | 33.554 / 4.203 |
-| Token theo vai trò (input) | block_analysis 5,72 triệu; rethink 2,56 triệu; code 1,26 triệu; expansion 0,40 triệu; critic 0,12 triệu |
-
----
-
-## Phụ lục B. 7B nhánh HuyinCP (tham khảo, protocol khác)
-
-Protocol khác:
-- 2 rollout, width 3, tối đa 2 rethink.
-- Public là một nửa số test; **chấm trên toàn bộ test**, gồm cả public, với timeout 5 giây.
-- Temperature 0,2.
-- Code trong `external/ReThinkMCTS`, model `qwen2.5-coder:7b-instruct`, Modal L40S.
-
-Không so trực tiếp với v3 hay 14B v1.
-
-| Phương pháp | Intro pass rate / P@1 | Inter pass rate / P@1 | Comp pass rate / P@1 | **Overall pass rate / P@1** | HumanEval P@1 | Nguồn |
-|---|---|---|---|---|---|---|
-| Direct | 45,84 / 31,00 | 26,18 / 7,00 | 19,52 / 4,00 | **30,51 / 14,00** | 80,49 | [retry](7b/rethinkmcts-apps-native-v2-w4-retry.md) |
-| RethinkMCTS dual (native_v2, 295/300 có candidate) | 56,70 / 38,00 | 42,36 / 14,00 | 30,07 / 5,00 | **43,04 / 19,00** | 91,46 (run `native_v1`) | [retry](7b/rethinkmcts-apps-native-v2-w4-retry.md) |
-| RethinkMCTS test-only (297/300) | 61,14 / 41,00 | 45,46 / 18,00 | 29,42 / 9,00 | **45,34 / 22,67** | 89,63 | [test-only](7b/rethinkmcts-test-only-v1.md) |
-| RethinkMCTS dual (native_v1, đã bị thay thế) | 31,40 / 20,00 | 17,69 / 6,00 | 10,80 / 3,00 | **19,96 / 9,67** | 91,46 | [v2-all-tests](7b/benchmark-v2-all-tests.md); prompt thiếu hướng dẫn stdin/stdout, 106/295 bài in ra rỗng |
-
-Bài thiếu candidate được tính 0. Hàng dual native_v2 và test-only không được kiểm định ghép cặp với nhau.
+Kết quả 14B v1 (Qwen2.5-Coder-14B) và nhánh 7B của HuyinCP thuộc protocol khác, có lỗi đã biết (D-006), nên **không dùng cho kết luận**. Ngày 13/11/2026 chúng đã được gỡ khỏi nhánh, cùng các bảng phụ lục A/B trước đây của sổ này. Có thể lấy lại bằng `git show archive/pre-v3-2026-11-13:docs/results/BENCHMARK_LEDGER.md`, hoặc lấy thẳng artifact với `git checkout archive/pre-v3-2026-11-13 -- runs/<run>`.

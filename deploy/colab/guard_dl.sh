@@ -1,5 +1,5 @@
 #!/bin/bash
-# Like guard.sh, but never opens `colab ssh`: a packer loop on the VM (started by orchestrate_ls.sh)
+# Like the archived guard.sh, but never opens `colab ssh`: a packer loop on the VM (started by orchestrate_ls.sh)
 # rewrites /content/partial.tar.gz atomically every ~5 min, and this guard only downloads it through
 # the contents API. Introduced after three runtimes vanished within ~2 min of a guard.sh ssh save
 # (13/11/2026, 01:49, 02:21, 02:47). Later losses (02:57, 03:13, 03:21) happened without ssh, one

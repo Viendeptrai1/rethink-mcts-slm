@@ -11,7 +11,7 @@ For each run it reports what must hold before spending GPU on a full benchmark:
 Optionally converts measured GPU time into a cost estimate for a full cohort.
 
 Usage:
-  python3 scripts/pilot_report.py runs/pilot_qwen25c7b_mcts [more runs...] \
+  python3 scripts/pilot_report.py runs/v3_apps_qwen25c7b_mcts [more runs...] \
       [--gpu-seconds 1234 --gpu-price-hour 1.95 --target-problems 300] [--json out.json]
 """
 import argparse

@@ -4,7 +4,7 @@
 |---|---|
 | `native_v3` | Protocol v3 (từ 11/2026, [configs/v3_7b](../configs/v3_7b/README.md)). Sửa các lỗi liệt kê dưới đây, bám prompt trong phụ lục bài báo (critic có thought, thang [-1, 1]; block analysis nhận xét từng block). Phần giao diện thực thi dùng chung `_interface.jinja`. Chạy với `prompts.strict_variables: true`: template dùng biến mà code không truyền sẽ báo lỗi. |
 | `native_v2` | Mọi run 14B được báo cáo (APPS MCTS/Direct/BO3/tắt rethink/Iterative Repair, HumanEval). Hash từng file nằm trong `prompt_hashes` của manifest. |
-| `compact_v1` | Các run pilot/tuning cũ (`runs/pilot_*`, `runs/tuning_*`), các config smoke/mock và config cũ. Không dùng cho kết quả chính. |
+| `compact_v1` | Config smoke/mock (`configs/smoke_mock.yaml`, `research_smoke.yaml`). Các run v1 dùng bundle này đã được lưu trữ (tag `archive/pre-v3-2026-11-13`). Không dùng cho kết quả chính. |
 
 Không xóa hay sửa file trong `native_v2`: mọi manifest đều ghi hash của **tất cả** các file `*.jinja` trong bộ này. Kể cả các file `graph_*.jinja` (chỉ `GraphSolver` dùng), sửa bất kỳ file nào cũng làm manifest của các run cũ không còn khớp.
 

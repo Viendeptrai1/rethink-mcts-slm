@@ -36,14 +36,13 @@ Bộ config này dùng cho đợt thực nghiệm mới (từ 11/2026), thay cho
 
 ## Lệnh chạy
 
-Triển khai endpoint (**tốn credit**, chỉ chạy khi đã quyết định):
+Chạy thật (**tốn credit**, chỉ chạy khi đã quyết định). vLLM và solver chạy chung một máy A100-SXM4-40GB, theo một "plan" (danh sách run):
 
 ```bash
-MODAL_APP_NAME=rethink-qwen25c7b VLLM_MODEL_ID=Qwen/Qwen2.5-Coder-7B-Instruct VLLM_GPU=L40S \
-VLLM_PIP_SPEC=vllm==0.31.0 VLLM_ENFORCE_EAGER=0 MODAL_MAX_INPUTS=64 VLLM_MAX_MODEL_LEN=32768 \
-modal deploy deploy/modal_vllm.py
-# Song song: ngắt app khi chạm trần credit hoặc thời gian
-MODAL_APP_NAME=rethink-qwen25c7b MODAL_MAX_CREDIT=25 MODAL_MAX_HOURS=2 python3 scripts/modal_spending_guard.py
+# Modal: một container chạy cả plan; kết quả ghi vào volume tlcn-v31-runs
+modal run --detach deploy/modal_v31_runner.py --plan deploy/colab/v31_campaign/plans/qwen35_modal.plan
+modal run deploy/modal_v31_runner.py::status
+# Colab: xem deploy/colab/v31_campaign/README.md (orchestrate_ls.sh, relaunch.sh, run_one.sh)
 ```
 
 Chạy benchmark (mỗi model × phương pháp × dataset một thư mục riêng):
@@ -58,7 +57,7 @@ python3 scripts/run_benchmark_batch.py --config configs/v3_7b/apps_baseline.yaml
   --set sampling.code.temperature=0.8 --set sampling.code.top_p=0.95 --set model.base_url=$E --set model.model=$M
 ```
 
-**Chạy trên Colab:** `deploy/colab/` (`orchestrate.sh` chạy trên máy cá nhân: xin phiên A100, upload code, giữ kernel bận, tải kết quả về rồi tắt phiên; `run_plan.sh` chạy trên VM; kế hoạch sinh bằng `make_plans.py`). Thông số chạy song song (16 worker, `test_workers=4`, `max_test_processes=8`) đã kiểm chứng ở pilot P2b, xem [BENCHMARK_LEDGER.md](../../docs/results/BENCHMARK_LEDGER.md) mục 11.
+**Chạy trên Colab:** `deploy/colab/` (`orchestrate_ls.sh` chạy trên máy cá nhân: xin phiên A100, upload code, giữ kernel bận, tải bản lưu tạm qua `guard_dl.sh`, tải kết quả về rồi tắt phiên; `run_plan.sh` chạy trên VM; kế hoạch sinh bằng `make_plans.py`). Thông số chạy song song (16 worker, `test_workers=4`, `max_test_processes=8`) đã kiểm chứng ở pilot P2b, xem [BENCHMARK_LEDGER.md](../../docs/results/BENCHMARK_LEDGER.md) mục 11.
 
 **Phiên bản Python:** solver, trace và sandbox phải chạy Python 3.11. Với Python 3.13, 3 test về trace fail: hàm đệ quy bị bỏ sót lượt chạy, làm block feedback thiếu dữ liệu mà không báo lỗi. vLLM là tiến trình riêng nên dùng Python nào cũng được. Trước mỗi đợt chạy, phải chạy `pytest` bằng đúng interpreter sẽ dùng.
 

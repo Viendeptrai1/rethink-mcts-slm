@@ -1,29 +1,26 @@
-# Trạng thái hiện tại — 08/10/2026
+# Trạng thái hiện tại: 13/11/2026
 
-## Stable facts
+## Thông tin đã chắc chắn
 
-- **Mốc nghiên cứu hiện tại:** Đã phân chia và thực thi thực nghiệm song song giữa 2 thành viên:
-  - **Nhánh 7B (`Qwen2.5-Coder-7B-Instruct`):** Do HuyinCP thực hiện trên Modal GPU và CKEY. Toàn bộ tài liệu báo cáo và artifact đã được tích hợp vào [`docs/results/7b/`](../results/7b/).
-  - **Nhánh 14B (`Qwen2.5-Coder-14B-Instruct`):** Do Kotori thực hiện trên TLCN với remote endpoint vLLM. Các run đã hoàn thành lưu tại [`runs/`](../../runs/).
-- **Bộ dữ liệu chuẩn hóa:** Cả 2 nhánh dùng chung chính xác 100% tập **APPS 300** (`seed=2027`: 100 Intro, 100 Inter, 100 Comp theo [`data/cohorts/apps_benchmark_300.json`](../../data/cohorts/apps_benchmark_300.json)) và **HumanEval 164**.
-- **Kết quả HumanEval (164/164 bài):**
-  - 7B: Direct 80.49% $\to$ MCTS Test-only 89.63% $\to$ MCTS Dual 91.46%.
-  - 14B: Direct 90.24% $\to$ BoN-3 91.46% $\to$ MCTS 93.29%.
-  - *Luận điểm được chứng minh:* MCTS giúp 7B vượt qua năng lực của 14B sinh trực tiếp (91.46% vs 90.24%). MCTS trên 14B đạt trần 93.29%.
-- **Kết quả APPS (300 bài full: 100 Intro, 100 Inter, 100 Comp):**
-  - **7B (Chính thức - HuyinCP):** Direct (14.00% Pass@1, 30.51% Pass Rate) $\to$ MCTS Dual (19.00% Pass@1, 43.04% Pass Rate) $\to$ MCTS Test-only (22.67% Pass@1, 45.34% Pass Rate).
-  - **14B (Chính thức - Kotori - ĐÃ HOÀN TẤT 300/300 bài):** MCTS Dual đạt **36.00% Pass@1** (108/300) và **53.49% Hidden Pass Rate**. So với 7B MCTS Dual, 14B tăng vượt bậc **+17.00% Pass@1** (gần gấp đôi) và tăng đặc biệt mạnh ở phân tầng Competition (28.00% vs 5.00%, +23.00%).
-- **Phát hiện quan trọng về Ablation & Model Scaling:**
-  - Cấu hình Test-only trên 7B cho hiệu quả cao hơn Dual Reward (22.67% vs 19.00%), xác nhận hiện tượng suy giảm năng lực tự thẩm định (critic degradation) của mô hình nhỏ $\le$ 7B.
-  - Khi quy mô mô hình tăng lên 14B, khả năng suy luận kết hợp tìm kiếm cây MCTS giải quyết hiệu quả các bài toán thuật toán khó phức tạp (Competition: 28% pass).
-- **Kiểm thử tự động:** Toàn bộ 36 tests qua (`pytest -v`), không có regression trong kiến trúc domain/ports/adapters.
+- **Protocol:** v3.1, code đóng băng ở commit `d9666c4` ([PROTOCOL.md](PROTOCOL.md) mục 8; quyết định D-006, D-007, D-008 trong [DECISION_LOG.md](DECISION_LOG.md)).
+- **Nguồn số liệu duy nhất:** [BENCHMARK_LEDGER.md](../results/BENCHMARK_LEDGER.md) và [docs/results/v3/](../results/v3/). Mọi kết quả trước v3 đã gỡ khỏi nhánh và lưu ở tag `archive/pre-v3-2026-11-13`.
+- **Đã xong E1–E4:** Qwen2.5-Coder-7B và Seed-Coder-8B (Colab A100), mỗi model đủ 6 run, không có lỗi kỹ thuật.
+- **Qwen3.5-9B:**
+  - Chạy trên Modal A100-SXM4-40GB: gate (khớp gate Colab ở 12/13 bài), Direct APPS, cả ba run HumanEval. Best-of-16 APPS đang chạy.
+  - MCTS APPS chạy trên Colab: 116/300, đang dừng vì Colab thu hồi runtime khoảng mỗi 27 phút.
 
-## Active operating decisions
+## Quan sát (chưa phải kết luận)
 
-1. Tài liệu chi tiết đối đầu 7B vs 14B được chuẩn hóa tại [`docs/results/BENCHMARK_7B_VS_14B_REPORT.md`](../results/BENCHMARK_7B_VS_14B_REPORT.md).
-2. Lưu giữ toàn bộ 9 báo cáo gốc của 7B trong [`docs/results/7b/`](../results/7b/) để bảo toàn tính minh bạch nguồn gốc (provenance).
-3. Đợt chạy 14B APPS Benchmark 300 bài đã hoàn tất và gom kết quả vào [`runs/benchmark_apps_14b_dual_unified/`](../../runs/benchmark_apps_14b_dual_unified/). Modal GPU containers đã được dừng an toàn để bảo toàn quota.
+Số liệu ở ledger mục 2–10 và trong file phân tích.
 
-## Current context
+- MCTS và Best-of-16 đều hơn Direct rõ rệt ở mọi ô đã có.
+- MCTS không hơn Best-of-16 ở ô nào. MCTS tốn khoảng 12 lần token cho mỗi bài giải được trên APPS.
+- Critic không giúp một cách nhất quán (cộng 5 ô: thắng 11, thua 10).
+- Search, chưa tính critic, cải thiện rất rõ so với chương trình đầu tiên mà nó sinh ra.
 
-Mục tiêu nghiên cứu: Hoàn tất phần thực nghiệm của tiểu luận / luận văn chuyên ngành với bảng đối đầu đầy đủ giữa 7B và 14B, làm nổi bật vai trò của MCTS và cơ chế phản hồi kiểm thử trong việc nâng cao năng lực suy luận của các mô hình ngôn ngữ nhỏ (SLMs).
+## Việc đang mở
+
+- Chạy xong MCTS APPS của Qwen3.5 (Colab khi ổn định, hoặc chạy lại từ đầu trên Modal nếu tăng hạn mức). Sau đó chạy `analyze_v3.py` cho cả 3 model và cập nhật ledger.
+- Sửa lỗi kiểm tra CRLF khi resume ([RA_SOAT_2026-11-13.md](../RA_SOAT_2026-11-13.md) mục 2.2). Thêm test cho `analyze_v3.py`.
+- Viết lại các chương báo cáo theo [KHUNG_BAO_CAO_v2.md](../report/KHUNG_BAO_CAO_v2.md).
+- Tùy chọn: E5–E7.

@@ -54,7 +54,7 @@ Chuẩn bị APPS từ raw local sang thư mục mới, giữ dữ liệu cũ:
 python3 -m rethink_mcts.cli prepare --dataset apps \
   --raw-path data/apps/apps_300.jsonl --output prepared/apps_v2
 python3 -m rethink_mcts.cli benchmark \
-  --config configs/research_base.yaml \
+  --config configs/research_base.yaml  # v2, đã lưu trữ ở tag archive/pre-v3-2026-11-13 \
   --output-dir runs/apps_v2_dry_run --dry-run
 ```
 
@@ -62,7 +62,7 @@ python3 -m rethink_mcts.cli benchmark \
 
 ```bash
 python3 -m rethink_mcts.cli benchmark \
-  --config configs/research_base.yaml --output-dir runs/he_7b_trace \
+  --config configs/research_base.yaml  # v2, đã lưu trữ ở tag archive/pre-v3-2026-11-13 --output-dir runs/he_7b_trace \
   --set model.model=Qwen/Qwen2.5-Coder-7B-Instruct \
   --set data.adapter=humaneval \
   --set data.prepared_public_path=prepared/humaneval/public/problems.jsonl \
