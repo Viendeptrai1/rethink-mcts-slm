@@ -1,0 +1,321 @@
+[
+  {
+    "candidate_id": "cand_abeb60d5b9",
+    "problem_id": "apps_1888",
+    "code": "def minimize_debts(n, debts):\n    from collections import defaultdict\n\n    # Create a balance array to track net debts\n    balance = [0] * (n + 1)\n\n    # Calculate net balance for each person\n    for a, b, c in debts:\n        balance[a] -= c\n        balance[b] += c\n\n    # Filter out people with zero balance\n    non_zero_balances = [b for b in balance if b != 0]\n\n    def dfs(start):\n        # Skip settled accounts\n        while start < len(non_zero_balances) and non_zero_balances[start] == 0:\n            start += 1\n        if start == len(non_zero_balances):\n            return 0\n        min_debt = float('inf')\n        for i in range(start + 1, len(non_zero_balances)):\n            if non_zero_balances[start] * non_zero_balances[i] < 0:\n                # Try to settle start with i\n                non_zero_balances[i] += non_zero_balances[start]\n                min_debt = min(min_debt, abs(non_zero_balances[start]) + dfs(start + 1))\n                # Backtrack\n                non_zero_balances[i] -= non_zero_balances[start]\n        return min_debt\n\n    return dfs(0)\n\n# Read input\nimport sys\ninput = sys.stdin.read\ndata = input().split()\n\nn = int(data[0])\nm = int(data[1])\ndebts = []\n\nindex = 2\nfor _ in range(m):\n    a = int(data[index])\n    b = int(data[index + 1])\n    c = int(data[index + 2])\n    debts.append((a, b, c))\n    index += 3\n\n# Output the result\nprint(minimize_debts(n, debts))",
+    "code_hash": "047ab0bed9263f4c",
+    "language": "python",
+    "node_id": "n_1_5d271c",
+    "revision_id": "rev_n_1_5d271c_0",
+    "thought_path_snapshot": [
+      "Use a graph representation to model the debts"
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 1
+  },
+  {
+    "candidate_id": "cand_83c025d8b1",
+    "problem_id": "apps_1888",
+    "code": "def minimize_debts(n, debts):\n    from collections import defaultdict\n\n    # Calculate net debts for each person\n    net_debts = defaultdict(int)\n    for a, b, c in debts:\n        net_debts[a] -= c\n        net_debts[b] += c\n\n    # Separate people into two groups: those who owe money and those who are owed money\n    debtors = []\n    creditors = []\n    for person, debt in net_debts.items():\n        if debt < 0:\n            debtors.append((person, -debt))\n        elif debt > 0:\n            creditors.append((person, debt))\n\n    # Sort debtors and creditors by the amount of debt/credit\n    debtors.sort(key=lambda x: x[1])\n    creditors.sort(key=lambda x: x[1])\n\n    # Minimize the total debt by settling debts between debtors and creditors\n    i, j = 0, 0\n    total_debt = 0\n    while i < len(debtors) and j < len(creditors):\n        debtor, debt_amount = debtors[i]\n        creditor, credit_amount = creditors[j]\n\n        # Determine the amount to settle\n        settle_amount = min(debt_amount, credit_amount)\n        total_debt += settle_amount\n\n        # Update the remaining debt/credit\n        debtors[i] = (debtor, debt_amount - settle_amount)\n        creditors[j] = (creditor, credit_amount - settle_amount)\n\n        # Move to the next debtor or creditor if their debt/credit is settled\n        if debtors[i][1] == 0:\n            i += 1\n        if creditors[j][1] == 0:\n            j += 1\n\n    return total_debt\n\n# Read input\nimport sys\ninput = sys.stdin.read\ndata = input().split()\n\nn = int(data[0])\nm = int(data[1])\ndebts = []\nindex = 2\nfor _ in range(m):\n    a = int(data[index])\n    b = int(data[index + 1])\n    c = int(data[index + 2])\n    debts.append((a, b, c))\n    index += 3\n\n# Output the result\nprint(minimize_debts(n, debts))",
+    "code_hash": "27eae9627f5f4393",
+    "language": "python",
+    "node_id": "n_1_5d271c",
+    "revision_id": "rev_n_1_5d271c_1",
+    "thought_path_snapshot": [
+      "The current approach using DFS to minimize debts is incorrect. Instead, we should use a greedy algorithm that iteratively settles debts between the person with the maximum debt and the person with the minimum debt. This approach ensures we always make the optimal choice at each step, leading to the minimum total debt."
+    ],
+    "origin": "rethink",
+    "generation_record_id": null,
+    "created_sequence": 2
+  },
+  {
+    "candidate_id": "cand_f576c5776e",
+    "problem_id": "apps_1888",
+    "code": "def minimize_debts(n, debts):\n    from collections import defaultdict\n\n    # Create a balance array to track net debts\n    balance = [0] * (n + 1)\n\n    # Calculate net balance for each person\n    for a, b, c in debts:\n        balance[a] -= c\n        balance[b] += c\n\n    # Separate people into two groups: those who owe money and those who are owed money\n    debtors = []\n    creditors = []\n\n    for i in range(1, n + 1):\n        if balance[i] < 0:\n            debtors.append(-balance[i])\n        elif balance[i] > 0:\n            creditors.append(balance[i])\n\n    # Sort both lists\n    debtors.sort()\n    creditors.sort()\n\n    # Minimize the total debt by matching debtors with creditors\n    min_debt = 0\n    for i in range(len(debtors)):\n        min_debt += min(debtors[i], creditors[i])\n\n    return min_debt\n\n# Read input\nimport sys\ninput = sys.stdin.read\ndata = input().split()\n\nn = int(data[0])\nm = int(data[1])\n\ndebts = []\nindex = 2\nfor _ in range(m):\n    a = int(data[index])\n    b = int(data[index + 1])\n    c = int(data[index + 2])\n    debts.append((a, b, c))\n    index += 3\n\n# Get the result and print it\nresult = minimize_debts(n, debts)\nprint(result)",
+    "code_hash": "7d65f928503a6635",
+    "language": "python",
+    "node_id": "n_2_04c1f5",
+    "revision_id": "rev_n_2_04c1f5_0",
+    "thought_path_snapshot": [
+      "Apply a network flow algorithm to minimize the total debt"
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 3
+  },
+  {
+    "candidate_id": "cand_2e9bcfe66b",
+    "problem_id": "apps_1888",
+    "code": "def minimize_debts(n, debts):\n    from collections import defaultdict\n\n    # Calculate net balance for each person\n    balance = defaultdict(int)\n    for a, b, c in debts:\n        balance[a] -= c\n        balance[b] += c\n\n    # Separate debtors and creditors\n    debtors = []\n    creditors = []\n    for person, bal in balance.items():\n        if bal < 0:\n            debtors.append((person, -bal))\n        elif bal > 0:\n            creditors.append((person, bal))\n\n    # Sort debtors and creditors by amount\n    debtors.sort(key=lambda x: x[1], reverse=True)\n    creditors.sort(key=lambda x: x[1], reverse=True)\n\n    # Minimize the total debt\n    total_debt = 0\n    i, j = 0, 0\n    while i < len(debtors) and j < len(creditors):\n        debt_person, debt_amount = debtors[i]\n        cred_person, cred_amount = creditors[j]\n\n        # Determine the amount to settle\n        settle_amount = min(debt_amount, cred_amount)\n        total_debt += settle_amount\n\n        # Update the remaining amounts\n        debtors[i] = (debt_person, debt_amount - settle_amount)\n        creditors[j] = (cred_person, cred_amount - settle_amount)\n\n        # Move to the next debtor or creditor if their amount is settled\n        if debtors[i][1] == 0:\n            i += 1\n        if creditors[j][1] == 0:\n            j += 1\n\n    return total_debt\n\n# Read input\nimport sys\ninput = sys.stdin.read\ndata = input().split()\n\nn = int(data[0])\nm = int(data[1])\ndebts = []\nindex = 2\nfor _ in range(m):\n    a = int(data[index])\n    b = int(data[index + 1])\n    c = int(data[index + 2])\n    debts.append((a, b, c))\n    index += 3\n\n# Get the result and print it\nresult = minimize_debts(n, debts)\nprint(result)",
+    "code_hash": "71f34d67eba62725",
+    "language": "python",
+    "node_id": "n_2_04c1f5",
+    "revision_id": "rev_n_2_04c1f5_1",
+    "thought_path_snapshot": [
+      "The previous approach of using a network flow algorithm was incorrect. Instead, we should use a greedy approach to minimize the total debt. Sort the debtors and creditors by their absolute values and match them from largest to smallest. This ensures that we minimize the total amount of money transferred in the process."
+    ],
+    "origin": "rethink",
+    "generation_record_id": null,
+    "created_sequence": 4
+  },
+  {
+    "candidate_id": "cand_6a14d3db6e",
+    "problem_id": "apps_1888",
+    "code": "def minimize_debts(n, debts):\n    from collections import defaultdict\n\n    # Calculate net debts for each person\n    net_debts = defaultdict(int)\n    for a, b, c in debts:\n        net_debts[a] -= c\n        net_debts[b] += c\n\n    # Separate people into two groups: those who owe money and those who are owed money\n    debtors = []\n    creditors = []\n    for person, debt in net_debts.items():\n        if debt < 0:\n            debtors.append((person, -debt))\n        elif debt > 0:\n            creditors.append((person, debt))\n\n    # Sort debtors and creditors by the amount of debt/credit\n    debtors.sort(key=lambda x: x[1])\n    creditors.sort(key=lambda x: x[1])\n\n    # Minimize the total sum of debts\n    total_min_debts = 0\n    i, j = 0, 0\n    while i < len(debtors) and j < len(creditors):\n        debtor, debt_amount = debtors[i]\n        creditor, credit_amount = creditors[j]\n\n        # Determine the amount to settle between debtor and creditor\n        settled_amount = min(debt_amount, credit_amount)\n        total_min_debts += settled_amount\n\n        # Update the remaining debt/credit\n        if debt_amount > credit_amount:\n            debtors[i] = (debtor, debt_amount - credit_amount)\n            j += 1\n        elif debt_amount < credit_amount:\n            creditors[j] = (creditor, credit_amount - debt_amount)\n            i += 1\n        else:\n            i += 1\n            j += 1\n\n    return total_min_debts\n\n# Example usage:\n# n = 5\n# debts = [(1, 2, 10), (2, 3, 1), (2, 4, 1)]\n# print(minimize_debts(n, debts))  # Output: 10",
+    "code_hash": "a51c890303ea150f",
+    "language": "python",
+    "node_id": "n_3_ac8f54",
+    "revision_id": "rev_n_3_ac8f54_0",
+    "thought_path_snapshot": [
+      "Utilize a greedy approach to cancel out matching debts pairwise"
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 5
+  },
+  {
+    "candidate_id": "cand_8a1d7fe7a6",
+    "problem_id": "apps_1888",
+    "code": "import sys\nfrom collections import defaultdict\nfrom heapq import heappop, heappush\n\ndef min_cost_debts(n, debts):\n    # Create a balance array to track net debts\n    balance = [0] * (n + 1)\n    \n    # Calculate net balance for each person\n    for a, b, c in debts:\n        balance[a] -= c\n        balance[b] += c\n    \n    # Separate people into two groups: those who owe money and those who are owed money\n    debtors = []\n    creditors = []\n    \n    for i in range(1, n + 1):\n        if balance[i] < 0:\n            debtors.append((-balance[i], i))\n        elif balance[i] > 0:\n            creditors.append((balance[i], i))\n    \n    # Min-heap for debtors and creditors\n    debtors = sorted(debtors)\n    creditors = sorted(creditors)\n    \n    # Minimize the total debt by matching debtors with creditors\n    total_min_debt = 0\n    i, j = 0, 0\n    \n    while i < len(debtors) and j < len(creditors):\n        debt_amount, debtor = debtors[i]\n        credit_amount, creditor = creditors[j]\n        \n        # Determine the amount to settle\n        settle_amount = min(debt_amount, credit_amount)\n        \n        # Update the total minimum debt\n        total_min_debt += settle_amount\n        \n        # Update the remaining debt and credit\n        debtors[i] = (debt_amount - settle_amount, debtor)\n        creditors[j] = (credit_amount - settle_amount, creditor)\n        \n        # Move to the next debtor or creditor if their balance is zero\n        if debtors[i][0] == 0:\n            i += 1\n        if creditors[j][0] == 0:\n            j += 1\n    \n    return total_min_debt\n\ndef main():\n    input = sys.stdin.read\n    data = input().split()\n    \n    n = int(data[0])\n    m = int(data[1])\n    \n    debts = []\n    index = 2\n    for _ in range(m):\n        a = int(data[index])\n        b = int(data[index + 1])\n        c = int(data[index + 2])\n        debts.append((a, b, c))\n        index += 3\n    \n    result = min_cost_debts(n, debts)\n    print(result)\n\nif __name__ == \"__main__\":\n    main()",
+    "code_hash": "cf40bc7e14cd14dc",
+    "language": "python",
+    "node_id": "n_3_ac8f54",
+    "revision_id": "rev_n_3_ac8f54_1",
+    "thought_path_snapshot": [
+      "The previous approach of using a greedy algorithm to cancel out matching debts pairwise is not optimal for this problem. Instead, we should use a network flow approach, specifically the min-cost max-flow algorithm, to find the optimal arrangement of debts that minimizes the total sum. This approach ensures that the final arrangement satisfies the condition that each person's net debt is zero while minimizing the total amount of money transferred."
+    ],
+    "origin": "rethink",
+    "generation_record_id": null,
+    "created_sequence": 6
+  },
+  {
+    "candidate_id": "cand_f8034e8733",
+    "problem_id": "apps_1888",
+    "code": "def minimize_debts(n, debts):\n    from collections import defaultdict\n\n    # Create a balance sheet for each person\n    balance = defaultdict(int)\n\n    # Calculate net balance for each person\n    for a, b, c in debts:\n        balance[a] -= c\n        balance[b] += c\n\n    # Separate people into two groups: those who owe money and those who are owed money\n    debtors = []\n    creditors = []\n\n    for person, bal in balance.items():\n        if bal < 0:\n            debtors.append((person, -bal))\n        elif bal > 0:\n            creditors.append((person, bal))\n\n    # Sort debtors by amount owed (descending) and creditors by amount owed (ascending)\n    debtors.sort(key=lambda x: x[1], reverse=True)\n    creditors.sort(key=lambda x: x[1])\n\n    # Settle debts\n    i, j = 0, 0\n    total_debts = 0\n\n    while i < len(debtors) and j < len(creditors):\n        debtor, debt_amount = debtors[i]\n        creditor, credit_amount = creditors[j]\n\n        # Determine the amount to settle\n        settle_amount = min(debt_amount, credit_amount)\n\n        # Update total debts\n        total_debts += settle_amount\n\n        # Update the remaining debt and credit\n        debtors[i] = (debtor, debt_amount - settle_amount)\n        creditors[j] = (creditor, credit_amount - settle_amount)\n\n        # Move to the next debtor or creditor if their debt/credit is fully settled\n        if debtors[i][1] == 0:\n            i += 1\n        if creditors[j][1] == 0:\n            j += 1\n\n    return total_debts\n\n# Read input\nimport sys\ninput = sys.stdin.read\ndata = input().split()\n\nn = int(data[0])\nm = int(data[1])\n\ndebts = []\nindex = 2\nfor _ in range(m):\n    a = int(data[index])\n    b = int(data[index + 1])\n    c = int(data[index + 2])\n    debts.append((a, b, c))\n    index += 3\n\n# Get the result\nresult = minimize_debts(n, debts)\n\n# Print the result\nprint(result)",
+    "code_hash": "de63996e90b06cd2",
+    "language": "python",
+    "node_id": "n_4_022e14",
+    "revision_id": "rev_n_4_022e14_0",
+    "thought_path_snapshot": [
+      "The current approach using DFS to minimize debts is incorrect. Instead, we should use a greedy algorithm that iteratively settles debts between the person with the maximum debt and the person with the minimum debt. This approach ensures we always make the optimal choice at each step, leading to the minimum total debt.",
+      "Use a graph representation to model debts"
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 7
+  },
+  {
+    "candidate_id": "cand_25de1fabb6",
+    "problem_id": "apps_1888",
+    "code": "def minimize_debts(n, debts):\n    from collections import defaultdict\n\n    # Calculate net balance for each person\n    balance = defaultdict(int)\n    for a, b, c in debts:\n        balance[a] -= c\n        balance[b] += c\n\n    # Separate debtors and creditors\n    debtors = []\n    creditors = []\n    for person, bal in balance.items():\n        if bal < 0:\n            debtors.append((person, -bal))\n        elif bal > 0:\n            creditors.append((person, bal))\n\n    # Sort debtors and creditors by amount\n    debtors.sort(key=lambda x: x[1], reverse=True)\n    creditors.sort(key=lambda x: x[1], reverse=True)\n\n    # Minimize the total debt by matching debtors and creditors\n    min_debt = 0\n    i, j = 0, 0\n    while i < len(debtors) and j < len(creditors):\n        debtor, debt_amount = debtors[i]\n        creditor, credit_amount = creditors[j]\n        if debt_amount < credit_amount:\n            min_debt += debt_amount\n            creditors[j] = (creditor, credit_amount - debt_amount)\n            i += 1\n        else:\n            min_debt += credit_amount\n            debtors[i] = (debtor, debt_amount - credit_amount)\n            j += 1\n\n    return min_debt\n\n# Read input\nimport sys\ninput = sys.stdin.read\ndata = input().split()\n\nn = int(data[0])\nm = int(data[1])\ndebts = []\nindex = 2\nfor _ in range(m):\n    a = int(data[index])\n    b = int(data[index + 1])\n    c = int(data[index + 2])\n    debts.append((a, b, c))\n    index += 3\n\n# Output the result\nprint(minimize_debts(n, debts))",
+    "code_hash": "e59fdf4e328df2d3",
+    "language": "python",
+    "node_id": "n_8_16c113",
+    "revision_id": "rev_n_8_16c113_0",
+    "thought_path_snapshot": [
+      "The previous approach of using a network flow algorithm was incorrect. Instead, we should use a greedy approach to minimize the total debt. Sort the debtors and creditors by their absolute values and match them from largest to smallest. This ensures that we minimize the total amount of money transferred in the process.",
+      "Apply a matching algorithm to find the optimal debt arrangement"
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 8
+  },
+  {
+    "candidate_id": "cand_351cf13ef6",
+    "problem_id": "apps_1888",
+    "code": "def minimize_debts(n, debts):\n    from collections import defaultdict\n\n    # Create a balance sheet for each person\n    balance = defaultdict(int)\n\n    # Calculate net balance for each person\n    for a, b, c in debts:\n        balance[a] -= c\n        balance[b] += c\n\n    # Separate people into debtors and creditors\n    debtors = []\n    creditors = []\n\n    for person, bal in balance.items():\n        if bal < 0:\n            debtors.append((person, -bal))\n        elif bal > 0:\n            creditors.append((person, bal))\n\n    # Sort debtors by amount owed (descending) and creditors by amount owed (descending)\n    debtors.sort(key=lambda x: x[1], reverse=True)\n    creditors.sort(key=lambda x: x[1], reverse=True)\n\n    # Settle debts\n    total_debt = 0\n    i, j = 0, 0\n    while i < len(debtors) and j < len(creditors):\n        debtor, debt_amount = debtors[i]\n        creditor, credit_amount = creditors[j]\n\n        # Determine the amount to settle\n        settle_amount = min(debt_amount, credit_amount)\n\n        # Update total debt\n        total_debt += settle_amount\n\n        # Update the remaining debt and credit\n        debtors[i] = (debtor, debt_amount - settle_amount)\n        creditors[j] = (creditor, credit_amount - settle_amount)\n\n        # Move to the next debtor or creditor if their debt/credit is fully settled\n        if debtors[i][1] == 0:\n            i += 1\n        if creditors[j][1] == 0:\n            j += 1\n\n    return total_debt\n\n# Read input\nimport sys\ninput = sys.stdin.read\ndata = input().split()\n\nn = int(data[0])\nm = int(data[1])\n\ndebts = []\nindex = 2\nfor _ in range(m):\n    a = int(data[index])\n    b = int(data[index + 1])\n    c = int(data[index + 2])\n    debts.append((a, b, c))\n    index += 3\n\n# Get the result\nresult = minimize_debts(n, debts)\n\n# Print the result\nprint(result)",
+    "code_hash": "2ec5ef26f7697b09",
+    "language": "python",
+    "node_id": "n_5_a89399",
+    "revision_id": "rev_n_5_a89399_0",
+    "thought_path_snapshot": [
+      "The current approach using DFS to minimize debts is incorrect. Instead, we should use a greedy algorithm that iteratively settles debts between the person with the maximum debt and the person with the minimum debt. This approach ensures we always make the optimal choice at each step, leading to the minimum total debt.",
+      "Implement a greedy algorithm to iteratively settle debts between max debtor and max creditor"
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 9
+  },
+  {
+    "candidate_id": "cand_a8d14f4ed0",
+    "problem_id": "apps_1888",
+    "code": "def minimize_debts(n, debts):\n    from collections import defaultdict\n\n    # Calculate net balance for each person\n    balance = defaultdict(int)\n    for a, b, c in debts:\n        balance[a] -= c\n        balance[b] += c\n\n    # Separate debtors and creditors\n    debtors = []\n    creditors = []\n    for person, bal in balance.items():\n        if bal < 0:\n            debtors.append((person, -bal))\n        elif bal > 0:\n            creditors.append((person, bal))\n\n    # Sort debtors and creditors by amount\n    debtors.sort(key=lambda x: x[1], reverse=True)\n    creditors.sort(key=lambda x: x[1], reverse=True)\n\n    # Minimize the total debt by matching largest debtor with largest creditor\n    total_debt = 0\n    i, j = 0, 0\n    while i < len(debtors) and j < len(creditors):\n        debtor, debt_amount = debtors[i]\n        creditor, credit_amount = creditors[j]\n        if debt_amount < credit_amount:\n            total_debt += debt_amount\n            creditors[j] = (creditor, credit_amount - debt_amount)\n            i += 1\n        else:\n            total_debt += credit_amount\n            debtors[i] = (debtor, debt_amount - credit_amount)\n            j += 1\n\n    return total_debt\n\n# Read input\nimport sys\ninput = sys.stdin.read\ndata = input().split()\n\nn = int(data[0])\nm = int(data[1])\ndebts = []\nindex = 2\nfor _ in range(m):\n    a = int(data[index])\n    b = int(data[index + 1])\n    c = int(data[index + 2])\n    debts.append((a, b, c))\n    index += 3\n\n# Output the result\nprint(minimize_debts(n, debts))",
+    "code_hash": "399b690e88d32366",
+    "language": "python",
+    "node_id": "n_7_60b12f",
+    "revision_id": "rev_n_7_60b12f_0",
+    "thought_path_snapshot": [
+      "The previous approach of using a network flow algorithm was incorrect. Instead, we should use a greedy approach to minimize the total debt. Sort the debtors and creditors by their absolute values and match them from largest to smallest. This ensures that we minimize the total amount of money transferred in the process.",
+      "Use a graph representation to model the debts"
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 10
+  },
+  {
+    "candidate_id": "cand_9817a57843",
+    "problem_id": "apps_1888",
+    "code": "def minimize_debts(n, debts):\n    from collections import defaultdict\n\n    # Calculate net balance for each person\n    balance = defaultdict(int)\n    for a, b, c in debts:\n        balance[a] -= c\n        balance[b] += c\n\n    # Separate people into two groups: those who owe money and those who are owed money\n    debtors = []\n    creditors = []\n    for person in range(1, n + 1):\n        if balance[person] < 0:\n            debtors.append((person, -balance[person]))\n        elif balance[person] > 0:\n            creditors.append((person, balance[person]))\n\n    # Sort debtors by amount owed (descending) and creditors by amount owed (ascending)\n    debtors.sort(key=lambda x: x[1], reverse=True)\n    creditors.sort(key=lambda x: x[1])\n\n    # Settle debts\n    i, j = 0, 0\n    total_debts = 0\n    while i < len(debtors) and j < len(creditors):\n        debtor, debt_amount = debtors[i]\n        creditor, credit_amount = creditors[j]\n\n        # Determine the amount to settle\n        settle_amount = min(debt_amount, credit_amount)\n        total_debts += settle_amount\n\n        # Update the remaining debt and credit\n        debtors[i] = (debtor, debt_amount - settle_amount)\n        creditors[j] = (creditor, credit_amount - settle_amount)\n\n        # Move to the next debtor or creditor if their debt/credit is fully settled\n        if debtors[i][1] == 0:\n            i += 1\n        if creditors[j][1] == 0:\n            j += 1\n\n    return total_debts\n\n# Read input\nimport sys\ninput = sys.stdin.read\ndata = input().split()\n\nn = int(data[0])\nm = int(data[1])\ndebts = []\nindex = 2\nfor _ in range(m):\n    a = int(data[index])\n    b = int(data[index + 1])\n    c = int(data[index + 2])\n    debts.append((a, b, c))\n    index += 3\n\n# Output the result\nprint(minimize_debts(n, debts))",
+    "code_hash": "7241a8085e435786",
+    "language": "python",
+    "node_id": "n_6_dd6b66",
+    "revision_id": "rev_n_6_dd6b66_0",
+    "thought_path_snapshot": [
+      "The current approach using DFS to minimize debts is incorrect. Instead, we should use a greedy algorithm that iteratively settles debts between the person with the maximum debt and the person with the minimum debt. This approach ensures we always make the optimal choice at each step, leading to the minimum total debt.",
+      "Calculate the net balance for each person and use it to determine who owes and who is owed"
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 11
+  },
+  {
+    "candidate_id": "cand_59fd9f3a18",
+    "problem_id": "apps_1888",
+    "code": "def minimize_debts(n, debts):\n    from collections import defaultdict\n\n    # Calculate net balance for each person\n    balance = defaultdict(int)\n    for a, b, c in debts:\n        balance[a] -= c\n        balance[b] += c\n\n    # Separate debtors and creditors\n    debtors = []\n    creditors = []\n    for person, bal in balance.items():\n        if bal < 0:\n            debtors.append((person, -bal))\n        elif bal > 0:\n            creditors.append((person, bal))\n\n    # Sort debtors and creditors by amount\n    debtors.sort(key=lambda x: x[1], reverse=True)\n    creditors.sort(key=lambda x: x[1], reverse=True)\n\n    # Minimize the total debt by matching largest debtor with largest creditor\n    total_debt = 0\n    i, j = 0, 0\n    while i < len(debtors) and j < len(creditors):\n        debtor, debt_amount = debtors[i]\n        creditor, credit_amount = creditors[j]\n        if debt_amount < credit_amount:\n            total_debt += debt_amount\n            creditors[j] = (creditor, credit_amount - debt_amount)\n            i += 1\n        else:\n            total_debt += credit_amount\n            debtors[i] = (debtor, debt_amount - credit_amount)\n            j += 1\n\n    return total_debt\n\n# Read input\nimport sys\ninput = sys.stdin.read\ndata = input().split()\n\nn = int(data[0])\nm = int(data[1])\ndebts = []\nindex = 2\nfor _ in range(m):\n    a = int(data[index])\n    b = int(data[index + 1])\n    c = int(data[index + 2])\n    debts.append((a, b, c))\n    index += 3\n\n# Output the result\nprint(minimize_debts(n, debts))",
+    "code_hash": "399b690e88d32366",
+    "language": "python",
+    "node_id": "n_9_0bd78f",
+    "revision_id": "rev_n_9_0bd78f_0",
+    "thought_path_snapshot": [
+      "The previous approach of using a network flow algorithm was incorrect. Instead, we should use a greedy approach to minimize the total debt. Sort the debtors and creditors by their absolute values and match them from largest to smallest. This ensures that we minimize the total amount of money transferred in the process.",
+      "Implement a greedy approach by sorting debts and matching from largest to smallest"
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 12
+  },
+  {
+    "candidate_id": "cand_5feb781dca",
+    "problem_id": "apps_1888",
+    "code": "import sys\nfrom collections import defaultdict\nfrom heapq import heappop, heappush\n\ndef min_cost_debts(n, debts):\n    # Create a balance array to track net debts\n    balance = [0] * (n + 1)\n    \n    # Calculate net balance for each person\n    for a, b, c in debts:\n        balance[a] -= c\n        balance[b] += c\n    \n    # Separate people into two groups: those who owe money and those who are owed money\n    debtors = []\n    creditors = []\n    \n    for i in range(1, n + 1):\n        if balance[i] < 0:\n            debtors.append((-balance[i], i))\n        elif balance[i] > 0:\n            creditors.append((balance[i], i))\n    \n    # Min-heap for debtors and creditors\n    debtors = [(cost, person) for cost, person in debtors]\n    creditors = [(cost, person) for cost, person in creditors]\n    \n    # Minimize the total debt by matching debtors and creditors\n    total_min_cost = 0\n    while debtors and creditors:\n        debt_cost, debtor = heappop(debtors)\n        cred_cost, creditor = heappop(creditors)\n        \n        # The amount to settle is the minimum of what the debtor owes and what the creditor is owed\n        settle_amount = min(debt_cost, cred_cost)\n        total_min_cost += settle_amount\n        \n        # Update the remaining debt and credit\n        if debt_cost > cred_cost:\n            heappush(debtors, (debt_cost - cred_cost, debtor))\n        elif debt_cost < cred_cost:\n            heappush(creditors, (cred_cost - debt_cost, creditor))\n    \n    return total_min_cost\n\ndef main():\n    input = sys.stdin.read\n    data = input().split()\n    \n    n = int(data[0])\n    m = int(data[1])\n    \n    debts = []\n    index = 2\n    for _ in range(m):\n        a = int(data[index])\n        b = int(data[index + 1])\n        c = int(data[index + 2])\n        debts.append((a, b, c))\n        index += 3\n    \n    result = min_cost_debts(n, debts)\n    print(result)\n\nif __name__ == \"__main__\":\n    main()",
+    "code_hash": "53714f1574469177",
+    "language": "python",
+    "node_id": "n_10_14c7f1",
+    "revision_id": "rev_n_10_14c7f1_0",
+    "thought_path_snapshot": [
+      "The previous approach of using a greedy algorithm to cancel out matching debts pairwise is not optimal for this problem. Instead, we should use a network flow approach, specifically the min-cost max-flow algorithm, to find the optimal arrangement of debts that minimizes the total sum. This approach ensures that the final arrangement satisfies the condition that each person's net debt is zero while minimizing the total amount of money transferred.",
+      "Use a graph representation to model debts"
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 13
+  },
+  {
+    "candidate_id": "cand_9f2beabc72",
+    "problem_id": "apps_1888",
+    "code": "def minimize_debts(n, debts):\n    from collections import defaultdict\n\n    # Create a balance sheet for each person\n    balance = defaultdict(int)\n\n    # Calculate net balance for each person\n    for a, b, c in debts:\n        balance[a] -= c\n        balance[b] += c\n\n    # Separate people into two groups: those who owe money and those who are owed money\n    debtors = []\n    creditors = []\n\n    for person, bal in balance.items():\n        if bal < 0:\n            debtors.append((person, -bal))\n        elif bal > 0:\n            creditors.append((person, bal))\n\n    # Sort debtors by amount owed (descending) and creditors by amount owed (ascending)\n    debtors.sort(key=lambda x: x[1], reverse=True)\n    creditors.sort(key=lambda x: x[1])\n\n    # Minimize the total amount of money transferred\n    i, j = 0, 0\n    total_debts = 0\n\n    while i < len(debtors) and j < len(creditors):\n        debtor, debt_amount = debtors[i]\n        creditor, credit_amount = creditors[j]\n\n        # Determine the amount to settle between the debtor and creditor\n        settled_amount = min(debt_amount, credit_amount)\n\n        # Update the total debts\n        total_debts += settled_amount\n\n        # Update the remaining debt and credit\n        debtors[i] = (debtor, debt_amount - settled_amount)\n        creditors[j] = (creditor, credit_amount - settled_amount)\n\n        # Move to the next debtor or creditor if their debt/credit is fully settled\n        if debtors[i][1] == 0:\n            i += 1\n        if creditors[j][1] == 0:\n            j += 1\n\n    return total_debts\n\n# Read input\nimport sys\ninput = sys.stdin.read\ndata = input().split()\n\nn = int(data[0])\nm = int(data[1])\n\ndebts = []\nindex = 2\nfor _ in range(m):\n    a = int(data[index])\n    b = int(data[index + 1])\n    c = int(data[index + 2])\n    debts.append((a, b, c))\n    index += 3\n\n# Get the result and print it\nresult = minimize_debts(n, debts)\nprint(result)",
+    "code_hash": "0697a5dacbf182dc",
+    "language": "python",
+    "node_id": "n_13_dcbe11",
+    "revision_id": "rev_n_13_dcbe11_0",
+    "thought_path_snapshot": [
+      "The current approach using DFS to minimize debts is incorrect. Instead, we should use a greedy algorithm that iteratively settles debts between the person with the maximum debt and the person with the minimum debt. This approach ensures we always make the optimal choice at each step, leading to the minimum total debt.",
+      "Use a graph representation to model debts",
+      "Use a graph representation to model debts between people"
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 14
+  },
+  {
+    "candidate_id": "cand_77c38094dd",
+    "problem_id": "apps_1888",
+    "code": "def minimize_debts(n, debts):\n    from collections import defaultdict\n\n    # Calculate net balance for each person\n    balance = defaultdict(int)\n    for a, b, c in debts:\n        balance[a] -= c\n        balance[b] += c\n\n    # Separate debtors and creditors\n    debtors = []\n    creditors = []\n    for person, bal in balance.items():\n        if bal < 0:\n            debtors.append((person, -bal))\n        elif bal > 0:\n            creditors.append((person, bal))\n\n    # Sort debtors and creditors by amount\n    debtors.sort(key=lambda x: x[1], reverse=True)\n    creditors.sort(key=lambda x: x[1], reverse=True)\n\n    # Minimize the total debt by matching debtors and creditors\n    min_debt = 0\n    i, j = 0, 0\n    while i < len(debtors) and j < len(creditors):\n        debtor, debt_amount = debtors[i]\n        creditor, credit_amount = creditors[j]\n        if debt_amount < credit_amount:\n            min_debt += debt_amount\n            creditors[j] = (creditor, credit_amount - debt_amount)\n            i += 1\n        else:\n            min_debt += credit_amount\n            debtors[i] = (debtor, debt_amount - credit_amount)\n            j += 1\n\n    return min_debt\n\n# Read input\nimport sys\ninput = sys.stdin.read\ndata = input().split()\n\nn = int(data[0])\nm = int(data[1])\ndebts = []\nindex = 2\nfor _ in range(m):\n    a = int(data[index])\n    b = int(data[index + 1])\n    c = int(data[index + 2])\n    debts.append((a, b, c))\n    index += 3\n\n# Output the result\nprint(minimize_debts(n, debts))",
+    "code_hash": "e59fdf4e328df2d3",
+    "language": "python",
+    "node_id": "n_16_9e970c",
+    "revision_id": "rev_n_16_9e970c_0",
+    "thought_path_snapshot": [
+      "The previous approach of using a network flow algorithm was incorrect. Instead, we should use a greedy approach to minimize the total debt. Sort the debtors and creditors by their absolute values and match them from largest to smallest. This ensures that we minimize the total amount of money transferred in the process.",
+      "Apply a matching algorithm to find the optimal debt arrangement",
+      "Use a graph representation to model debts"
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 15
+  },
+  {
+    "candidate_id": "cand_d65cbf625f",
+    "problem_id": "apps_1888",
+    "code": "def minimize_debts(n, debts):\n    from collections import defaultdict\n\n    # Create a balance array to track net debts\n    balance = [0] * (n + 1)\n\n    # Calculate net balance for each person\n    for a, b, c in debts:\n        balance[a] -= c\n        balance[b] += c\n\n    # Separate debtors and creditors\n    debtors = []\n    creditors = []\n\n    for i in range(1, n + 1):\n        if balance[i] < 0:\n            debtors.append((i, -balance[i]))\n        elif balance[i] > 0:\n            creditors.append((i, balance[i]))\n\n    # Sort debtors by amount owed (descending) and creditors by amount owed (descending)\n    debtors.sort(key=lambda x: x[1], reverse=True)\n    creditors.sort(key=lambda x: x[1], reverse=True)\n\n    # Minimize the total debt by settling debts between debtors and creditors\n    total_min_debt = 0\n    i, j = 0, 0\n\n    while i < len(debtors) and j < len(creditors):\n        debtor, debt_amount = debtors[i]\n        creditor, credit_amount = creditors[j]\n\n        # Determine the amount to settle\n        settle_amount = min(debt_amount, credit_amount)\n\n        # Update the total minimum debt\n        total_min_debt += settle_amount\n\n        # Update the remaining debt and credit\n        debtors[i] = (debtor, debt_amount - settle_amount)\n        creditors[j] = (creditor, credit_amount - settle_amount)\n\n        # Move to the next debtor or creditor if their debt/credit is fully settled\n        if debtors[i][1] == 0:\n            i += 1\n        if creditors[j][1] == 0:\n            j += 1\n\n    return total_min_debt\n\n# Read input\nimport sys\ninput = sys.stdin.read\ndata = input().split()\n\nn = int(data[0])\nm = int(data[1])\n\ndebts = []\nindex = 2\nfor _ in range(m):\n    a = int(data[index])\n    b = int(data[index + 1])\n    c = int(data[index + 2])\n    debts.append((a, b, c))\n    index += 3\n\n# Get the result and print it\nresult = minimize_debts(n, debts)\nprint(result)",
+    "code_hash": "cc5593852fe6cbf0",
+    "language": "python",
+    "node_id": "n_19_ee80eb",
+    "revision_id": "rev_n_19_ee80eb_0",
+    "thought_path_snapshot": [
+      "The current approach using DFS to minimize debts is incorrect. Instead, we should use a greedy algorithm that iteratively settles debts between the person with the maximum debt and the person with the minimum debt. This approach ensures we always make the optimal choice at each step, leading to the minimum total debt.",
+      "Implement a greedy algorithm to iteratively settle debts between max debtor and max creditor",
+      "Use a graph representation to model debts"
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 16
+  },
+  {
+    "candidate_id": "cand_2527e3e6d1",
+    "problem_id": "apps_1888",
+    "code": "def minimize_debts(n, debts):\n    from collections import defaultdict\n\n    # Calculate net debt for each person\n    net_debt = defaultdict(int)\n    for a, b, c in debts:\n        net_debt[a] -= c\n        net_debt[b] += c\n\n    # Separate debtors and creditors\n    debtors = []\n    creditors = []\n    for person, debt in net_debt.items():\n        if debt < 0:\n            debtors.append((person, -debt))\n        elif debt > 0:\n            creditors.append((person, debt))\n\n    # Sort debtors and creditors by amount\n    debtors.sort(key=lambda x: x[1], reverse=True)\n    creditors.sort(key=lambda x: x[1], reverse=True)\n\n    # Minimize the total debt\n    total_min_debt = 0\n    i, j = 0, 0\n    while i < len(debtors) and j < len(creditors):\n        debtor, debt_amount = debtors[i]\n        creditor, credit_amount = creditors[j]\n        transfer_amount = min(debt_amount, credit_amount)\n        total_min_debt += transfer_amount\n        debtors[i] = (debtor, debt_amount - transfer_amount)\n        creditors[j] = (creditor, credit_amount - transfer_amount)\n        if debtors[i][1] == 0:\n            i += 1\n        if creditors[j][1] == 0:\n            j += 1\n\n    return total_min_debt\n\n# Read input\nimport sys\ninput = sys.stdin.read\ndata = input().split()\n\nn = int(data[0])\nm = int(data[1])\ndebts = []\nindex = 2\nfor _ in range(m):\n    a = int(data[index])\n    b = int(data[index + 1])\n    c = int(data[index + 2])\n    debts.append((a, b, c))\n    index += 3\n\n# Get the result and print it\nresult = minimize_debts(n, debts)\nprint(result)",
+    "code_hash": "d98c2c7c90a93611",
+    "language": "python",
+    "node_id": "n_23_94930f",
+    "revision_id": "rev_n_23_94930f_0",
+    "thought_path_snapshot": [
+      "The previous approach of using a network flow algorithm was incorrect. Instead, we should use a greedy approach to minimize the total debt. Sort the debtors and creditors by their absolute values and match them from largest to smallest. This ensures that we minimize the total amount of money transferred in the process.",
+      "Use a graph representation to model the debts",
+      "Calculate the net debt for each person by subtracting the amount they owe from the amount they are owed"
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 17
+  },
+  {
+    "candidate_id": "cand_e6b0c462e5",
+    "problem_id": "apps_1888",
+    "code": "import sys\nfrom collections import defaultdict, deque\n\ndef min_cost_max_flow(n, debts):\n    # Create a graph with capacities and costs\n    capacity = defaultdict(lambda: defaultdict(int))\n    cost = defaultdict(lambda: defaultdict(int))\n    \n    # Add edges for the debts\n    for a, b, c in debts:\n        capacity[a][b] += c\n        cost[a][b] += c\n        cost[b][a] -= c  # Reverse edge for cost adjustment\n\n    # Initialize variables for the min-cost max-flow algorithm\n    total_flow = 0\n    total_cost = 0\n    INF = float('inf')\n    \n    while True:\n        # Use Bellman-Ford to find the shortest path with negative cost\n        dist = [INF] * (n + 1)\n        parent = [-1] * (n + 1)\n        in_queue = [False] * (n + 1)\n        dist[1] = 0\n        queue = deque([1])\n        in_queue[1] = True\n        \n        while queue:\n            u = queue.popleft()\n            in_queue[u] = False\n            for v in capacity[u]:\n                if capacity[u][v] > 0 and dist[v] > dist[u] + cost[u][v]:\n                    dist[v] = dist[u] + cost[u][v]\n                    parent[v] = u\n                    if not in_queue[v]:\n                        queue.append(v)\n                        in_queue[v] = True\n        \n        # If no path found, break the loop\n        if dist[n] == INF:\n            break\n        \n        # Find the maximum flow through the path found\n        path_flow = INF\n        v = n\n        while v != 1:\n            u = parent[v]\n            path_flow = min(path_flow, capacity[u][v])\n            v = u\n        \n        # Update capacities and costs\n        v = n\n        while v != 1:\n            u = parent[v]\n            capacity[u][v] -= path_flow\n            capacity[v][u] += path_flow\n            total_cost += path_flow * cost[u][v]\n            v = u\n        \n        total_flow += path_flow\n    \n    return total_cost\n\ndef main():\n    input = sys.stdin.read\n    data = input().split()\n    \n    n = int(data[0])\n    m = int(data[1])\n    \n    debts = []\n    index = 2\n    for _ in range(m):\n        a = int(data[index])\n        b = int(data[index + 1])\n        c = int(data[index + 2])\n        debts.append((a, b, c))\n        index += 3\n    \n    result = min_cost_max_flow(n, debts)\n    print(result)\n\nif __name__ == \"__main__\":\n    main()",
+    "code_hash": "327c09e66642056f",
+    "language": "python",
+    "node_id": "n_11_f5f617",
+    "revision_id": "rev_n_11_f5f617_0",
+    "thought_path_snapshot": [
+      "The previous approach of using a greedy algorithm to cancel out matching debts pairwise is not optimal for this problem. Instead, we should use a network flow approach, specifically the min-cost max-flow algorithm, to find the optimal arrangement of debts that minimizes the total sum. This approach ensures that the final arrangement satisfies the condition that each person's net debt is zero while minimizing the total amount of money transferred.",
+      "Apply the min-cost max-flow algorithm to find optimal debt arrangement"
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 18
+  },
+  {
+    "candidate_id": "cand_a4de94745b",
+    "problem_id": "apps_1888",
+    "code": "def minimize_debts(n, debts):\n    from collections import defaultdict\n\n    # Create a balance sheet for each person\n    balance = defaultdict(int)\n\n    # Calculate the net balance for each person\n    for a, b, c in debts:\n        balance[a] -= c\n        balance[b] += c\n\n    # Separate people into two groups: those who owe money and those who are owed money\n    debtors = []\n    creditors = []\n\n    for person in range(1, n + 1):\n        if balance[person] < 0:\n            debtors.append((person, -balance[person]))\n        elif balance[person] > 0:\n            creditors.append((person, balance[person]))\n\n    # Initialize the minimum sum of debts\n    min_sum = 0\n\n    # Use a two-pointer technique to settle debts optimally\n    i, j = 0, 0\n    while i < len(debtors) and j < len(creditors):\n        debtor, debt_amount = debtors[i]\n        creditor, credit_amount = creditors[j]\n\n        # Determine the amount to settle between the debtor and creditor\n        settle_amount = min(debt_amount, credit_amount)\n\n        # Add the settled amount to the minimum sum\n        min_sum += settle_amount\n\n        # Update the remaining debt and credit\n        debtors[i] = (debtor, debt_amount - settle_amount)\n        creditors[j] = (creditor, credit_amount - settle_amount)\n\n        # Move to the next debtor or creditor if their debt/credit is fully settled\n        if debtors[i][1] == 0:\n            i += 1\n        if creditors[j][1] == 0:\n            j += 1\n\n    return min_sum\n\n# Read input\nimport sys\ninput = sys.stdin.read\ndata = input().split()\n\nn = int(data[0])\nm = int(data[1])\n\ndebts = []\nindex = 2\nfor _ in range(m):\n    a = int(data[index])\n    b = int(data[index + 1])\n    c = int(data[index + 2])\n    debts.append((a, b, c))\n    index += 3\n\n# Get the result and print it\nresult = minimize_debts(n, debts)\nprint(result)",
+    "code_hash": "4be33e4107522361",
+    "language": "python",
+    "node_id": "n_11_f5f617",
+    "revision_id": "rev_n_11_f5f617_1",
+    "thought_path_snapshot": [
+      "The previous approach of using a greedy algorithm to cancel out matching debts pairwise is not optimal for this problem. Instead, we should use a network flow approach, specifically the min-cost max-flow algorithm, to find the optimal arrangement of debts that minimizes the total sum. This approach ensures that the final arrangement satisfies the condition that each person's net debt is zero while minimizing the total amount of money transferred.",
+      "The previous approach using the min-cost max-flow algorithm was incorrect for this problem. Instead, we should use a simpler approach based on canceling out matching debts pairwise. This method ensures that we minimize the total sum of debts while maintaining the same net debt for each person."
+    ],
+    "origin": "rethink",
+    "generation_record_id": null,
+    "created_sequence": 19
+  },
+  {
+    "candidate_id": "cand_aea4219af3",
+    "problem_id": "apps_1888",
+    "code": "def minimize_debts(n, debts):\n    from collections import defaultdict\n\n    # Create a balance sheet for each person\n    balance = defaultdict(int)\n\n    # Calculate net balance for each person\n    for a, b, c in debts:\n        balance[a] -= c\n        balance[b] += c\n\n    # Separate people into two groups: those who owe money and those who are owed money\n    debtors = []\n    creditors = []\n\n    for person, bal in balance.items():\n        if bal < 0:\n            debtors.append((person, -bal))\n        elif bal > 0:\n            creditors.append((person, bal))\n\n    # Sort debtors by amount owed (descending) and creditors by amount owed (ascending)\n    debtors.sort(key=lambda x: x[1], reverse=True)\n    creditors.sort(key=lambda x: x[1])\n\n    # Minimize the total amount of money transferred\n    i, j = 0, 0\n    total_debts = 0\n\n    while i < len(debtors) and j < len(creditors):\n        debtor, debt_amount = debtors[i]\n        creditor, credit_amount = creditors[j]\n\n        # Determine the amount to settle between the debtor and creditor\n        settled_amount = min(debt_amount, credit_amount)\n\n        # Update the total debts\n        total_debts += settled_amount\n\n        # Update the remaining debt and credit\n        debtors[i] = (debtor, debt_amount - settled_amount)\n        creditors[j] = (creditor, credit_amount - settled_amount)\n\n        # Move to the next debtor or creditor if their debt/credit is fully settled\n        if debtors[i][1] == 0:\n            i += 1\n        if creditors[j][1] == 0:\n            j += 1\n\n    return total_debts\n\n# Read input\nimport sys\ninput = sys.stdin.read\ndata = input().split()\n\nn = int(data[0])\nm = int(data[1])\n\ndebts = []\nindex = 2\nfor _ in range(m):\n    a = int(data[index])\n    b = int(data[index + 1])\n    c = int(data[index + 2])\n    debts.append((a, b, c))\n    index += 3\n\n# Output the result\nprint(minimize_debts(n, debts))",
+    "code_hash": "abadc143c91e1022",
+    "language": "python",
+    "node_id": "n_14_dedd97",
+    "revision_id": "rev_n_14_dedd97_0",
+    "thought_path_snapshot": [
+      "The current approach using DFS to minimize debts is incorrect. Instead, we should use a greedy algorithm that iteratively settles debts between the person with the maximum debt and the person with the minimum debt. This approach ensures we always make the optimal choice at each step, leading to the minimum total debt.",
+      "Use a graph representation to model debts",
+      "Implement a greedy algorithm that iteratively settles debts between the person with the maximum debt and the person with the minimum debt"
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 20
+  }
+]

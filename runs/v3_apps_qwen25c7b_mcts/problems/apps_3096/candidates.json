@@ -1,0 +1,516 @@
+[
+  {
+    "candidate_id": "cand_1df127a1a6",
+    "problem_id": "apps_3096",
+    "code": "from sys import stdin, stdout\nimport sys\nsys.setrecursionlimit(10**6)\n\ndef dfs(node, parent, jokes, visited, joke_set):\n    visited[node] = True\n    joke_set.add(jokes[node-1])\n    \n    for neighbor in graph[node]:\n        if neighbor != parent and not visited[neighbor]:\n            if not dfs(neighbor, node, jokes, visited, joke_set):\n                return False\n    \n    if len(joke_set) > 1 and max(joke_set) - min(joke_set) != len(joke_set) - 1:\n        return False\n    \n    return True\n\ndef count_sets(n, jokes, edges):\n    global graph\n    graph = [[] for _ in range(n+1)]\n    for u, v in edges:\n        graph[u].append(v)\n        graph[v].append(u)\n    \n    visited = [False] * (n+1)\n    total_sets = 0\n    \n    def backtrack(start):\n        nonlocal total_sets\n        if start == n + 1:\n            total_sets += 1\n            return\n        \n        for i in range(start, n + 1):\n            if not visited[i]:\n                visited[i] = True\n                if dfs(i, None, jokes, visited, set()):\n                    backtrack(i + 1)\n                visited[i] = False\n    \n    backtrack(1)\n    return total_sets\n\n# Read input\ninput = stdin.read\ndata = input().split()\nn = int(data[0])\njokes = list(map(int, data[1:n+1]))\nedges = []\nfor i in range(n-1):\n    u = int(data[n+i*2+1])\n    v = int(data[n+i*2+2])\n    edges.append((u, v))\n\n# Output result\nstdout.write(str(count_sets(n, jokes, edges)) + '\\n')",
+    "code_hash": "9521b4d941fa06e7",
+    "language": "python",
+    "node_id": "n_1_91128e",
+    "revision_id": "rev_n_1_91128e_0",
+    "thought_path_snapshot": [
+      "Recursive Backtracking"
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 1
+  },
+  {
+    "candidate_id": "cand_c1dba2f54a",
+    "problem_id": "apps_3096",
+    "code": "from collections import defaultdict\nimport sys\n\nsys.setrecursionlimit(10000)\n\ndef dfs(node, visited, joke_set, graph):\n    if node in visited:\n        return 0\n    \n    visited.add(node)\n    \n    valid = True\n    for neighbor in graph[node]:\n        if neighbor in visited:\n            continue\n        if abs(joke_set[node] - joke_set[neighbor]) != 1:\n            valid = False\n            break\n    \n    if not valid:\n        return 0\n    \n    count = 1\n    for neighbor in graph[node]:\n        if neighbor in visited:\n            continue\n        count += dfs(neighbor, visited, joke_set, graph)\n    \n    return count\n\ndef main():\n    input = sys.stdin.read\n    data = input().split()\n    \n    N = int(data[0])\n    joke_set = list(map(int, data[1:N+1]))\n    edges = data[N+1:]\n    \n    graph = defaultdict(list)\n    for i in range(N-1):\n        A = int(edges[i*2]) - 1\n        B = int(edges[i*2 + 1]) - 1\n        graph[A].append(B)\n    \n    result = 0\n    for i in range(N):\n        if i == 0:\n            result += dfs(i, set(), joke_set, graph)\n        else:\n            visited = set()\n            for j in range(N):\n                if j not in visited:\n                    result += dfs(j, visited, joke_set, graph)\n    \n    print(result)\n\nif __name__ == \"__main__\":\n    main()",
+    "code_hash": "b885ee6c0b92e36f",
+    "language": "python",
+    "node_id": "n_1_91128e",
+    "revision_id": "rev_n_1_91128e_1",
+    "thought_path_snapshot": [
+      "Recursive Backtracking with Memoization\n\nMemoize results of subproblems to avoid redundant calculations and improve efficiency."
+    ],
+    "origin": "rethink",
+    "generation_record_id": null,
+    "created_sequence": 2
+  },
+  {
+    "candidate_id": "cand_bb7353d569",
+    "problem_id": "apps_3096",
+    "code": "from collections import defaultdict\n\ndef count_joke_sets(N, V, superior):\n    dp = [defaultdict(int) for _ in range(N + 1)]\n    dp[1][V[0]] = 1\n    \n    for i in range(2, N + 1):\n        dp[i] = dp[superior[i - 1]].copy()\n        dp[i][V[i - 1]] += dp[superior[i - 1]][V[i - 1]]\n    \n    def is_consecutive(jokes):\n        return all(abs(a - b) == 1 for a, b in zip(sorted(jokes), sorted(jokes)[1:]))\n    \n    total_sets = sum(dp[N].values())\n    valid_sets = sum(dp[N][jokes] for jokes in dp[N] if is_consecutive(jokes))\n    \n    return valid_sets\n\n# Read input\nimport sys\ninput = sys.stdin.read\ndata = input().split()\n\nN = int(data[0])\nV = list(map(int, data[1:N+1]))\nsuperior = [int(x) for x in data[N+1:]]\n\n# Calculate and print result\nprint(count_joke_sets(N, V, superior))",
+    "code_hash": "a9e5742751d970e6",
+    "language": "python",
+    "node_id": "n_2_1e2fff",
+    "revision_id": "rev_n_2_1e2fff_0",
+    "thought_path_snapshot": [
+      "Dynamic Programming"
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 3
+  },
+  {
+    "candidate_id": "cand_d1127602b7",
+    "problem_id": "apps_3096",
+    "code": "from collections import defaultdict, deque\n\ndef count_valid_joke_sets(N, joke_types, hierarchy):\n    # Initialize adjacency list for the hierarchy\n    adj_list = defaultdict(list)\n    for parent, child in hierarchy:\n        adj_list[parent].append(child)\n\n    # Function to check if a set of jokes is valid\n    def is_valid_set(jokes):\n        return len(set(jokes)) == len(jokes) and all(abs(a - b) == 1 for a, b in zip(sorted(jokes), sorted(jokes)[1:]))\n\n    # DFS to find all valid subsets of jokes\n    def dfs(node, current_set):\n        nonlocal valid_sets\n        if node != 1 and node in adj_list[node]:\n            return\n        current_set.add(joke_types[node - 1])\n        if is_valid_set(current_set):\n            valid_sets.add(tuple(sorted(current_set)))\n        for neighbor in adj_list[node]:\n            dfs(neighbor, current_set.copy())\n        current_set.remove(joke_types[node - 1])\n\n    valid_sets = set()\n    dfs(1, set())\n\n    return len(valid_sets)\n\n# Read input\nimport sys\ninput = sys.stdin.read\ndata = input().split()\n\nN = int(data[0])\njoke_types = list(map(int, data[1:N+1]))\nhierarchy = [tuple(map(int, data[N+i*2:N+(i+1)*2])) for i in range(N-1)]\n\n# Output the result\nprint(count_valid_joke_sets(N, joke_types, hierarchy))",
+    "code_hash": "a0871a193282d7d6",
+    "language": "python",
+    "node_id": "n_2_1e2fff",
+    "revision_id": "rev_n_2_1e2fff_1",
+    "thought_path_snapshot": [
+      "Dynamic Programming with Set Operations"
+    ],
+    "origin": "rethink",
+    "generation_record_id": null,
+    "created_sequence": 4
+  },
+  {
+    "candidate_id": "cand_46bea1758f",
+    "problem_id": "apps_3096",
+    "code": "from collections import defaultdict, deque\n\ndef count_valid_joke_sets(N, joke_types, hierarchy):\n    def dfs(node, parent, visited, joke_set):\n        if node != 1 and (parent == -1 or joke_types[node] == joke_types[parent]):\n            return 0\n        if node in visited:\n            return 0\n        visited.add(node)\n        joke_set.add(joke_types[node])\n        valid = 1\n        for child in graph[node]:\n            if child != parent:\n                valid *= dfs(child, node, visited, joke_set.copy())\n        return valid\n\n    graph = defaultdict(list)\n    for a, b in hierarchy:\n        graph[a].append(b)\n\n    visited = set()\n    total_sets = 0\n    for i in range(1, N + 1):\n        if i not in visited:\n            total_sets += dfs(i, -1, visited, set())\n\n    return total_sets\n\n# Example usage:\nimport sys\ninput = sys.stdin.read\ndata = input().split()\n\nN = int(data[0])\njoke_types = list(map(int, data[1:N+1]))\nhierarchy = [tuple(map(int, data[N+i*2:N+(i+1)*2])) for i in range(N-1)]\n\nprint(count_valid_joke_sets(N, joke_types, hierarchy))",
+    "code_hash": "35ebe85c5a999a8d",
+    "language": "python",
+    "node_id": "n_3_7a9f2a",
+    "revision_id": "rev_n_3_7a9f2a_0",
+    "thought_path_snapshot": [
+      "Graph Traversal"
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 5
+  },
+  {
+    "candidate_id": "cand_537a5d5043",
+    "problem_id": "apps_3096",
+    "code": "from collections import defaultdict\nimport sys\n\nsys.setrecursionlimit(10000)\n\ndef dfs(node, parent, jokes, memo):\n    if node in memo:\n        return memo[node]\n    \n    valid_sets = {jokes[node]}\n    for child in graph[node]:\n        if child != parent:\n            child_sets = dfs(child, node, jokes, memo)\n            for s in child_sets:\n                if abs(s - jokes[node]) == 1:\n                    continue\n                new_set = valid_sets.copy()\n                new_set.add(s)\n                valid_sets.update(new_set)\n    \n    memo[node] = valid_sets\n    return valid_sets\n\ndef count_valid_joke_sets(N, jokes, superior_pairs):\n    global graph\n    graph = defaultdict(list)\n    for a, b in superior_pairs:\n        graph[a].append(b)\n    \n    memo = {}\n    root = 1\n    valid_sets = dfs(root, None, jokes, memo)\n    \n    return len(valid_sets)\n\n# Read input\ninput = sys.stdin.read\ndata = input().split()\n\nN = int(data[0])\njokes = list(map(int, data[1:N+1]))\nsuperior_pairs = [(int(data[N+i*2]), int(data[N+i*2+1])) for i in range(N-1)]\n\n# Calculate and print the result\nresult = count_valid_joke_sets(N, jokes, superior_pairs)\nprint(result)",
+    "code_hash": "bbbccd501603f49c",
+    "language": "python",
+    "node_id": "n_3_7a9f2a",
+    "revision_id": "rev_n_3_7a9f2a_1",
+    "thought_path_snapshot": [
+      "Graph Traversal with Memoization"
+    ],
+    "origin": "rethink",
+    "generation_record_id": null,
+    "created_sequence": 6
+  },
+  {
+    "candidate_id": "cand_eff34bed57",
+    "problem_id": "apps_3096",
+    "code": "from collections import defaultdict\nimport sys\n\nsys.setrecursionlimit(10000)\n\ndef dfs(node, visited, graph, jokes, memo):\n    if node in memo:\n        return memo[node]\n    \n    if len(graph[node]) == 0:\n        return {jokes[node]}\n    \n    result = set()\n    for neighbor in graph[node]:\n        if not visited[neighbor]:\n            visited[neighbor] = True\n            for subset in dfs(neighbor, visited, graph, jokes, memo):\n                if all(abs(subset[i] - subset[i+1]) == 1 for i in range(len(subset)-1)):\n                    new_subset = list(sorted(set(subset + [jokes[node]])))\n                    if new_subset[-1] - new_subset[0] == len(new_subset) - 1:\n                        result.add(tuple(new_subset))\n            visited[neighbor] = False\n    \n    memo[node] = result\n    return result\n\ndef count_valid_joke_sets(N, jokes, superior_pairs):\n    graph = defaultdict(list)\n    for a, b in superior_pairs:\n        graph[a].append(b)\n    \n    visited = [False] * (N + 1)\n    visited[1] = True\n    memo = {}\n    \n    valid_sets = dfs(1, visited, graph, jokes, memo)\n    \n    return len(valid_sets)\n\n# Read input\ninput = sys.stdin.read\ndata = input().split()\n\nN = int(data[0])\njokes = list(map(int, data[1:N+1]))\nsuperior_pairs = [(int(data[N+i*2]), int(data[N+i*2+1])) for i in range(N-1)]\n\n# Calculate and print the result\nprint(count_valid_joke_sets(N, jokes, superior_pairs))",
+    "code_hash": "88f67f15eb2bfbb1",
+    "language": "python",
+    "node_id": "n_5_9cd45d",
+    "revision_id": "rev_n_5_9cd45d_0",
+    "thought_path_snapshot": [
+      "Recursive Backtracking with Memoization\n\nMemoize results of subproblems to avoid redundant calculations and improve efficiency.",
+      "Iterate through possible subsets of employees"
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 7
+  },
+  {
+    "candidate_id": "cand_bcb950c5e8",
+    "problem_id": "apps_3096",
+    "code": "from collections import defaultdict\nimport sys\n\nsys.setrecursionlimit(10000)\n\ndef dfs(node, parent, jokes, graph, dp):\n    if node in dp:\n        return dp[node]\n    \n    mask = 1 << node\n    max_joke = 0\n    \n    for neighbor in graph[node]:\n        if neighbor != parent:\n            neighbor_mask = dfs(neighbor, node, jokes, graph, dp)\n            if (jokes[neighbor] == jokes[node] + 1) or (jokes[neighbor] == jokes[node] - 1):\n                continue\n            max_joke |= neighbor_mask\n    \n    dp[node] = mask | max_joke\n    return dp[node]\n\ndef count_sets(N, jokes, superior_pairs):\n    graph = defaultdict(list)\n    for a, b in superior_pairs:\n        graph[a].append(b)\n    \n    dp = {}\n    result = dfs(1, None, jokes, graph, dp)\n    \n    # Count valid subsets\n    count = 0\n    for i in range(1, 1 << N):\n        valid = True\n        current_joke = float('inf')\n        for j in range(N):\n            if i & (1 << j):\n                if current_joke != float('inf') and abs(current_joke - jokes[j]) != 1:\n                    valid = False\n                    break\n                current_joke = jokes[j]\n        if valid:\n            count += 1\n    \n    return count\n\n# Read input\nN = int(input())\njokes = list(map(int, input().split()))\nsuperior_pairs = [tuple(map(int, input().split())) for _ in range(N - 1)]\n\n# Calculate and print the result\nprint(count_sets(N, jokes, superior_pairs))",
+    "code_hash": "676925c8cb134544",
+    "language": "python",
+    "node_id": "n_5_9cd45d",
+    "revision_id": "rev_n_5_9cd45d_1",
+    "thought_path_snapshot": [
+      "Recursive Backtracking with Memoization\n\nMemoize results of subproblems to avoid redundant calculations and improve efficiency.",
+      "Thought-2: Dynamic Programming with Bitmasking\n\nUse dynamic programming with bitmasking to efficiently track the inclusion of employees and ensure the constraints are met. This approach allows us to explore all possible combinations of employees while maintaining the required properties."
+    ],
+    "origin": "rethink",
+    "generation_record_id": null,
+    "created_sequence": 8
+  },
+  {
+    "candidate_id": "cand_03b1fe4462",
+    "problem_id": "apps_3096",
+    "code": "from collections import defaultdict, deque\n\ndef count_valid_joke_sets(N, joke_types, hierarchy):\n    def dfs(node, parent, visited, joke_set):\n        if node in visited:\n            return 0\n        \n        visited.add(node)\n        \n        valid = 0\n        for child in graph[node]:\n            if child != parent:\n                child_joke_set = set()\n                if dfs(child, node, visited, child_joke_set) == 0:\n                    continue\n                \n                if not joke_set or max(joke_set[-1], max(child_joke_set)) - min(min(joke_set), min(child_joke_set)) <= 1:\n                    new_joke_set = joke_set.union(child_joke_set)\n                    if len(new_joke_set) > 1 and len(new_joke_set) == len(range(min(new_joke_set), max(new_joke_set) + 1)):\n                        valid += 1\n        \n        if not joke_set or joke_types[node] not in joke_set:\n            joke_set.add(joke_types[node])\n            valid += 1\n        \n        return valid\n    \n    graph = defaultdict(list)\n    for a, b in hierarchy:\n        graph[a].append(b)\n    \n    visited = set()\n    result = dfs(1, None, visited, set())\n    print(result)\n\n# Example usage:\nimport sys\ninput = sys.stdin.read\ndata = input().split()\n\nN = int(data[0])\njoke_types = list(map(int, data[1:N+1]))\nhierarchy = [tuple(map(int, data[N+i*2:N+(i+1)*2])) for i in range(N-1)]\n\ncount_valid_joke_sets(N, joke_types, hierarchy)",
+    "code_hash": "b93005f9cad1bce9",
+    "language": "python",
+    "node_id": "n_7_a06f00",
+    "revision_id": "rev_n_7_a06f00_0",
+    "thought_path_snapshot": [
+      "Dynamic Programming with Set Operations",
+      "Review the DFS implementation and ensure it correctly handles the constraints."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 9
+  },
+  {
+    "candidate_id": "cand_ab4b2f8c43",
+    "problem_id": "apps_3096",
+    "code": "from typing import List\nimport sys\n\ndef count_valid_joke_sets(N: int, joke_types: List[int], hierarchy: List[List[int]]) -> int:\n    # Initialize DP table\n    dp = [set() for _ in range(N + 1)]\n    dp[1] = {joke_types[0]}\n    \n    # Build adjacency list for the hierarchy\n    adj_list = [[] for _ in range(N + 1)]\n    for parent, child in hierarchy:\n        adj_list[parent].append(child)\n    \n    def is_consecutive(s: set) -> bool:\n        s = sorted(list(s))\n        return all(b - a == 1 for a, b in zip(s, s[1:]))\n    \n    def dfs(node: int, parent_jokes: set) -> None:\n        new_jokes = parent_jokes.copy()\n        new_jokes.add(joke_types[node - 1])\n        \n        if is_consecutive(new_jokes):\n            dp[node] |= {new_jokes}\n        \n        for neighbor in adj_list[node]:\n            if neighbor != node // 2:  # Skip the parent to avoid cycles\n                dfs(neighbor, new_jokes)\n    \n    dfs(1, set())\n    \n    result = sum(len(dp[i]) for i in range(1, N + 1))\n    return result\n\n# Read input\ninput = sys.stdin.read\ndata = input().split()\n\nN = int(data[0])\njoke_types = list(map(int, data[1:N+1]))\nhierarchy = [[int(data[N+i*2]), int(data[N+(i*2)+1])] for i in range(N-1)]\n\n# Calculate and print the result\nprint(count_valid_joke_sets(N, joke_types, hierarchy))",
+    "code_hash": "83b8533173eef1c5",
+    "language": "python",
+    "node_id": "n_7_a06f00",
+    "revision_id": "rev_n_7_a06f00_1",
+    "thought_path_snapshot": [
+      "Dynamic Programming with Set Operations",
+      "Review the logic for checking if the set of jokes formed by the invitees and the current person is consecutive. Ensure that the union operation and the consecutive check are correctly implemented."
+    ],
+    "origin": "rethink",
+    "generation_record_id": null,
+    "created_sequence": 10
+  },
+  {
+    "candidate_id": "cand_3c6fc10d29",
+    "problem_id": "apps_3096",
+    "code": "from collections import defaultdict\nimport sys\n\nsys.setrecursionlimit(10000)\n\ndef dfs(node, parent, jokes, graph, memo):\n    if (node, tuple(sorted(jokes))) in memo:\n        return memo[(node, tuple(sorted(jokes)))]\n    \n    if node == 1:\n        valid_jokes = {j for j in range(1, 101)}\n    else:\n        valid_jokes = set(range(1, 101))\n        for neighbor in graph[node]:\n            if neighbor != parent:\n                valid_jokes -= set(jokes[neighbor])\n    \n    count = 0\n    for joke in valid_jokes:\n        new_jokes = jokes[:]\n        new_jokes[node] = joke\n        if check_consecutive(new_jokes, graph, node, parent):\n            count += dfs(node, parent, new_jokes, graph, memo)\n    \n    memo[(node, tuple(sorted(jokes)))] = count\n    return count\n\ndef check_consecutive(jokes, graph, node, parent):\n    if node == 1:\n        return True\n    \n    min_joke = min(jokes[n] for n in graph[node] if n != parent)\n    max_joke = max(jokes[n] for n in graph[node] if n != parent)\n    return max_joke - min_joke == len(set(jokes[n] for n in graph[node] if n != parent)) - 1\n\ndef main():\n    input = sys.stdin.read\n    data = input().split()\n    \n    N = int(data[0])\n    jokes = [int(data[i]) for i in range(1, N + 1)]\n    edges = [(int(data[N + 2 * i]), int(data[N + 2 * i + 1])) for i in range(N - 1)]\n    \n    graph = defaultdict(list)\n    for u, v in edges:\n        graph[u].append(v)\n        graph[v].append(u)\n    \n    memo = {}\n    result = dfs(1, None, jokes, graph, memo)\n    print(result)\n\nif __name__ == \"__main__\":\n    main()",
+    "code_hash": "0a65d9d6d63bcbf9",
+    "language": "python",
+    "node_id": "n_10_4663bd",
+    "revision_id": "rev_n_10_4663bd_0",
+    "thought_path_snapshot": [
+      "Graph Traversal with Memoization",
+      "Revisit the DFS approach with a focus on maintaining a set of valid joke types for each node."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 11
+  },
+  {
+    "candidate_id": "cand_a62c3de060",
+    "problem_id": "apps_3096",
+    "code": "from collections import defaultdict\nimport sys\n\nsys.setrecursionlimit(10000)\n\ndef dfs(node, parent, jokes, graph, dp):\n    if (node, tuple(sorted(jokes))) in dp:\n        return dp[(node, tuple(sorted(jokes)))]\n    \n    if len(set(jokes)) != len(jokes):\n        dp[(node, tuple(sorted(jokes)))] = 0\n        return 0\n    \n    if node == 1:\n        dp[(node, tuple(sorted(jokes)))] = 1\n        return 1\n    \n    count = 0\n    for neighbor in graph[node]:\n        if neighbor != parent:\n            new_jokes = list(jokes)\n            new_jokes.append(graph[node][neighbor])\n            count += dfs(neighbor, node, new_jokes, graph, dp)\n    \n    dp[(node, tuple(sorted(jokes)))] = count\n    return count\n\ndef main():\n    input = sys.stdin.read\n    data = input().split()\n    \n    N = int(data[0])\n    jokes = [int(data[i]) for i in range(1, N + 1)]\n    edges = []\n    index = N + 1\n    \n    for _ in range(N - 1):\n        A = int(data[index])\n        B = int(data[index + 1])\n        edges.append((A, B))\n        index += 2\n    \n    graph = defaultdict(dict)\n    for A, B in edges:\n        graph[A][B] = jokes[B - 1]\n    \n    dp = {}\n    result = dfs(1, None, [], graph, dp)\n    print(result)\n\nif __name__ == \"__main__\":\n    main()",
+    "code_hash": "6ee3ebe66ca23b05",
+    "language": "python",
+    "node_id": "n_10_4663bd",
+    "revision_id": "rev_n_10_4663bd_1",
+    "thought_path_snapshot": [
+      "Graph Traversal with Memoization",
+      "Revised Thought-2: Use dynamic programming with memoization to keep track of valid joke sets for each node, considering its subordinates and ensuring the constraints are met. This approach avoids deep recursion by storing intermediate results and reusing them when needed."
+    ],
+    "origin": "rethink",
+    "generation_record_id": null,
+    "created_sequence": 12
+  },
+  {
+    "candidate_id": "cand_d1c06a63dc",
+    "problem_id": "apps_3096",
+    "code": "from collections import defaultdict\nimport sys\n\nsys.setrecursionlimit(10000)\n\ndef dfs(node, visited, joke_set, graph):\n    if node in visited:\n        return 0\n    \n    visited.add(node)\n    \n    valid = 0\n    for neighbor in graph[node]:\n        if neighbor not in visited:\n            neighbor_joke_set = joke_set.copy()\n            neighbor_joke_set.add(graph[node][neighbor])\n            \n            if len(neighbor_joke_set) == 1 or (len(neighbor_joke_set) > 1 and max(neighbor_joke_set) - min(neighbor_joke_set) == len(neighbor_joke_set) - 1):\n                valid += dfs(neighbor, visited, neighbor_joke_set, graph)\n                \n    return valid + 1\n\ndef main():\n    input = sys.stdin.read\n    data = input().split()\n    \n    N = int(data[0])\n    jokes = list(map(int, data[1:N+1]))\n    edges = data[N+1:]\n    \n    graph = defaultdict(dict)\n    for i in range(N-1):\n        A = int(edges[i*2]) - 1\n        B = int(edges[i*2+1]) - 1\n        graph[A][B] = jokes[B]\n        \n    result = 0\n    for i in range(N):\n        if i not in graph:\n            result += dfs(i, set(), {jokes[i]}, graph)\n    \n    print(result)\n\nif __name__ == \"__main__\":\n    main()",
+    "code_hash": "0edd339075c560d5",
+    "language": "python",
+    "node_id": "n_4_e54a99",
+    "revision_id": "rev_n_4_e54a99_0",
+    "thought_path_snapshot": [
+      "Recursive Backtracking with Memoization\n\nMemoize results of subproblems to avoid redundant calculations and improve efficiency.",
+      "Optimize DFS with memoization"
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 13
+  },
+  {
+    "candidate_id": "cand_d53e13e275",
+    "problem_id": "apps_3096",
+    "code": "from collections import defaultdict\nimport sys\n\nsys.setrecursionlimit(10000)\n\ndef dfs(node, visited, parent_jokes, graph, joke_count):\n    if node in visited:\n        return 0\n    \n    visited.add(node)\n    \n    current_jokes = set()\n    total_sets = 0\n    \n    for neighbor in graph[node]:\n        if neighbor == parent_jokes[node]:\n            continue\n        \n        neighbor_jokes = dfs(neighbor, visited, parent_jokes, graph, joke_count)\n        \n        if len(current_jokes.intersection(neighbor_jokes)) > 0:\n            continue\n        \n        if not is_consecutive(current_jokes, neighbor_jokes):\n            continue\n        \n        total_sets += neighbor_jokes[0]\n        current_jokes.update(neighbor_jokes)\n    \n    if node != 1:\n        current_jokes.add(joke_count[node])\n    \n    return {frozenset(current_jokes): total_sets + 1}\n\ndef is_consecutive(set1, set2):\n    combined = list(set1.union(set2))\n    combined.sort()\n    return all(combined[i] - combined[i - 1] == 1 for i in range(1, len(combined)))\n\ndef main():\n    input = sys.stdin.read\n    data = input().split()\n    \n    N = int(data[0])\n    joke_count = [int(data[i]) for i in range(1, N + 1)]\n    graph = defaultdict(list)\n    parent_jokes = [-1] * (N + 1)\n    \n    index = N + 1\n    for _ in range(N - 1):\n        A = int(data[index])\n        B = int(data[index + 1])\n        graph[A].append(B)\n        parent_jokes[B] = A\n        index += 2\n    \n    result = dfs(1, set(), parent_jokes, graph, joke_count)\n    print(result[frozenset([joke_count[1]])])\n\nif __name__ == \"__main__\":\n    main()",
+    "code_hash": "7dbfc8f27170a8b0",
+    "language": "python",
+    "node_id": "n_4_e54a99",
+    "revision_id": "rev_n_4_e54a99_1",
+    "thought_path_snapshot": [
+      "Recursive Backtracking with Memoization\n\nMemoize results of subproblems to avoid redundant calculations and improve efficiency.",
+      "Thought-2: Use Depth-First Search (DFS) with Memoization to efficiently explore all valid combinations of jokes while avoiding redundant calculations. Ensure that the constraints regarding joke uniqueness, supervisor invitations, and consecutive joke sets are strictly enforced during the DFS traversal."
+    ],
+    "origin": "rethink",
+    "generation_record_id": null,
+    "created_sequence": 14
+  },
+  {
+    "candidate_id": "cand_394ee4e5c0",
+    "problem_id": "apps_3096",
+    "code": "from collections import defaultdict, deque\n\ndef count_valid_joke_sets(N, V, superior):\n    # Initialize graph and in-degree array\n    graph = defaultdict(list)\n    in_degree = [0] * (N + 1)\n    \n    # Build the graph and calculate in-degrees\n    for u, v in superior:\n        graph[u].append(v)\n        in_degree[v] += 1\n    \n    # Initialize DP table\n    dp = [set() for _ in range(N + 1)]\n    dp[1].add(frozenset([V[0]]))\n    \n    # Topological sort using Kahn's algorithm\n    queue = deque([u for u in range(1, N + 1) if in_degree[u] == 0])\n    \n    while queue:\n        u = queue.popleft()\n        \n        for v in graph[u]:\n            in_degree[v] -= 1\n            \n            for jokes in dp[u]:\n                new_jokes = jokes.union({V[v - 1]})\n                \n                # Check if the new set of jokes is consecutive\n                if len(new_jokes) > 1:\n                    min_joke = min(new_jokes)\n                    max_joke = max(new_jokes)\n                    \n                    if max_joke - min_joke == len(new_jokes) - 1:\n                        dp[v].add(new_jokes)\n                else:\n                    dp[v].add(new_jokes)\n            \n            if in_degree[v] == 0:\n                queue.append(v)\n    \n    # Count the number of valid joke sets\n    result = sum(len(dp[i]) for i in range(1, N + 1))\n    return result\n\n# Read input\nimport sys\ninput = sys.stdin.read\ndata = input().split()\n\nN = int(data[0])\nV = list(map(int, data[1:N+1]))\nsuperior = [(int(data[N+i*2]), int(data[N+i*2+1])) for i in range(N-1)]\n\n# Calculate and print the result\nprint(count_valid_joke_sets(N, V, superior))",
+    "code_hash": "2df3d26dc16d825e",
+    "language": "python",
+    "node_id": "n_8_13c510",
+    "revision_id": "rev_n_8_13c510_0",
+    "thought_path_snapshot": [
+      "Dynamic Programming with Set Operations",
+      "Check the logic for identifying valid joke sets and ensure it accounts for all given constraints."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 15
+  },
+  {
+    "candidate_id": "cand_a9368ee139",
+    "problem_id": "apps_3096",
+    "code": "from collections import defaultdict, deque\n\ndef count_joke_sets(N, V, superior):\n    dp = [set() for _ in range(N + 1)]\n    dp[1].add(frozenset())\n    \n    graph = defaultdict(list)\n    for a, b in superior:\n        graph[a].append(b)\n    \n    def is_consecutive(s, v):\n        s.add(v)\n        l = list(s)\n        l.sort()\n        return all(l[i] + 1 == l[i + 1] for i in range(len(l) - 1))\n    \n    queue = deque([1])\n    while queue:\n        node = queue.popleft()\n        for child in graph[node]:\n            for s in dp[node]:\n                if is_consecutive(s, V[child - 1]):\n                    dp[child].add(s.union({V[child - 1]}))\n            queue.append(child)\n    \n    return sum(len(dp[i]) for i in range(1, N + 1))\n\n# Example usage:\nif __name__ == \"__main__\":\n    import sys\n    input = sys.stdin.read\n    data = input().split()\n    \n    N = int(data[0])\n    V = list(map(int, data[1:N+1]))\n    superior = []\n    index = N + 1\n    for _ in range(N - 1):\n        A = int(data[index])\n        B = int(data[index + 1])\n        superior.append((A, B))\n        index += 2\n    \n    result = count_joke_sets(N, V, superior)\n    print(result)",
+    "code_hash": "b8e28e3d30130293",
+    "language": "python",
+    "node_id": "n_8_13c510",
+    "revision_id": "rev_n_8_13c510_1",
+    "thought_path_snapshot": [
+      "Dynamic Programming with Set Operations",
+      "Thought-2: Ensure that the dynamic programming table updates correctly by checking the consecutive constraint before adding a new joke set. Specifically, when updating the DP table for a subordinate, verify that the union of the current joke set and the new joke does not violate the consecutive constraint. If it does, skip adding this combination to the DP table. This ensures that only valid joke sets are considered during the topological sort."
+    ],
+    "origin": "rethink",
+    "generation_record_id": null,
+    "created_sequence": 16
+  },
+  {
+    "candidate_id": "cand_236c7f7cbc",
+    "problem_id": "apps_3096",
+    "code": "from collections import defaultdict, deque\nimport sys\n\nsys.setrecursionlimit(10000)\n\ndef dfs(node, visited, graph, joke_set):\n    visited[node] = True\n    joke_set.add(jokes[node-1])\n    \n    for neighbor in graph[node]:\n        if not visited[neighbor]:\n            if not dfs(neighbor, visited, graph, joke_set):\n                return False\n    \n    return True\n\ndef check_consecutive(joke_set):\n    sorted_jokes = sorted(list(joke_set))\n    for i in range(len(sorted_jokes)-1):\n        if sorted_jokes[i+1] - sorted_jokes[i] != 1:\n            return False\n    return True\n\ndef count_valid_sets(N, jokes, superior_pairs):\n    graph = defaultdict(list)\n    for A, B in superior_pairs:\n        graph[A].append(B)\n    \n    visited = [False] * (N + 1)\n    total_sets = 0\n    \n    for node in range(1, N + 1):\n        if not visited[node]:\n            joke_set = set()\n            if dfs(node, visited, graph, joke_set):\n                if len(joke_set) == len(set(range(min(joke_set), max(joke_set)+1))) and check_consecutive(joke_set):\n                    total_sets += 1\n    \n    return total_sets\n\n# Read input\nN = int(input())\njokes = list(map(int, input().split()))\nsuperior_pairs = [tuple(map(int, input().split())) for _ in range(N-1)]\n\n# Calculate and print the result\nprint(count_valid_sets(N, jokes, superior_pairs))",
+    "code_hash": "da6427bb1ce688a4",
+    "language": "python",
+    "node_id": "n_11_b7ef29",
+    "revision_id": "rev_n_11_b7ef29_0",
+    "thought_path_snapshot": [
+      "Graph Traversal with Memoization",
+      "Implement a topological sort to ensure that we process nodes in a valid order before exploring their descendants."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 17
+  },
+  {
+    "candidate_id": "cand_fc3cfd7935",
+    "problem_id": "apps_3096",
+    "code": "from collections import defaultdict\nimport sys\n\nsys.setrecursionlimit(10000)\n\ndef dfs(node, parent, jokes, visited):\n    if node in visited:\n        return True\n    \n    visited.add(node)\n    \n    for neighbor in graph[node]:\n        if neighbor == parent:\n            continue\n        if neighbor in visited:\n            return False\n        \n        if not dfs(neighbor, node, jokes, visited):\n            return False\n    \n    return True\n\ndef is_consecutive(jokes):\n    sorted_jokes = sorted(jokes)\n    return all(sorted_jokes[i] + 1 == sorted_jokes[i + 1] for i in range(len(sorted_jokes) - 1))\n\ndef count_valid_sets(node, parent, jokes, visited):\n    if node in visited:\n        return 0\n    \n    visited.add(node)\n    \n    valid_sets = 0\n    \n    for neighbor in graph[node]:\n        if neighbor == parent:\n            continue\n        if not dfs(neighbor, node, jokes, visited):\n            continue\n        \n        new_jokes = jokes | {jokes[neighbor]}\n        \n        if len(new_jokes) > 1 and not is_consecutive(new_jokes):\n            continue\n        \n        valid_sets += 1 + count_valid_sets(neighbor, node, new_jokes, visited)\n    \n    visited.remove(node)\n    \n    return valid_sets\n\nN = int(input())\njokes = list(map(int, input().split()))\ngraph = defaultdict(list)\n\nfor _ in range(N - 1):\n    A, B = map(int, input().split())\n    graph[A].append(B)\n    graph[B].append(A)\n\nvisited = set()\nresult = count_valid_sets(1, None, {jokes[0]}, visited)\n\nprint(result)",
+    "code_hash": "2035bf7d42de2506",
+    "language": "python",
+    "node_id": "n_11_b7ef29",
+    "revision_id": "rev_n_11_b7ef29_1",
+    "thought_path_snapshot": [
+      "Graph Traversal with Memoization",
+      "Thought-2: Use Depth-First Search (DFS) with memoization to explore all possible sets of invited employees while ensuring that the constraints are met. During the DFS traversal, keep track of the current set of jokes and verify that it remains valid according to the given rules. If a conflict arises, backtrack and try a different path. This approach ensures that all valid combinations are explored efficiently."
+    ],
+    "origin": "rethink",
+    "generation_record_id": null,
+    "created_sequence": 18
+  },
+  {
+    "candidate_id": "cand_0dc110bf6d",
+    "problem_id": "apps_3096",
+    "code": "from collections import defaultdict\nimport sys\n\nsys.setrecursionlimit(10000)\n\ndef dfs(node, parent, jokes, graph, memo):\n    if node in memo:\n        return memo[node]\n    \n    valid_sets = {frozenset()}\n    \n    for neighbor in graph[node]:\n        if neighbor != parent:\n            child_sets = dfs(neighbor, node, jokes, graph, memo)\n            for child_set in child_sets:\n                if len(child_set) == 0 or max(child_set) + 1 < jokes[node] < min(child_set) - 1:\n                    new_set = child_set.union({jokes[node]})\n                    valid_sets.add(frozenset(sorted(new_set)))\n    \n    memo[node] = valid_sets\n    return valid_sets\n\ndef count_valid_joke_sets(N, jokes, superior_pairs):\n    graph = defaultdict(list)\n    for A, B in superior_pairs:\n        graph[A].append(B)\n    \n    memo = {}\n    total_sets = dfs(1, None, jokes, graph, memo)\n    \n    return sum(len(s) for s in total_sets)\n\n# Read input\nN = int(input())\njokes = list(map(int, input().split()))\nsuperior_pairs = [tuple(map(int, input().split())) for _ in range(N-1)]\n\n# Calculate and print the result\nprint(count_valid_joke_sets(N, jokes, superior_pairs))",
+    "code_hash": "5dd5e15123eadb96",
+    "language": "python",
+    "node_id": "n_6_707d7e",
+    "revision_id": "rev_n_6_707d7e_0",
+    "thought_path_snapshot": [
+      "Recursive Backtracking with Memoization\n\nMemoize results of subproblems to avoid redundant calculations and improve efficiency.",
+      "Use dynamic programming to track valid joke sets"
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 19
+  },
+  {
+    "candidate_id": "cand_40206f0afe",
+    "problem_id": "apps_3096",
+    "code": "from collections import defaultdict, deque\n\ndef count_valid_joke_sets(N, V, superior):\n    # Initialize memoization dictionary\n    memo = {}\n    \n    def dfs(employee, current_set):\n        if employee in memo:\n            return memo[employee]\n        \n        # Check if the current employee can be included in the set\n        if any(abs(current_set[j] - V[employee]) != 1 for j in range(len(current_set))):\n            return 0\n        \n        # If the employee has a superior, check if the superior is in the set\n        if superior[employee] != -1 and superior[employee] not in current_set:\n            return 0\n        \n        # Add the current employee to the set\n        new_set = current_set + [V[employee]]\n        \n        # Count the number of valid sets including the current employee\n        count = 1\n        for next_employee in range(1, N+1):\n            if next_employee not in current_set and next_employee not in new_set:\n                count += dfs(next_employee, new_set)\n        \n        # Store the result in memoization dictionary\n        memo[employee] = count\n        return count\n    \n    # Start DFS from the CEO (employee 1)\n    total_count = dfs(1, [])\n    \n    # Subtract 1 because we need to exclude the empty set\n    return max(total_count - 1, 0)\n\n# Read input\nimport sys\ninput = sys.stdin.read\ndata = input().split()\n\nN = int(data[0])\nV = list(map(int, data[1:N+1]))\nsuperior = [-1] * (N+1)\nfor i in range(N-1):\n    A = int(data[N+i*2+1])\n    B = int(data[N+i*2+2])\n    superior[B] = A\n\n# Calculate and print the result\nprint(count_valid_joke_sets(N, V, superior))",
+    "code_hash": "08b8e90aeaff0625",
+    "language": "python",
+    "node_id": "n_6_707d7e",
+    "revision_id": "rev_n_6_707d7e_1",
+    "thought_path_snapshot": [
+      "Recursive Backtracking with Memoization\n\nMemoize results of subproblems to avoid redundant calculations and improve efficiency.",
+      "Thought-2: Use dynamic programming to track valid joke sets while ensuring the constraints are met efficiently. Specifically, use a DP table where `dp[i][j]` represents whether it's possible to include employee `i` with joke type `j` in the set, considering the constraints on supervisors and consecutive joke types. This approach allows us to build up solutions incrementally and avoid redundant calculations through memoization."
+    ],
+    "origin": "rethink",
+    "generation_record_id": null,
+    "created_sequence": 20
+  },
+  {
+    "candidate_id": "cand_63be415f95",
+    "problem_id": "apps_3096",
+    "code": "from collections import defaultdict\n\ndef dfs(node, parent, mask, jokes, graph):\n    if node in memo[mask]:\n        return memo[mask][node]\n    \n    include = exclude = 0\n    \n    for neighbor in graph[node]:\n        if neighbor != parent:\n            new_mask = mask | (1 << neighbor)\n            if jokes[neighbor] == jokes[node] + 1 or jokes[neighbor] == jokes[node] - 1:\n                include += dfs(neighbor, node, new_mask, jokes, graph)\n            else:\n                exclude += dfs(neighbor, node, new_mask, jokes, graph)\n    \n    include += 1\n    exclude += 1\n    \n    memo[mask][node] = include * exclude\n    return memo[mask][node]\n\ndef count_joke_sets(N, jokes, superior_pairs):\n    graph = defaultdict(list)\n    for a, b in superior_pairs:\n        graph[a].append(b)\n    \n    memo = [{} for _ in range(1 << N)]\n    \n    result = dfs(1, None, 0, jokes, graph)\n    \n    return result\n\n# Example usage:\nif __name__ == \"__main__\":\n    import sys\n    input = sys.stdin.read\n    data = input().split()\n    \n    N = int(data[0])\n    jokes = list(map(int, data[1:N+1]))\n    superior_pairs = [(int(data[N+i*2]) for i in range(N-1))]\n    \n    result = count_joke_sets(N, jokes, superior_pairs)\n    print(result)",
+    "code_hash": "d8dcf6924dfc6721",
+    "language": "python",
+    "node_id": "n_13_16f7b0",
+    "revision_id": "rev_n_13_16f7b0_0",
+    "thought_path_snapshot": [
+      "Recursive Backtracking with Memoization\n\nMemoize results of subproblems to avoid redundant calculations and improve efficiency.",
+      "Thought-2: Dynamic Programming with Bitmasking\n\nUse dynamic programming with bitmasking to efficiently track the inclusion of employees and ensure the constraints are met. This approach allows us to explore all possible combinations of employees while maintaining the required properties.",
+      "Iterative Depth-First Search (DFS) with Bitmasking"
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 21
+  },
+  {
+    "candidate_id": "cand_fa3fc79869",
+    "problem_id": "apps_3096",
+    "code": "from collections import defaultdict\n\ndef count_joke_sets(N, joke_types, superior_pairs):\n    def dfs(employee, mask):\n        if employee in memo[mask]:\n            return memo[mask][employee]\n        \n        if employee == 1:\n            valid = True\n            for i in range(2, N + 1):\n                if mask & (1 << i) and abs(joke_types[i] - joke_types[1]) != 1:\n                    valid = False\n                    break\n            if valid:\n                memo[mask][employee] = 1\n            else:\n                memo[mask][employee] = 0\n        else:\n            valid = True\n            for i in range(1, N + 1):\n                if mask & (1 << i) and i in superior_pairs[employee] and abs(joke_types[i] - joke_types[employee]) != 1:\n                    valid = False\n                    break\n            if valid:\n                memo[mask][employee] = sum(dfs(i, mask | (1 << i)) for i in range(1, N + 1) if i not in superior_pairs[employee])\n            else:\n                memo[mask][employee] = 0\n        \n        return memo[mask][employee]\n\n    superior_pairs = defaultdict(list)\n    for a, b in superior_pairs:\n        superior_pairs[b].append(a)\n\n    memo = [{} for _ in range(1 << N)]\n    return dfs(1, 1)\n\n# Example usage:\nif __name__ == \"__main__\":\n    import sys\n    input = sys.stdin.read\n    data = input().split()\n    \n    N = int(data[0])\n    joke_types = list(map(int, data[1:N+1]))\n    superior_pairs = []\n    index = N + 1\n    for _ in range(N - 1):\n        A = int(data[index])\n        B = int(data[index + 1])\n        superior_pairs.append((A, B))\n        index += 2\n    \n    result = count_joke_sets(N, joke_types, superior_pairs)\n    print(result)",
+    "code_hash": "8fc1e4e6d06e5b1f",
+    "language": "python",
+    "node_id": "n_13_16f7b0",
+    "revision_id": "rev_n_13_16f7b0_1",
+    "thought_path_snapshot": [
+      "Recursive Backtracking with Memoization\n\nMemoize results of subproblems to avoid redundant calculations and improve efficiency.",
+      "Thought-2: Dynamic Programming with Bitmasking\n\nUse dynamic programming with bitmasking to efficiently track the inclusion of employees and ensure the constraints are met. This approach allows us to explore all possible combinations of employees while maintaining the required properties.",
+      "Thought-3: Correctly parse the input to handle the generator expression properly. Use list comprehension instead of a generator expression to correctly create the `superior_pairs` list."
+    ],
+    "origin": "rethink",
+    "generation_record_id": null,
+    "created_sequence": 22
+  },
+  {
+    "candidate_id": "cand_6eeb1ef74c",
+    "problem_id": "apps_3096",
+    "code": "from collections import defaultdict, deque\n\ndef count_valid_joke_sets(N, joke_types, hierarchy):\n    # Build the adjacency list for the hierarchy\n    adj_list = defaultdict(list)\n    for parent, child in hierarchy:\n        adj_list[parent].append(child)\n\n    # Function to check if a set of jokes is valid\n    def is_valid_set(jokes):\n        return len(set(jokes)) == len(jokes) and all(abs(a - b) == 1 for a, b in zip(sorted(jokes), sorted(jokes)[1:]))\n\n    # DFS to find all valid subsets of jokes\n    def dfs(node, current_set):\n        if node in visited:\n            return\n        visited.add(node)\n        current_set.append(joke_types[node - 1])\n        if is_valid_set(current_set):\n            result.add(tuple(sorted(current_set)))\n        for neighbor in adj_list[node]:\n            dfs(neighbor, current_set[:])\n        current_set.pop()\n\n    visited = set()\n    result = set()\n    dfs(1, [])\n\n    return len(result)\n\n# Input reading\nimport sys\ninput = sys.stdin.read\ndata = input().split()\n\nN = int(data[0])\njoke_types = list(map(int, data[1:N+1]))\nhierarchy = [tuple(map(int, data[N+i*2:N+(i+1)*2])) for i in range(N-1)]\n\n# Output the result\nprint(count_valid_joke_sets(N, joke_types, hierarchy))",
+    "code_hash": "ac90ae15faf669ba",
+    "language": "python",
+    "node_id": "n_9_7f977a",
+    "revision_id": "rev_n_9_7f977a_0",
+    "thought_path_snapshot": [
+      "Dynamic Programming with Set Operations",
+      "Validate the input parsing and ensure it correctly extracts the necessary information."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 23
+  },
+  {
+    "candidate_id": "cand_02f8a2176d",
+    "problem_id": "apps_3096",
+    "code": "from collections import defaultdict, deque\n\ndef count_valid_joke_sets(N, joke_types, hierarchy):\n    def dfs(node, visited, joke_set):\n        if node in visited:\n            return 0\n        visited.add(node)\n        valid = 0\n        for child in hierarchy[node]:\n            child_jokes = set()\n            for c in range(joke_set[-1] + 1, 101):\n                child_jokes.add(c)\n            valid += dfs(child, visited, joke_set | child_jokes)\n        if len(joke_set) == 1 or (len(joke_set) > 1 and max(joke_set) - min(joke_set) == len(joke_set) - 1):\n            valid += 1\n        return valid\n\n    visited = set()\n    total_valid_sets = 0\n    for i in range(1, N + 1):\n        if i not in visited:\n            total_valid_sets += dfs(i, visited, {joke_types[i - 1]})\n    return total_valid_sets\n\n# Example usage:\nif __name__ == \"__main__\":\n    import sys\n    input = sys.stdin.read\n    data = input().split()\n    \n    N = int(data[0])\n    joke_types = list(map(int, data[1:N+1]))\n    hierarchy = defaultdict(list)\n    index = N + 1\n    for _ in range(N - 1):\n        A = int(data[index]) - 1\n        B = int(data[index + 1]) - 1\n        hierarchy[A].append(B)\n        index += 2\n    \n    result = count_valid_joke_sets(N, joke_types, hierarchy)\n    print(result)",
+    "code_hash": "f1906dbf8cd32d87",
+    "language": "python",
+    "node_id": "n_9_7f977a",
+    "revision_id": "rev_n_9_7f977a_1",
+    "thought_path_snapshot": [
+      "Dynamic Programming with Set Operations",
+      "Validate the input parsing and ensure it correctly extracts the necessary information, particularly focusing on the hierarchy structure to avoid any misinterpretation of the parent-child relationships."
+    ],
+    "origin": "rethink",
+    "generation_record_id": null,
+    "created_sequence": 24
+  },
+  {
+    "candidate_id": "cand_0f6c87f560",
+    "problem_id": "apps_3096",
+    "code": "from collections import defaultdict\nimport sys\n\nsys.setrecursionlimit(10000)\n\ndef dfs(node, parent, jokes, graph, memo):\n    if node in memo:\n        return memo[node]\n    \n    valid_sets = {frozenset()}\n    for neighbor in graph[node]:\n        if neighbor != parent:\n            sub_sets = dfs(neighbor, node, jokes, graph, memo)\n            for sub_set in sub_sets:\n                if len(sub_set) == 0 or max(sub_set) + 1 < jokes[neighbor] < min(sub_set) - 1:\n                    new_set = sub_set.union({jokes[neighbor]})\n                    valid_sets.add(new_set)\n    \n    memo[node] = valid_sets\n    return valid_sets\n\ndef count_valid_joke_sets(N, jokes, superior_pairs):\n    graph = defaultdict(list)\n    for A, B in superior_pairs:\n        graph[A].append(B)\n    \n    memo = {}\n    total_sets = dfs(1, None, jokes, graph, memo)\n    \n    result = sum(len(s) for s in total_sets)\n    return result\n\n# Read input\nN = int(input().strip())\njokes = list(map(int, input().strip().split()))\nsuperior_pairs = [tuple(map(int, input().strip().split())) for _ in range(N-1)]\n\n# Calculate and print the result\nprint(count_valid_joke_sets(N, jokes, superior_pairs))",
+    "code_hash": "15197d3b7cf7a9a8",
+    "language": "python",
+    "node_id": "n_12_35be50",
+    "revision_id": "rev_n_12_35be50_0",
+    "thought_path_snapshot": [
+      "Graph Traversal with Memoization",
+      "Utilize dynamic programming to store intermediate results and avoid redundant calculations."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 25
+  },
+  {
+    "candidate_id": "cand_bf0620b4df",
+    "problem_id": "apps_3096",
+    "code": "from collections import defaultdict\nimport sys\n\nsys.setrecursionlimit(10000)\n\ndef dfs(node, parent, jokes, visited, memo):\n    if node in memo:\n        return memo[node]\n    \n    valid_sets = {frozenset()}\n    for child in graph[node]:\n        if child != parent:\n            child_sets = dfs(child, node, jokes, visited, memo)\n            for s in child_sets:\n                if len(s) == 0 or max(s) + 1 < jokes[child] < min(s) - 1:\n                    new_set = s.union({jokes[child]})\n                    valid_sets.add(new_set)\n    \n    if jokes[node] not in [min(valid_sets), max(valid_sets)]:\n        valid_sets.add(frozenset([jokes[node]]))\n    \n    memo[node] = valid_sets\n    return valid_sets\n\ndef count_valid_joke_sets(N, jokes, superior_pairs):\n    global graph\n    graph = defaultdict(list)\n    for a, b in superior_pairs:\n        graph[a].append(b)\n    \n    visited = [False] * (N + 1)\n    memo = {}\n    result = dfs(1, None, jokes, visited, memo)\n    return sum(len(s) for s in result)\n\n# Read input\ninput = sys.stdin.read\ndata = input().split()\nN = int(data[0])\njokes = list(map(int, data[1:N+1]))\nsuperior_pairs = [(int(data[N+i*2]), int(data[N+i*2+1])) for i in range(N-1)]\n\n# Calculate and print the result\nprint(count_valid_joke_sets(N, jokes, superior_pairs))",
+    "code_hash": "a3f80f24d59c1900",
+    "language": "python",
+    "node_id": "n_12_35be50",
+    "revision_id": "rev_n_12_35be50_1",
+    "thought_path_snapshot": [
+      "Graph Traversal with Memoization",
+      "Utilize depth-first search (DFS) with memoization to explore all possible sets of jokes while adhering to the given constraints. Store intermediate results in a memoization table to avoid redundant calculations and ensure efficient computation within the given constraints."
+    ],
+    "origin": "rethink",
+    "generation_record_id": null,
+    "created_sequence": 26
+  },
+  {
+    "candidate_id": "cand_d064311c99",
+    "problem_id": "apps_3096",
+    "code": "from collections import defaultdict\nimport sys\n\nsys.setrecursionlimit(10000)\n\ndef dfs(node, visited, graph, jokes, memo):\n    if node in memo:\n        return memo[node]\n    \n    if node == 1:\n        count = 1\n    else:\n        count = 0\n    \n    for neighbor in graph[node]:\n        if not visited[neighbor]:\n            visited[neighbor] = True\n            if abs(jokes[node] - jokes[neighbor]) == 1:\n                count += dfs(neighbor, visited, graph, jokes, memo)\n            visited[neighbor] = False\n    \n    memo[node] = count\n    return count\n\ndef main():\n    input = sys.stdin.read\n    data = input().split()\n    \n    N = int(data[0])\n    jokes = list(map(int, data[1:N+1]))\n    edges = data[N+1:]\n    \n    graph = defaultdict(list)\n    for i in range(N-1):\n        A = int(edges[i*2]) - 1\n        B = int(edges[i*2 + 1]) - 1\n        graph[A].append(B)\n    \n    visited = [False] * N\n    visited[0] = True\n    memo = {}\n    \n    result = dfs(0, visited, graph, jokes, memo)\n    print(result)\n\nif __name__ == \"__main__\":\n    main()",
+    "code_hash": "7d3b44421729d57e",
+    "language": "python",
+    "node_id": "n_17_3d81b8",
+    "revision_id": "rev_n_17_3d81b8_0",
+    "thought_path_snapshot": [
+      "Recursive Backtracking with Memoization\n\nMemoize results of subproblems to avoid redundant calculations and improve efficiency.",
+      "Thought-2: Use Depth-First Search (DFS) with Memoization to efficiently explore all valid combinations of jokes while avoiding redundant calculations. Ensure that the constraints regarding joke uniqueness, supervisor invitations, and consecutive joke sets are strictly enforced during the DFS traversal.",
+      "Topological Sorting with Memoization"
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 27
+  },
+  {
+    "candidate_id": "cand_23cdc650ea",
+    "problem_id": "apps_3096",
+    "code": "from collections import defaultdict\nimport sys\n\nsys.setrecursionlimit(10000)\n\ndef dfs(employee, visited, jokes, parent_jokes):\n    if employee in visited:\n        return 0\n    \n    visited.add(employee)\n    \n    current_jokes = parent_jokes.copy()\n    current_jokes.add(jokes[employee-1])\n    \n    if len(current_jokes) != len(set(current_jokes)):\n        return 0\n    \n    if employee == 1:\n        return 1\n    \n    count = 0\n    for subordinate in graph[employee]:\n        if subordinate not in visited:\n            count += dfs(subordinate, visited, jokes, current_jokes)\n    \n    return count\n\ndef main():\n    input = sys.stdin.read\n    data = input().split()\n    \n    N = int(data[0])\n    jokes = list(map(int, data[1:N+1]))\n    edges = data[N+1:]\n    \n    graph = defaultdict(list)\n    for i in range(N-1):\n        A = int(edges[i*2]) - 1\n        B = int(edges[i*2 + 1]) - 1\n        graph[A].append(B)\n    \n    result = dfs(0, set(), jokes, set())\n    print(result)\n\nif __name__ == \"__main__\":\n    main()",
+    "code_hash": "969ae198960ef849",
+    "language": "python",
+    "node_id": "n_17_3d81b8",
+    "revision_id": "rev_n_17_3d81b8_1",
+    "thought_path_snapshot": [
+      "Recursive Backtracking with Memoization\n\nMemoize results of subproblems to avoid redundant calculations and improve efficiency.",
+      "Thought-2: Use Depth-First Search (DFS) with Memoization to efficiently explore all valid combinations of jokes while avoiding redundant calculations. Ensure that the constraints regarding joke uniqueness, supervisor invitations, and consecutive joke sets are strictly enforced during the DFS traversal.",
+      "Thought-3: Dynamic Programming with Memoization\n\nUse dynamic programming to keep track of valid subsets of jokes that can be formed up to each employee, ensuring that the constraints regarding joke uniqueness, supervisor invitations, and consecutive joke sets are strictly enforced. Memoize intermediate results to avoid redundant calculations and improve efficiency."
+    ],
+    "origin": "rethink",
+    "generation_record_id": null,
+    "created_sequence": 28
+  },
+  {
+    "candidate_id": "cand_21c757df97",
+    "problem_id": "apps_3096",
+    "code": "from typing import List\nimport sys\n\ndef count_valid_joke_sets(N: int, joke_types: List[int], hierarchy: List[List[int]]) -> int:\n    # Initialize DP table\n    dp = [set() for _ in range(N + 1)]\n    dp[1] = {joke_types[0]}\n    \n    # Process each employee\n    for i in range(2, N + 1):\n        parent = hierarchy[i - 2][1]\n        joke_type = joke_types[i - 1]\n        \n        # Create a new set for the current employee\n        new_set = {joke_type}\n        \n        # Union with the parent's set\n        new_set.update(dp[parent])\n        \n        # Check for consecutive numbers\n        min_val = min(new_set)\n        max_val = max(new_set)\n        if max_val - min_val == len(new_set) - 1:\n            dp[i].add(frozenset(new_set))\n    \n    # Count valid sets\n    result = sum(len(s) for s in dp)\n    return result\n\n# Read input\ninput = sys.stdin.read\ndata = input().split()\nN = int(data[0])\njoke_types = list(map(int, data[1:N+1]))\nhierarchy = [list(map(int, data[N+i*2:N+(i+1)*2])) for i in range(N-1)]\n\n# Get the result\nresult = count_valid_joke_sets(N, joke_types, hierarchy)\n\n# Print the result\nprint(result)",
+    "code_hash": "149d0d50b56951d5",
+    "language": "python",
+    "node_id": "n_21_03dbbd",
+    "revision_id": "rev_n_21_03dbbd_0",
+    "thought_path_snapshot": [
+      "Dynamic Programming with Set Operations",
+      "Review the logic for checking if the set of jokes formed by the invitees and the current person is consecutive. Ensure that the union operation and the consecutive check are correctly implemented.",
+      "Refactor the code to improve readability and maintainability while ensuring it adheres to the constraints."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 29
+  },
+  {
+    "candidate_id": "cand_0bdbec49ef",
+    "problem_id": "apps_3096",
+    "code": "from collections import defaultdict\nimport sys\n\ndef count_consecutive_sets(N, V, superior):\n    dp = [defaultdict(int) for _ in range(N + 1)]\n    dp[1][frozenset([V[0]])] = 1\n    \n    for i in range(2, N + 1):\n        for jokes in dp[i - 1]:\n            new_jokes = jokes.union(frozenset([V[i - 1]]))\n            if all(abs(b - a) == 1 for a, b in zip(sorted(list(new_jokes)), sorted(list(new_jokes))[1:])):\n                dp[i][new_jokes] += dp[i - 1][jokes]\n    \n    return sum(dp[N].values())\n\nif __name__ == \"__main__\":\n    input = sys.stdin.read\n    data = input().split()\n    \n    N = int(data[0])\n    V = list(map(int, data[1:N+1]))\n    superior = []\n    \n    for i in range(N - 1):\n        A = int(data[N + 1 + 2 * i]) - 1\n        B = int(data[N + 2 + 2 * i]) - 1\n        superior.append((A, B))\n    \n    result = count_consecutive_sets(N, V, superior)\n    print(result)",
+    "code_hash": "91861ba107b444f5",
+    "language": "python",
+    "node_id": "n_21_03dbbd",
+    "revision_id": "rev_n_21_03dbbd_1",
+    "thought_path_snapshot": [
+      "Dynamic Programming with Set Operations",
+      "Review the logic for checking if the set of jokes formed by the invitees and the current person is consecutive. Ensure that the union operation and the consecutive check are correctly implemented.",
+      "Refactor the code to ensure that the set of jokes is checked for consecutiveness before adding it to the DP table. Specifically, convert the frozensets to lists, sort them, and then check if the difference between adjacent elements is exactly 1. If not, skip adding the set to the DP table. This will prevent the TypeError encountered during execution."
+    ],
+    "origin": "rethink",
+    "generation_record_id": null,
+    "created_sequence": 30
+  },
+  {
+    "candidate_id": "cand_6edbc36c76",
+    "problem_id": "apps_3096",
+    "code": "from collections import defaultdict\nimport sys\n\nsys.setrecursionlimit(10000)\n\ndef dfs(node, parent, jokes, graph, dp):\n    if (node, tuple(sorted(jokes))) in dp:\n        return dp[(node, tuple(sorted(jokes)))]\n    \n    if len(jokes) > 1 and abs(jokes[-1] - jokes[0]) != len(jokes) - 1:\n        dp[(node, tuple(sorted(jokes)))] = 0\n        return 0\n    \n    count = 1\n    for neighbor in graph[node]:\n        if neighbor == parent:\n            continue\n        new_jokes = list(jokes)\n        new_jokes.append(graph[node][neighbor])\n        count += dfs(neighbor, node, new_jokes, graph, dp)\n    \n    dp[(node, tuple(sorted(jokes)))] = count\n    return count\n\ndef main():\n    input = sys.stdin.read\n    data = input().split()\n    \n    index = 0\n    N = int(data[index])\n    index += 1\n    \n    jokes = [int(data[index + i]) for i in range(N)]\n    index += N\n    \n    graph = defaultdict(dict)\n    for _ in range(N - 1):\n        A = int(data[index])\n        B = int(data[index + 1])\n        graph[A][B] = jokes[B - 1]\n        index += 2\n    \n    dp = {}\n    result = dfs(1, None, [], graph, dp)\n    print(result)\n\nif __name__ == \"__main__\":\n    main()",
+    "code_hash": "2fb8bc0edcbfae8d",
+    "language": "python",
+    "node_id": "n_22_96dc67",
+    "revision_id": "rev_n_22_96dc67_0",
+    "thought_path_snapshot": [
+      "Graph Traversal with Memoization",
+      "Revised Thought-2: Use dynamic programming with memoization to keep track of valid joke sets for each node, considering its subordinates and ensuring the constraints are met. This approach avoids deep recursion by storing intermediate results and reusing them when needed.",
+      "Revisit the constraint on consecutive joke sets and ensure the logic correctly handles this condition."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 31
+  },
+  {
+    "candidate_id": "cand_c5d8b5be90",
+    "problem_id": "apps_3096",
+    "code": "from collections import defaultdict\nimport sys\n\nsys.setrecursionlimit(10000)\n\ndef dfs(node, parent, jokes, graph, dp):\n    if node in dp:\n        return dp[node]\n    \n    valid_sets = {frozenset()}\n    \n    for neighbor in graph[node]:\n        if neighbor != parent:\n            child_sets = dfs(neighbor, node, jokes, graph, dp)\n            for child_set in child_sets:\n                new_set = child_set.union({jokes[node]})\n                if len(new_set) == len(child_set) + 1 and max(new_set) - min(new_set) == len(new_set) - 1:\n                    valid_sets.add(new_set)\n    \n    dp[node] = valid_sets\n    return valid_sets\n\ndef count_valid_joke_sets(N, jokes, superior_pairs):\n    graph = defaultdict(list)\n    for A, B in superior_pairs:\n        graph[A].append(B)\n    \n    dp = {}\n    total_sets = dfs(1, None, jokes, graph, dp)\n    \n    result = sum(len(s) for s in total_sets)\n    return result\n\n# Read input\nN = int(input())\njokes = list(map(int, input().split()))\nsuperior_pairs = [tuple(map(int, input().split())) for _ in range(N-1)]\n\n# Calculate and print the result\nprint(count_valid_joke_sets(N, jokes, superior_pairs))",
+    "code_hash": "62c6699f2fd3a573",
+    "language": "python",
+    "node_id": "n_22_96dc67",
+    "revision_id": "rev_n_22_96dc67_1",
+    "thought_path_snapshot": [
+      "Graph Traversal with Memoization",
+      "Revised Thought-2: Use dynamic programming with memoization to keep track of valid joke sets for each node, considering its subordinates and ensuring the constraints are met. This approach avoids deep recursion by storing intermediate results and reusing them when needed.",
+      "Revised Thought-3: Ensure that the logic correctly handles the constraint on consecutive joke sets by checking if the set of jokes told by the invitees that person X is superior to (directly or indirectly) tell and person X don't form a set of consecutive numbers before adding person X to the set. If they do not form a consecutive set, skip adding person X to the set."
+    ],
+    "origin": "rethink",
+    "generation_record_id": null,
+    "created_sequence": 32
+  }
+]

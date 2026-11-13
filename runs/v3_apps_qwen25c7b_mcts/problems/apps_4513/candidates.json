@@ -1,0 +1,516 @@
+[
+  {
+    "candidate_id": "cand_5091c36755",
+    "problem_id": "apps_4513",
+    "code": "def find_unique_elements(grid):\n    unique_rows = []\n    unique_cols = []\n    unique_blocks = []\n\n    for i in range(9):\n        row = set()\n        col = set()\n        block = set()\n        for j in range(9):\n            if grid[i][j] != '0':\n                row.add(grid[i][j])\n            if grid[j][i] != '0':\n                col.add(grid[j][i])\n            block_index = (i // 3) * 3 + j // 3\n            if grid[block_index // 3 * 3 + j % 3][block_index % 3 * 3 + j // 3] != '0':\n                block.add(grid[block_index // 3 * 3 + j % 3][block_index % 3 * 3 + j // 3])\n        unique_rows.append(row)\n        unique_cols.append(col)\n        unique_blocks.append(block)\n\n    return unique_rows, unique_cols, unique_blocks\n\ndef replace_unique_with_random(grid, unique_rows, unique_cols, unique_blocks):\n    import random\n    changes = 0\n    for i in range(9):\n        for j in range(9):\n            if grid[i][j] == '0':\n                continue\n            row_set = unique_rows[i]\n            col_set = unique_cols[j]\n            block_index = (i // 3) * 3 + j // 3\n            block_set = unique_blocks[block_index]\n            possible_values = {str(x) for x in range(1, 10)} - (row_set | col_set | block_set)\n            if possible_values:\n                new_value = random.choice(list(possible_values))\n                grid[i] = grid[i][:j] + new_value + grid[i][j+1:]\n                changes += 1\n                if changes >= 9:\n                    return grid\n    return grid\n\ndef solve(input_data):\n    t = int(input_data.readline().strip())\n    results = []\n    for _ in range(t):\n        grid = [input_data.readline().strip() for _ in range(9)]\n        unique_rows, unique_cols, unique_blocks = find_unique_elements(grid)\n        result_grid = replace_unique_with_random(grid, unique_rows, unique_cols, unique_blocks)\n        results.append(result_grid)\n    return '\\n'.join('\\n'.join(row) for row in results)\n\n# Example usage:\n# input_data = sys.stdin.read()\n# output = solve(input_data)\n# print(output)",
+    "code_hash": "318a68f8ca956451",
+    "language": "python",
+    "node_id": "n_2_625d4f",
+    "revision_id": "rev_n_2_625d4f_0",
+    "thought_path_snapshot": [
+      "Iteratively remove unique values from rows, columns, and blocks until at most 9 changes are made."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 1
+  },
+  {
+    "candidate_id": "cand_e85537d024",
+    "problem_id": "apps_4513",
+    "code": "def find_unique_positions(grid):\n    rows = [set() for _ in range(9)]\n    cols = [set() for _ in range(9)]\n    blocks = [[set() for _ in range(3)] for _ in range(3)]\n\n    unique_positions = []\n\n    for i in range(9):\n        for j in range(9):\n            num = int(grid[i][j])\n            if num not in rows[i] and num not in cols[j] and num not in blocks[i // 3][j // 3]:\n                unique_positions.append((i, j))\n            rows[i].add(num)\n            cols[j].add(num)\n            blocks[i // 3][j // 3].add(num)\n\n    return unique_positions\n\ndef make_anti_sudoku(grid):\n    unique_positions = find_unique_positions(grid)\n    changes_made = 0\n\n    for pos in unique_positions:\n        i, j = pos\n        original_num = int(grid[i][j])\n        for new_num in range(1, 10):\n            if new_num != original_num and new_num not in set(grid[x][y] for x in range(i - i % 3, i - i % 3 + 3) for y in range(j - j % 3, j - j % 3 + 3)):\n                grid[i] = grid[i][:j] + str(new_num) + grid[i][j+1:]\n                changes_made += 1\n                break\n        if changes_made >= 9:\n            break\n\n    return grid\n\ndef solve():\n    import sys\n    input = sys.stdin.read\n    data = input().split()\n    \n    t = int(data[0])\n    results = []\n    \n    index = 1\n    for _ in range(t):\n        grid = data[index:index+81]\n        index += 81\n        anti_sudoku_grid = make_anti_sudoku(grid)\n        results.extend(anti_sudoku_grid)\n    \n    print('\\n'.join(results))\n\nif __name__ == \"__main__\":\n    solve()",
+    "code_hash": "95bf47383cc1ad4c",
+    "language": "python",
+    "node_id": "n_2_625d4f",
+    "revision_id": "rev_n_2_625d4f_1",
+    "thought_path_snapshot": [
+      "Iterate through each cell and check if its value is unique within its row, column, and block. If it is, replace it with a different value while ensuring the new value maintains the anti-sudoku properties. Continue this process until at most 9 changes are made."
+    ],
+    "origin": "rethink",
+    "generation_record_id": null,
+    "created_sequence": 2
+  },
+  {
+    "candidate_id": "cand_ffbc8a7522",
+    "problem_id": "apps_4513",
+    "code": "import random\n\ndef make_anti_sudoku(sudoku):\n    changes = 0\n    rows = [set() for _ in range(9)]\n    cols = [set() for _ in range(9)]\n    blocks = [[set() for _ in range(3)] for _ in range(3)]\n\n    for i in range(9):\n        for j in range(9):\n            num = int(sudoku[i][j])\n            if num in rows[i] or num in cols[j] or num in blocks[i//3][j//3]:\n                continue\n            rows[i].add(num)\n            cols[j].add(num)\n            blocks[i//3][j//3].add(num)\n            continue\n            # Change the value\n            new_num = random.randint(1, 9)\n            while new_num == num or new_num in rows[i] or new_num in cols[j] or new_num in blocks[i//3][j//3]:\n                new_num = random.randint(1, 9)\n            sudoku[i] = sudoku[i][:j] + str(new_num) + sudoku[i][j+1:]\n            changes += 1\n            if changes >= 9:\n                return sudoku\n            rows[i].add(new_num)\n            cols[j].add(new_num)\n            blocks[i//3][j//3].add(new_num)\n\n    return sudoku\n\ndef solve():\n    import sys\n    input = sys.stdin.read\n    data = input().split()\n    \n    t = int(data[0])\n    index = 1\n    results = []\n    \n    for _ in range(t):\n        sudoku = data[index:index+81]\n        index += 81\n        result = make_anti_sudoku(sudoku)\n        results.append('\\n'.join(result))\n    \n    for result in results:\n        print(result)\n\nif __name__ == \"__main__\":\n    solve()",
+    "code_hash": "e41b9ee6bc4df82c",
+    "language": "python",
+    "node_id": "n_1_551b3c",
+    "revision_id": "rev_n_1_551b3c_0",
+    "thought_path_snapshot": [
+      "Randomly select cells and change their values while ensuring the resulting grid remains valid Sudoku."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 3
+  },
+  {
+    "candidate_id": "cand_aafc77ac46",
+    "problem_id": "apps_4513",
+    "code": "def make_anti_sudoku(sudoku):\n    def has_duplicates(lst):\n        return len(lst) != len(set(lst))\n\n    def find_changes():\n        changes = []\n        for i in range(9):\n            for j in range(9):\n                if has_duplicates([sudoku[i][j] for i in range(9)]) or \\\n                   has_duplicates([sudoku[j][i] for i in range(9)]) or \\\n                   has_duplicates([sudoku[x//3*3 + y//3][x%3*3 + y%3] for x in range(3) for y in range(3)]):\n                    continue\n                changes.append((i, j))\n                if len(changes) == 9:\n                    return changes\n        return changes\n\n    changes = find_changes()\n    for i, j in changes:\n        new_val = str((int(sudoku[i][j]) % 9) + 1)\n        sudoku[i] = sudoku[i][:j] + new_val + sudoku[i][j+1:]\n    return sudoku\n\ndef solve(t, puzzles):\n    results = []\n    for _ in range(t):\n        sudoku = [list(puzzles[_].strip()) for _ in range(9)]\n        anti_sudoku = make_anti_sudoku(sudoku)\n        results.append('\\n'.join(''.join(row) for row in anti_sudoku))\n    return '\\n\\n'.join(results)\n\n# Example usage:\n# t = int(input())\n# puzzles = [input() for _ in range(t)]\n# print(solve(t, puzzles))",
+    "code_hash": "a121ae858b13a6c4",
+    "language": "python",
+    "node_id": "n_1_551b3c",
+    "revision_id": "rev_n_1_551b3c_1",
+    "thought_path_snapshot": [
+      "To generate an anti-Sudoku, we need to strategically change at most 9 elements in the given Sudoku solution such that each row, column, and 3x3 block contains at least two equal elements. Instead of randomly changing elements, we should identify positions where changing the element will most effectively disrupt the Sudoku's structure while still satisfying the anti-Sudoku conditions. This involves selecting elements that are part of multiple constraints (rows, columns, and blocks) and changing them to create duplicates."
+    ],
+    "origin": "rethink",
+    "generation_record_id": null,
+    "created_sequence": 4
+  },
+  {
+    "candidate_id": "cand_edfd81c44b",
+    "problem_id": "apps_4513",
+    "code": "def is_valid(grid):\n    for i in range(9):\n        if len(set(grid[i])) != 9 or len(set(grid[j][i] for j in range(9))) != 9:\n            return False\n    for x in range(0, 9, 3):\n        for y in range(0, 9, 3):\n            if len(set(grid[x + dx][y + dy] for dx in range(3) for dy in range(3))) != 9:\n                return False\n    return True\n\ndef solve(grid, changes=0):\n    if changes == 9 or is_valid(grid):\n        return grid\n    for i in range(9):\n        for j in range(9):\n            if grid[i][j] != '0':\n                continue\n            for num in range(1, 10):\n                grid[i] = grid[i][:j] + str(num) + grid[i][j+1:]\n                if solve(grid, changes + 1):\n                    return grid\n                grid[i] = grid[i][:j] + '0' + grid[i][j+1:]\n    return None\n\ndef main():\n    import sys\n    input = sys.stdin.read\n    data = input().split()\n    \n    t = int(data[0])\n    results = []\n    \n    index = 1\n    for _ in range(t):\n        grid = [data[index + i] for i in range(9)]\n        result = solve([list(row) for row in grid], 0)\n        results.append('\\n'.join(''.join(row) for row in result))\n        index += 9\n    \n    for result in results:\n        print(result)\n\nif __name__ == \"__main__\":\n    main()",
+    "code_hash": "95d45d0de0d50054",
+    "language": "python",
+    "node_id": "n_3_ef7f6d",
+    "revision_id": "rev_n_3_ef7f6d_0",
+    "thought_path_snapshot": [
+      "Use a backtracking algorithm to systematically replace values in the grid while checking for anti-Sudoku conditions."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 5
+  },
+  {
+    "candidate_id": "cand_c609bd29b9",
+    "problem_id": "apps_4513",
+    "code": "def make_anti_sudoku(grid):\n    def has_duplicate(lst):\n        return len(set(lst)) != len(lst)\n\n    def modify_cell(i, j):\n        original = grid[i][j]\n        for num in range(1, 10):\n            if num != original:\n                grid[i] = grid[i][:j] + str(num) + grid[i][j+1:]\n                if has_duplicate([grid[x][j] for x in range(9)]) or \\\n                   has_duplicate([grid[i][y] for y in range(9)]) or \\\n                   has_duplicate([grid[(i//3)*3+x][(j//3)*3+y] for x in range(3) for y in range(3)]):\n                    return True\n                grid[i] = grid[i][:j] + str(original) + grid[i][j+1:]\n        return False\n\n    modified_cells = 0\n    for i in range(9):\n        for j in range(9):\n            if not has_duplicate([grid[x][j] for x in range(9)]) or \\\n               not has_duplicate([grid[i][y] for y in range(9)]) or \\\n               not has_duplicate([grid[(i//3)*3+x][(j//3)*3+y] for x in range(3) for y in range(3)]):\n                if modify_cell(i, j):\n                    modified_cells += 1\n                    if modified_cells >= 9:\n                        break\n        if modified_cells >= 9:\n            break\n\n    return grid\n\ndef solve():\n    import sys\n    input = sys.stdin.read\n    data = input().split()\n    \n    t = int(data[0])\n    results = []\n    \n    index = 1\n    for _ in range(t):\n        grid = [data[index + i] for i in range(9)]\n        result_grid = make_anti_sudoku(grid)\n        results.append('\\n'.join(result_grid))\n        index += 9\n    \n    for result in results:\n        print(result)\n\nif __name__ == \"__main__\":\n    solve()",
+    "code_hash": "cff57f5e0be86e5e",
+    "language": "python",
+    "node_id": "n_3_ef7f6d",
+    "revision_id": "rev_n_3_ef7f6d_1",
+    "thought_path_snapshot": [
+      "To generate an anti-sudoku grid, we need to ensure that each row, column, and 3x3 block contains at least two equal elements. Instead of using a backtracking approach to modify the entire grid, we can focus on modifying specific cells to achieve the required condition. Here's a refined strategy:\n\n1. Identify cells in the grid that do not already meet the anti-sudoku criteria.\n2. Change these cells to a value that ensures the row, column, or block has at least two equal elements.\n3. Continue this process until at most 9 cells have been modified.\n\nThis approach ensures that we only make the minimum necessary changes to achieve the desired anti-sudoku properties."
+    ],
+    "origin": "rethink",
+    "generation_record_id": null,
+    "created_sequence": 6
+  },
+  {
+    "candidate_id": "cand_2d6aaa09ab",
+    "problem_id": "apps_4513",
+    "code": "import sys\nfrom random import choice\n\ndef is_valid(board, row, col, num):\n    for x in range(9):\n        if board[row][x] == num or board[x][col] == num:\n            return False\n    start_row, start_col = 3 * (row // 3), 3 * (col // 3)\n    for i in range(3):\n        for j in range(3):\n            if board[i + start_row][j + start_col] == num:\n                return False\n    return True\n\ndef find_unique_positions(board):\n    unique_positions = []\n    for i in range(9):\n        for j in range(9):\n            if len(set([board[i][k] for k in range(9)])) > 1 and \\\n               len(set([board[k][j] for k in range(9)])) > 1 and \\\n               len(set([board[3*(i//3)+k//3][3*(j//3)+k%3] for k in range(9)])) > 1:\n                unique_positions.append((i, j))\n    return unique_positions\n\ndef solve(board, changes=0):\n    if changes >= 9:\n        return board\n    unique_positions = find_unique_positions(board)\n    if not unique_positions:\n        return board\n    pos = choice(unique_positions)\n    original_num = board[pos[0]][pos[1]]\n    for num in range(1, 10):\n        if num != original_num and is_valid(board, pos[0], pos[1], num):\n            board[pos[0]][pos[1]] = num\n            result = solve(board, changes + 1)\n            if result:\n                return result\n            board[pos[0]][pos[1]] = original_num\n    return None\n\ndef main():\n    input = sys.stdin.read\n    data = input().split()\n    t = int(data[0])\n    index = 1\n    results = []\n    for _ in range(t):\n        board = [list(map(int, data[index:index+9])) for index in range(index, index+81, 9)]\n        solved_board = solve(board)\n        results.append(solved_board)\n        index += 81\n    for result in results:\n        for row in result:\n            print(''.join(map(str, row)))\n\nif __name__ == \"__main__\":\n    main()",
+    "code_hash": "a0390219005a64d7",
+    "language": "python",
+    "node_id": "n_5_2135c4",
+    "revision_id": "rev_n_5_2135c4_0",
+    "thought_path_snapshot": [
+      "Iterate through each cell and check if its value is unique within its row, column, and block. If it is, replace it with a different value while ensuring the new value maintains the anti-sudoku properties. Continue this process until at most 9 changes are made.",
+      "Identify all unique positions and randomly select up to 9 of them to replace with another number."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 7
+  },
+  {
+    "candidate_id": "cand_6202235d38",
+    "problem_id": "apps_4513",
+    "code": "def find_repeated_elements(grid):\n    rows = [set() for _ in range(9)]\n    cols = [set() for _ in range(9)]\n    blocks = [[set() for _ in range(3)] for _ in range(3)]\n\n    for i in range(9):\n        for j in range(9):\n            num = int(grid[i][j])\n            if num in rows[i] or num in cols[j] or num in blocks[i//3][j//3]:\n                return i, j, num\n            rows[i].add(num)\n            cols[j].add(num)\n            blocks[i//3][j//3].add(num)\n\n    return None, None, None\n\ndef change_value(grid, i, j, new_val):\n    grid[i] = grid[i][:j] + str(new_val) + grid[i][j+1:]\n\ndef solve(grid):\n    changes = 0\n    while changes < 9:\n        i, j, num = find_repeated_elements(grid)\n        if i is None:\n            break\n        new_val = (num % 9) + 1 if num != 9 else 1\n        grid = change_value(grid, i, j, new_val)\n        changes += 1\n    return grid\n\ndef main():\n    import sys\n    input = sys.stdin.read\n    data = input().split()\n    \n    t = int(data[0])\n    results = []\n    \n    index = 1\n    for _ in range(t):\n        grid = data[index:index+9]\n        index += 9\n        result = solve(grid)\n        results.append('\\n'.join(result))\n    \n    for result in results:\n        print(result)\n\nif __name__ == \"__main__\":\n    main()",
+    "code_hash": "8e75553b34d592f4",
+    "language": "python",
+    "node_id": "n_5_2135c4",
+    "revision_id": "rev_n_5_2135c4_1",
+    "thought_path_snapshot": [
+      "Iterate through each cell and check if its value is unique within its row, column, and block. If it is, replace it with a different value while ensuring the new value maintains the anti-sudoku properties. Continue this process until at most 9 changes are made.",
+      "Identify all cells where the current number is repeated in its row, column, or block. Select one such cell and change its value to a different number that still satisfies the anti-sudoku conditions. Repeat this process up to 9 times."
+    ],
+    "origin": "rethink",
+    "generation_record_id": null,
+    "created_sequence": 8
+  },
+  {
+    "candidate_id": "cand_99e8d3cea2",
+    "problem_id": "apps_4513",
+    "code": "def make_anti_sudoku(sudoku):\n    # Convert the string representation of the Sudoku into a list of lists\n    grid = [list(map(int, row)) for row in sudoku.split('\\n')]\n    \n    # Function to check if the current grid is already anti-sudoku\n    def is_anti_sudoku(grid):\n        for i in range(9):\n            row = set(grid[i])\n            col = set(grid[j][i] for j in range(9))\n            block = set(grid[x + i // 3 * 3][y + i % 3 * 3] for x in range(3) for y in range(3))\n            if len(row) == 9 or len(col) == 9 or len(block) == 9:\n                return False\n        return True\n    \n    # If the grid is already anti-sudoku, return it as is\n    if is_anti_sudoku(grid):\n        return '\\n'.join(''.join(map(str, row)) for row in grid)\n    \n    # Try changing up to 9 elements to make the grid anti-sudoku\n    changes = 0\n    for i in range(9):\n        for j in range(9):\n            original_value = grid[i][j]\n            for new_value in range(1, 10):\n                if new_value != original_value:\n                    grid[i][j] = new_value\n                    if is_anti_sudoku(grid):\n                        changes += 1\n                        if changes >= 9:\n                            return '\\n'.join(''.join(map(str, row)) for row in grid)\n                        break\n            grid[i][j] = original_value\n    \n    # If we couldn't find a valid anti-sudoku within 9 changes, return the original grid\n    return '\\n'.join(''.join(map(str, row)) for row in grid)\n\n# Read input\nimport sys\ninput = sys.stdin.read\ndata = input().split()\n\n# Number of test cases\nt = int(data[0])\n\n# Process each test case\nresults = []\nfor i in range(t):\n    sudoku = data[1 + i * 9 : 1 + (i + 1) * 9]\n    result = make_anti_sudoku('\\n'.join(sudoku))\n    results.append(result)\n\n# Print all results\nprint('\\n'.join(results))",
+    "code_hash": "230abb05138e8f89",
+    "language": "python",
+    "node_id": "n_7_f18143",
+    "revision_id": "rev_n_7_f18143_0",
+    "thought_path_snapshot": [
+      "To generate an anti-Sudoku, we need to strategically change at most 9 elements in the given Sudoku solution such that each row, column, and 3x3 block contains at least two equal elements. Instead of randomly changing elements, we should identify positions where changing the element will most effectively disrupt the Sudoku's structure while still satisfying the anti-Sudoku conditions. This involves selecting elements that are part of multiple constraints (rows, columns, and blocks) and changing them to create duplicates.",
+      "Identify critical cells that affect multiple constraints."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 9
+  },
+  {
+    "candidate_id": "cand_1214d8e6b3",
+    "problem_id": "apps_4513",
+    "code": "import sys\nfrom collections import defaultdict\n\ndef make_anti_sudoku(sudoku):\n    def count_duplicates(row, col, block):\n        counts = defaultdict(int)\n        for r in range(9):\n            for c in range(9):\n                if r == row or c == col or (r // 3 == row // 3 and c // 3 == col // 3):\n                    counts[sudoku[r][c]] += 1\n        return counts\n\n    changes = []\n    for row in range(9):\n        for col in range(9):\n            if len(count_duplicates(row, col, None)) < 2:\n                changes.append((row, col))\n                if len(changes) >= 9:\n                    break\n        if len(changes) >= 9:\n            break\n\n    for row, col in changes:\n        new_value = str((int(sudoku[row][col]) % 9) + 1)\n        while new_value == sudoku[row][col]:\n            new_value = str((int(new_value) % 9) + 1)\n        sudoku[row] = sudoku[row][:col] + new_value + sudoku[row][col+1:]\n\n    return sudoku\n\ndef main():\n    input = sys.stdin.read\n    data = input().split()\n    \n    t = int(data[0])\n    index = 1\n    results = []\n    \n    for _ in range(t):\n        sudoku = [data[index + i] for i in range(9)]\n        index += 9\n        anti_sudoku = make_anti_sudoku(sudoku)\n        results.append('\\n'.join(anti_sudoku))\n    \n    for result in results:\n        print(result)\n\nif __name__ == \"__main__\":\n    main()",
+    "code_hash": "95289c3fa4ee3fc8",
+    "language": "python",
+    "node_id": "n_7_f18143",
+    "revision_id": "rev_n_7_f18143_1",
+    "thought_path_snapshot": [
+      "To generate an anti-Sudoku, we need to strategically change at most 9 elements in the given Sudoku solution such that each row, column, and 3x3 block contains at least two equal elements. Instead of randomly changing elements, we should identify positions where changing the element will most effectively disrupt the Sudoku's structure while still satisfying the anti-Sudoku conditions. This involves selecting elements that are part of multiple constraints (rows, columns, and blocks) and changing them to create duplicates.",
+      "To generate an anti-Sudoku, we need to strategically change at most 9 elements in the given Sudoku solution such that each row, column, and 3x3 block contains at least two equal elements. Instead of randomly changing elements, we should identify positions where changing the element will most effectively disrupt the Sudoku's structure while still satisfying the anti-Sudoku conditions. This involves selecting elements that are part of multiple constraints (rows, columns, and blocks) and changing them to create duplicates. Additionally, we should prioritize changing elements in rows, columns, and blocks that currently have fewer unique values to maximize the disruption."
+    ],
+    "origin": "rethink",
+    "generation_record_id": null,
+    "created_sequence": 10
+  },
+  {
+    "candidate_id": "cand_ed89975a79",
+    "problem_id": "apps_4513",
+    "code": "def make_anti_sudoku(grid):\n    def has_duplicate(lst):\n        return len(set(lst)) != len(lst)\n\n    def find_unique_cells():\n        unique_cells = []\n        for i in range(9):\n            for j in range(9):\n                if grid[i][j] == '0':\n                    continue\n                row = [grid[i][k] for k in range(9)]\n                col = [grid[k][j] for k in range(9)]\n                block = [grid[(i // 3) * 3 + x][(j // 3) * 3 + y] for x in range(3) for y in range(3)]\n                if not has_duplicate(row) or not has_duplicate(col) or not has_duplicate(block):\n                    unique_cells.append((i, j))\n        return unique_cells\n\n    def replace_cell(i, j):\n        current_value = int(grid[i][j])\n        for new_value in range(1, 10):\n            if new_value != current_value:\n                grid[i] = grid[i][:j] + str(new_value) + grid[i][j+1:]\n                break\n\n    unique_cells = find_unique_cells()\n    for cell in unique_cells[:9]:\n        replace_cell(cell[0], cell[1])\n\n    return grid\n\ndef solve(t, grids):\n    results = []\n    for grid in grids:\n        anti_sudoku_grid = make_anti_sudoku([list(line) for line in grid.split('\\n')])\n        results.append('\\n'.join(''.join(row) for row in anti_sudoku_grid))\n    return results\n\n# Example usage\nif __name__ == \"__main__\":\n    import sys\n    input = sys.stdin.read\n    data = input().split()\n    \n    t = int(data[0])\n    grids = [data[i*9+1:i*9+10] for i in range(t)]\n    \n    results = solve(t, grids)\n    \n    for result in results:\n        print(result)",
+    "code_hash": "293aa962c96398ec",
+    "language": "python",
+    "node_id": "n_10_52fc65",
+    "revision_id": "rev_n_10_52fc65_0",
+    "thought_path_snapshot": [
+      "To generate an anti-sudoku grid, we need to ensure that each row, column, and 3x3 block contains at least two equal elements. Instead of using a backtracking approach to modify the entire grid, we can focus on modifying specific cells to achieve the required condition. Here's a refined strategy:\n\n1. Identify cells in the grid that do not already meet the anti-sudoku criteria.\n2. Change these cells to a value that ensures the row, column, or block has at least two equal elements.\n3. Continue this process until at most 9 cells have been modified.\n\nThis approach ensures that we only make the minimum necessary changes to achieve the desired anti-sudoku properties.",
+      "Identify cells with unique values and replace them with another number within the same row, column, or block."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 11
+  },
+  {
+    "candidate_id": "cand_e20ba1bc9e",
+    "problem_id": "apps_4513",
+    "code": "def make_anti_sudoku(grid):\n    def has_duplicate(lst):\n        return len(set(lst)) != len(lst)\n\n    def find_unique_cells():\n        unique_cells = []\n        for i in range(9):\n            for j in range(9):\n                if grid[i][j] == '0':\n                    continue\n                row = [grid[i][k] for k in range(9)]\n                col = [grid[k][j] for k in range(9)]\n                block = [grid[(i // 3) * 3 + x][(j // 3) * 3 + y] for x in range(3) for y in range(3)]\n                if not has_duplicate(row) and not has_duplicate(col) and not has_duplicate(block):\n                    unique_cells.append((i, j))\n        return unique_cells\n\n    unique_cells = find_unique_cells()\n    modified_count = 0\n    for cell in unique_cells:\n        i, j = cell\n        original_value = grid[i][j]\n        for new_value in range(1, 10):\n            if str(new_value) != original_value:\n                grid[i] = grid[i][:j] + str(new_value) + grid[i][j+1:]\n                row = [grid[i][k] for k in range(9)]\n                col = [grid[k][j] for k in range(9)]\n                block = [grid[(i // 3) * 3 + x][(j // 3) * 3 + y] for x in range(3) for y in range(3)]\n                if has_duplicate(row) and has_duplicate(col) and has_duplicate(block):\n                    modified_count += 1\n                    break\n        if modified_count >= 9:\n            break\n\n    return grid\n\ndef solve(t, grids):\n    results = []\n    for _ in range(t):\n        grid = [list(input().strip()) for _ in range(9)]\n        anti_sudoku_grid = make_anti_sudoku(grid)\n        results.append('\\n'.join(''.join(row) for row in anti_sudoku_grid))\n    return '\\n'.join(results)\n\n# Example usage:\n# t = int(input())\n# grids = [input() for _ in range(t * 9)]\n# result = solve(t, grids)\n# print(result)",
+    "code_hash": "e0d324009e7fc595",
+    "language": "python",
+    "node_id": "n_10_52fc65",
+    "revision_id": "rev_n_10_52fc65_1",
+    "thought_path_snapshot": [
+      "To generate an anti-sudoku grid, we need to ensure that each row, column, and 3x3 block contains at least two equal elements. Instead of using a backtracking approach to modify the entire grid, we can focus on modifying specific cells to achieve the required condition. Here's a refined strategy:\n\n1. Identify cells in the grid that do not already meet the anti-sudoku criteria.\n2. Change these cells to a value that ensures the row, column, or block has at least two equal elements.\n3. Continue this process until at most 9 cells have been modified.\n\nThis approach ensures that we only make the minimum necessary changes to achieve the desired anti-sudoku properties.",
+      "Thought-2: Identify cells with unique values and replace them with another number within the same row, column, or block, ensuring that the replacement does not violate the anti-sudoku conditions. This approach will help in making minimal changes while ensuring the grid meets the required criteria."
+    ],
+    "origin": "rethink",
+    "generation_record_id": null,
+    "created_sequence": 12
+  },
+  {
+    "candidate_id": "cand_d6fa953866",
+    "problem_id": "apps_4513",
+    "code": "import sys\nimport random\n\ndef is_valid(board, row, col, num):\n    # Check if the number is not in the current row\n    for x in range(9):\n        if board[row][x] == num:\n            return False\n    \n    # Check if the number is not in the current column\n    for x in range(9):\n        if board[x][col] == num:\n            return False\n    \n    # Check if the number is not in the current 3x3 box\n    start_row = row - row % 3\n    start_col = col - col % 3\n    for i in range(3):\n        for j in range(3):\n            if board[i + start_row][j + start_col] == num:\n                return False\n    \n    return True\n\ndef make_anti_sudoku(board):\n    changes = 0\n    for row in range(9):\n        for col in range(9):\n            original_num = board[row][col]\n            for new_num in range(1, 10):\n                if new_num != original_num and is_valid(board, row, col, new_num):\n                    board[row][col] = new_num\n                    changes += 1\n                    if changes >= 9:\n                        return\n    return\n\ndef solve():\n    t = int(input())\n    results = []\n    for _ in range(t):\n        board = [list(map(int, list(input()))) for _ in range(9)]\n        make_anti_sudoku(board)\n        result = '\\n'.join(''.join(map(str, row)) for row in board)\n        results.append(result)\n    \n    for result in results:\n        print(result)\n\nif __name__ == \"__main__\":\n    solve()",
+    "code_hash": "1db1e840687bb7e4",
+    "language": "python",
+    "node_id": "n_4_ddf838",
+    "revision_id": "rev_n_4_ddf838_0",
+    "thought_path_snapshot": [
+      "Iterate through each cell and check if its value is unique within its row, column, and block. If it is, replace it with a different value while ensuring the new value maintains the anti-sudoku properties. Continue this process until at most 9 changes are made.",
+      "Iterate through each cell and replace it with a random number if it's unique in its row, column, and block."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 13
+  },
+  {
+    "candidate_id": "cand_ad439a355e",
+    "problem_id": "apps_4513",
+    "code": "def is_valid(board, row, col, num):\n    # Check if the number is not in the current row\n    for x in range(9):\n        if board[row][x] == num:\n            return False\n    \n    # Check if the number is not in the current column\n    for x in range(9):\n        if board[x][col] == num:\n            return False\n    \n    # Check if the number is not in the current 3x3 block\n    start_row = row - row % 3\n    start_col = col - col % 3\n    for i in range(3):\n        for j in range(3):\n            if board[i + start_row][j + start_col] == num:\n                return False\n    \n    return True\n\ndef find_unique_cells(board):\n    unique_cells = []\n    for i in range(9):\n        for j in range(9):\n            if len(set([board[i][k] for k in range(9)])) > 1 and \\\n               len(set([board[k][j] for k in range(9)])) > 1 and \\\n               len(set([board[i // 3 * 3 + k // 3][j // 3 * 3 + k % 3] for k in range(9)])) > 1:\n                unique_cells.append((i, j))\n    return unique_cells\n\ndef solve(board, changes=0):\n    if changes >= 9 or all(all(cell != 'X' for cell in row) for row in board):\n        return board\n    \n    unique_cells = find_unique_cells(board)\n    if not unique_cells:\n        return board\n    \n    row, col = unique_cells[0]\n    original_value = board[row][col]\n    \n    for num in range(1, 10):\n        if str(num) != original_value and is_valid(board, row, col, num):\n            board[row] = board[row][:col] + str(num) + board[row][col+1:]\n            result = solve(board, changes + 1)\n            if result:\n                return result\n            board[row] = board[row][:col] + original_value + board[row][col+1:]\n    \n    return None\n\ndef main():\n    import sys\n    input = sys.stdin.read\n    data = input().split()\n    \n    t = int(data[0])\n    index = 1\n    results = []\n    \n    for _ in range(t):\n        board = [data[index + i] for i in range(9)]\n        index += 9\n        solved_board = solve(board)\n        results.append('\\n'.join(solved_board))\n    \n    for result in results:\n        print(result)\n\nif __name__ == \"__main__\":\n    main()",
+    "code_hash": "fc8e347140d6855b",
+    "language": "python",
+    "node_id": "n_4_ddf838",
+    "revision_id": "rev_n_4_ddf838_1",
+    "thought_path_snapshot": [
+      "Iterate through each cell and check if its value is unique within its row, column, and block. If it is, replace it with a different value while ensuring the new value maintains the anti-sudoku properties. Continue this process until at most 9 changes are made.",
+      "Thought-2: Instead of replacing a cell with a random number, iterate through the possible new numbers in ascending order and select the first valid number that meets the anti-sudoku criteria. This ensures that the changes are minimal and more likely to produce a valid anti-sudoku board."
+    ],
+    "origin": "rethink",
+    "generation_record_id": null,
+    "created_sequence": 14
+  },
+  {
+    "candidate_id": "cand_dffca988d7",
+    "problem_id": "apps_4513",
+    "code": "import sys\nfrom random import randint\n\ndef make_anti_sudoku(sudoku):\n    changes = 0\n    rows = [set() for _ in range(9)]\n    cols = [set() for _ in range(9)]\n    blocks = [[set() for _ in range(3)] for _ in range(3)]\n\n    for i in range(9):\n        for j in range(9):\n            num = int(sudoku[i][j])\n            if num in rows[i] or num in cols[j] or num in blocks[i//3][j//3]:\n                continue\n            rows[i].add(num)\n            cols[j].add(num)\n            blocks[i//3][j//3].add(num)\n            continue\n            # Change the cell\n            new_num = randint(1, 9)\n            while new_num == num or new_num in rows[i] or new_num in cols[j] or new_num in blocks[i//3][j//3]:\n                new_num = randint(1, 9)\n            sudoku[i] = sudoku[i][:j] + str(new_num) + sudoku[i][j+1:]\n            changes += 1\n            if changes >= 9:\n                return sudoku\n            rows[i].add(new_num)\n            cols[j].add(new_num)\n            blocks[i//3][j//3].add(new_num)\n\n    return sudoku\n\ndef main():\n    input = sys.stdin.read\n    data = input().split()\n    \n    t = int(data[0])\n    index = 1\n    results = []\n    \n    for _ in range(t):\n        sudoku = data[index:index+9]\n        index += 9\n        result = make_anti_sudoku(sudoku)\n        results.append(result)\n    \n    for result in results:\n        print('\\n'.join(result))\n\nif __name__ == \"__main__\":\n    main()",
+    "code_hash": "5823c44c62f4d27e",
+    "language": "python",
+    "node_id": "n_8_827f1c",
+    "revision_id": "rev_n_8_827f1c_0",
+    "thought_path_snapshot": [
+      "To generate an anti-Sudoku, we need to strategically change at most 9 elements in the given Sudoku solution such that each row, column, and 3x3 block contains at least two equal elements. Instead of randomly changing elements, we should identify positions where changing the element will most effectively disrupt the Sudoku's structure while still satisfying the anti-Sudoku conditions. This involves selecting elements that are part of multiple constraints (rows, columns, and blocks) and changing them to create duplicates.",
+      "Randomly select cells and check if they violate anti-Sudoku conditions."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 15
+  },
+  {
+    "candidate_id": "cand_5cd4977704",
+    "problem_id": "apps_4513",
+    "code": "import sys\nfrom collections import defaultdict\n\ndef make_anti_sudoku(sudoku):\n    rows = [set() for _ in range(9)]\n    cols = [set() for _ in range(9)]\n    blocks = [[set() for _ in range(3)] for _ in range(3)]\n\n    for i in range(9):\n        for j in range(9):\n            num = int(sudoku[i][j])\n            if num in rows[i]:\n                continue\n            if num in cols[j]:\n                continue\n            if num in blocks[i // 3][j // 3]:\n                continue\n            rows[i].add(num)\n            cols[j].add(num)\n            blocks[i // 3][j // 3].add(num)\n\n    changes = []\n    for i in range(9):\n        for j in range(9):\n            num = int(sudoku[i][j])\n            if len(rows[i]) == 1 and len(cols[j]) == 1 and len(blocks[i // 3][j // 3]) == 1:\n                new_num = (num % 9) + 1\n                if new_num != num:\n                    changes.append((i, j, new_num))\n                    rows[i].remove(num)\n                    cols[j].remove(num)\n                    blocks[i // 3][j // 3].remove(num)\n                    rows[i].add(new_num)\n                    cols[j].add(new_num)\n                    blocks[i // 3][j // 3].add(new_num)\n                    break\n        if len(changes) >= 9:\n            break\n\n    result = []\n    for i in range(9):\n        for j in range(9):\n            if (i, j) in changes:\n                result.append(str(changes[(i, j)][2]))\n            else:\n                result.append(sudoku[i][j])\n\n    return ''.join(result)\n\ndef main():\n    input = sys.stdin.read\n    data = input().split()\n    \n    t = int(data[0])\n    index = 1\n    results = []\n    \n    for _ in range(t):\n        sudoku = data[index:index+81]\n        index += 81\n        anti_sudoku = make_anti_sudoku(sudoku)\n        results.append(anti_sudoku)\n    \n    for result in results:\n        print(result)\n\nif __name__ == \"__main__\":\n    main()",
+    "code_hash": "a9b7743d1708c207",
+    "language": "python",
+    "node_id": "n_8_827f1c",
+    "revision_id": "rev_n_8_827f1c_1",
+    "thought_path_snapshot": [
+      "To generate an anti-Sudoku, we need to strategically change at most 9 elements in the given Sudoku solution such that each row, column, and 3x3 block contains at least two equal elements. Instead of randomly changing elements, we should identify positions where changing the element will most effectively disrupt the Sudoku's structure while still satisfying the anti-Sudoku conditions. This involves selecting elements that are part of multiple constraints (rows, columns, and blocks) and changing them to create duplicates.",
+      "To generate an anti-Sudoku, we need to strategically change at most 9 elements in the given Sudoku solution such that each row, column, and 3x3 block contains at least two equal elements. Instead of randomly changing elements, we should identify positions where changing the element will most effectively disrupt the Sudoku's structure while still satisfying the anti-Sudoku conditions. This involves selecting elements that are part of multiple constraints (rows, columns, and blocks) and changing them to create duplicates. We should also ensure that the chosen elements do not violate the Sudoku rules initially."
+    ],
+    "origin": "rethink",
+    "generation_record_id": null,
+    "created_sequence": 16
+  },
+  {
+    "candidate_id": "cand_b0287e19c7",
+    "problem_id": "apps_4513",
+    "code": "import random\n\ndef make_anti_sudoku(grid):\n    def has_duplicate(row, col, val):\n        return grid[row].count(val) > 1 or [grid[i][col] for i in range(9)].count(val) > 1\n    \n    def has_block_duplicate(block_row, block_col, val):\n        block = []\n        for i in range(3):\n            for j in range(3):\n                block.append(grid[block_row * 3 + i][block_col * 3 + j])\n        return block.count(val) > 1\n    \n    def find_non_anti_cells():\n        non_anti_cells = []\n        for i in range(9):\n            for j in range(9):\n                if not has_duplicate(i, j, grid[i][j]) or not has_block_duplicate(i // 3, j // 3, grid[i][j]):\n                    non_anti_cells.append((i, j))\n        return non_anti_cells\n    \n    non_anti_cells = find_non_anti_cells()\n    modified_cells = set()\n    \n    while len(modified_cells) < 9:\n        cell = random.choice(non_anti_cells)\n        if cell not in modified_cells:\n            original_val = grid[cell[0]][cell[1]]\n            new_val = random.randint(1, 9)\n            while new_val == original_val or has_duplicate(cell[0], cell[1], new_val) or has_block_duplicate(cell[0] // 3, cell[1] // 3, new_val):\n                new_val = random.randint(1, 9)\n            grid[cell[0]][cell[1]] = new_val\n            modified_cells.add(cell)\n    \n    return grid\n\ndef solve(input_data):\n    t = int(input_data.readline().strip())\n    results = []\n    \n    for _ in range(t):\n        grid = [list(map(int, list(input_data.readline().strip()))) for _ in range(9)]\n        anti_sudoku_grid = make_anti_sudoku(grid)\n        result = '\\n'.join(''.join(map(str, row)) for row in anti_sudoku_grid)\n        results.append(result)\n    \n    return '\\n\\n'.join(results)\n\n# Example usage:\n# input_data = sys.stdin.read()\n# output = solve(input_data)\n# print(output)",
+    "code_hash": "6279f7e0672d11de",
+    "language": "python",
+    "node_id": "n_11_0143a5",
+    "revision_id": "rev_n_11_0143a5_0",
+    "thought_path_snapshot": [
+      "To generate an anti-sudoku grid, we need to ensure that each row, column, and 3x3 block contains at least two equal elements. Instead of using a backtracking approach to modify the entire grid, we can focus on modifying specific cells to achieve the required condition. Here's a refined strategy:\n\n1. Identify cells in the grid that do not already meet the anti-sudoku criteria.\n2. Change these cells to a value that ensures the row, column, or block has at least two equal elements.\n3. Continue this process until at most 9 cells have been modified.\n\nThis approach ensures that we only make the minimum necessary changes to achieve the desired anti-sudoku properties.",
+      "Randomly select cells and change their values while ensuring the anti-sudoku conditions are met."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 17
+  },
+  {
+    "candidate_id": "cand_4da395460c",
+    "problem_id": "apps_4513",
+    "code": "def make_anti_sudoku(grid):\n    def has_duplicate(lst):\n        return len(set(lst)) != len(lst)\n\n    def find_changes():\n        changes = []\n        for i in range(9):\n            for j in range(9):\n                if not has_duplicate([grid[i][j], grid[j][i]] + [grid[x//3*3+y//3][x%3*3+y%3] for x in range(i//3*3, i//3*3+3) for y in range(j//3*3, j//3*3+3)]):\n                    new_val = next(v for v in range(1, 10) if v not in {grid[i][j], grid[j][i]} + [grid[x//3*3+y//3][x%3*3+y%3] for x in range(i//3*3, i//3*3+3) for y in range(j//3*3, j//3*3+3)])\n                    changes.append((i, j, new_val))\n        return changes[:9]\n\n    changes = find_changes()\n    for i, j, val in changes:\n        grid[i] = grid[i][:j] + str(val) + grid[i][j+1:]\n    return grid\n\ndef solve(t, grids):\n    results = []\n    for grid in grids:\n        results.append(make_anti_sudoku(grid))\n    return results\n\n# Input reading\nimport sys\ninput = sys.stdin.read\ndata = input().split()\n\nt = int(data[0])\ngrids = [data[i*9+1:i*9+10] for i in range(t)]\n\n# Solve and output\nresults = solve(t, grids)\nfor result in results:\n    print('\\n'.join(result))",
+    "code_hash": "db0d2a75bf4bca39",
+    "language": "python",
+    "node_id": "n_11_0143a5",
+    "revision_id": "rev_n_11_0143a5_1",
+    "thought_path_snapshot": [
+      "To generate an anti-sudoku grid, we need to ensure that each row, column, and 3x3 block contains at least two equal elements. Instead of using a backtracking approach to modify the entire grid, we can focus on modifying specific cells to achieve the required condition. Here's a refined strategy:\n\n1. Identify cells in the grid that do not already meet the anti-sudoku criteria.\n2. Change these cells to a value that ensures the row, column, or block has at least two equal elements.\n3. Continue this process until at most 9 cells have been modified.\n\nThis approach ensures that we only make the minimum necessary changes to achieve the desired anti-sudoku properties.",
+      "To ensure the generated anti-sudoku grid meets the required conditions, we should prioritize changing cells that are part of rows, columns, or blocks where duplicates already exist. This way, we minimize the number of changes needed and increase the likelihood of producing a valid anti-sudoku grid within the limit of 9 changes. We can achieve this by iterating through the grid and checking each cell to see if it needs to be changed to maintain the anti-sudoku property. If a cell does not meet the criteria, we replace its value with a different number that ensures the row, column, or block has at least two equal elements. By focusing on cells that already contain duplicates, we reduce the complexity of finding valid replacements and increase the chances of success within the given constraints."
+    ],
+    "origin": "rethink",
+    "generation_record_id": null,
+    "created_sequence": 18
+  },
+  {
+    "candidate_id": "cand_ff2b67a6d1",
+    "problem_id": "apps_4513",
+    "code": "def find_unique_positions(grid):\n    rows = [set() for _ in range(9)]\n    cols = [set() for _ in range(9)]\n    blocks = [[set() for _ in range(3)] for _ in range(3)]\n\n    unique_positions = []\n\n    for i in range(9):\n        for j in range(9):\n            num = int(grid[i][j])\n            if num not in rows[i] and num not in cols[j] and num not in blocks[i // 3][j // 3]:\n                unique_positions.append((i, j))\n            rows[i].add(num)\n            cols[j].add(num)\n            blocks[i // 3][j // 3].add(num)\n\n    return unique_positions\n\ndef is_valid(grid, x, y, num):\n    for i in range(9):\n        if grid[x][i] == str(num) or grid[i][y] == str(num):\n            return False\n    start_row, start_col = 3 * (x // 3), 3 * (y // 3)\n    for i in range(start_row, start_row + 3):\n        for j in range(start_col, start_col + 3):\n            if grid[i][j] == str(num):\n                return False\n    return True\n\ndef solve(grid, unique_positions, changes=0):\n    if changes >= 9:\n        return True\n    for pos in unique_positions:\n        x, y = pos\n        original_num = int(grid[x][y])\n        for num in range(1, 10):\n            if num != original_num and is_valid(grid, x, y, num):\n                grid[x] = grid[x][:y] + str(num) + grid[x][y+1:]\n                if solve(grid, unique_positions, changes + 1):\n                    return True\n                grid[x] = grid[x][:y] + str(original_num) + grid[x][y+1:]\n        return False\n    return True\n\ndef main():\n    import sys\n    input = sys.stdin.read\n    data = input().split()\n    \n    t = int(data[0])\n    index = 1\n    results = []\n    \n    for _ in range(t):\n        grid = data[index:index+81]\n        index += 81\n        \n        unique_positions = find_unique_positions(grid)\n        \n        for pos in unique_positions:\n            x, y = pos\n            original_num = int(grid[x][y])\n            for num in range(1, 10):\n                if num != original_num and is_valid(grid, x, y, num):\n                    grid[x] = grid[x][:y] + str(num) + grid[x][y+1:]\n                    break\n        \n        results.append('\\n'.join(grid))\n    \n    for result in results:\n        print(result)\n\nif __name__ == \"__main__\":\n    main()",
+    "code_hash": "b124fb8856e75c65",
+    "language": "python",
+    "node_id": "n_6_7e8358",
+    "revision_id": "rev_n_6_7e8358_0",
+    "thought_path_snapshot": [
+      "Iterate through each cell and check if its value is unique within its row, column, and block. If it is, replace it with a different value while ensuring the new value maintains the anti-sudoku properties. Continue this process until at most 9 changes are made.",
+      "Use a backtracking algorithm to try replacing unique numbers with others, ensuring the anti-sudoku condition is met."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 19
+  },
+  {
+    "candidate_id": "cand_c9bb92a921",
+    "problem_id": "apps_4513",
+    "code": "def make_anti_sudoku(sudoku):\n    def find_unique_positions(grid, row, col, num):\n        for r in range(9):\n            if grid[r][col] == num:\n                return False\n        for c in range(9):\n            if grid[row][c] == num:\n                return False\n        start_row, start_col = 3 * (row // 3), 3 * (col // 3)\n        for r in range(start_row, start_row + 3):\n            for c in range(start_col, start_col + 3):\n                if grid[r][c] == num:\n                    return False\n        return True\n\n    def get_first_unique(grid, row, col):\n        for num in range(1, 10):\n            if find_unique_positions(grid, row, col, num):\n                return num\n        return None\n\n    def change_to_unique(grid, row, col):\n        unique_num = get_first_unique(grid, row, col)\n        if unique_num is not None:\n            grid[row][col] = str(unique_num)\n\n    def count_changes(grid):\n        changes = 0\n        for row in range(9):\n            for col in range(9):\n                if grid[row][col] != 'X':\n                    change_to_unique(grid, row, col)\n                    changes += 1\n                    if changes >= 9:\n                        break\n            if changes >= 9:\n                break\n        return changes\n\n    result = []\n    for s in sudoku:\n        grid = [list(s[i:i+9]) for i in range(0, 81, 9)]\n        changes = count_changes(grid)\n        result.append(''.join([''.join(row) for row in grid]))\n    \n    return result\n\n# Example usage:\nsudoku_input = [\n    \"154873296\",\n    \"386592714\",\n    \"729641835\",\n    \"863725149\",\n    \"975314628\",\n    \"412968357\",\n    \"631457982\",\n    \"598236471\",\n    \"247189563\"\n]\nprint(make_anti_sudoku(sudoku_input))",
+    "code_hash": "d8180e27fa6e0626",
+    "language": "python",
+    "node_id": "n_6_7e8358",
+    "revision_id": "rev_n_6_7e8358_1",
+    "thought_path_snapshot": [
+      "Iterate through each cell and check if its value is unique within its row, column, and block. If it is, replace it with a different value while ensuring the new value maintains the anti-sudoku properties. Continue this process until at most 9 changes are made.",
+      "Thought-2: Instead of using a backtracking approach to try changing unique numbers, we can directly identify and change the first unique number found in each row, column, and block to create an anti-sudoku. This ensures that we meet the requirement of having at most 9 changes and guarantees the existence of an answer."
+    ],
+    "origin": "rethink",
+    "generation_record_id": null,
+    "created_sequence": 20
+  },
+  {
+    "candidate_id": "cand_6309c883ec",
+    "problem_id": "apps_4513",
+    "code": "def find_unique_cells(grid):\n    rows = [set() for _ in range(9)]\n    cols = [set() for _ in range(9)]\n    blocks = [[set() for _ in range(3)] for _ in range(3)]\n    unique_cells = []\n\n    for i in range(9):\n        for j in range(9):\n            num = int(grid[i][j])\n            if num not in rows[i] and num not in cols[j] and num not in blocks[i//3][j//3]:\n                unique_cells.append((i, j))\n            rows[i].add(num)\n            cols[j].add(num)\n            blocks[i//3][j//3].add(num)\n\n    return unique_cells\n\ndef find_duplicate_cells(grid):\n    duplicates = []\n    for i in range(9):\n        for j in range(9):\n            num = int(grid[i][j])\n            if grid[i].count(str(num)) > 1 or ''.join(row[j] for row in grid).count(str(num)) > 1:\n                duplicates.append((i, j))\n    return duplicates\n\ndef find_min_valid_number(grid, x, y):\n    used_numbers = set()\n    for i in range(9):\n        used_numbers.add(int(grid[x][i]))\n        used_numbers.add(int(grid[i][y]))\n        used_numbers.add(int(grid[(x//3)*3 + i%3][(y//3)*3 + i//3]))\n    return next((num for num in range(1, 10) if num not in used_numbers), None)\n\ndef solve(grid):\n    unique_cells = find_unique_cells(grid)\n    duplicate_cells = find_duplicate_cells(grid)\n    changes = 0\n\n    for x, y in unique_cells:\n        if changes >= 9:\n            break\n        min_valid_num = find_min_valid_number(grid, x, y)\n        if min_valid_num is not None:\n            grid[x] = grid[x][:y] + str(min_valid_num) + grid[x][y+1:]\n            changes += 1\n\n    for x, y in duplicate_cells:\n        if changes >= 9:\n            break\n        min_valid_num = find_min_valid_number(grid, x, y)\n        if min_valid_num is not None:\n            grid[x] = grid[x][:y] + str(min_valid_num) + grid[x][y+1:]\n            changes += 1\n\n    return grid\n\ndef main():\n    import sys\n    input = sys.stdin.read\n    data = input().split()\n\n    t = int(data[0])\n    results = []\n\n    index = 1\n    for _ in range(t):\n        grid = data[index:index+9]\n        index += 9\n        result = solve(grid)\n        results.append('\\n'.join(result))\n\n    print('\\n'.join(results))\n\nif __name__ == \"__main__\":\n    main()",
+    "code_hash": "14e0542aa613d707",
+    "language": "python",
+    "node_id": "n_14_5f3a21",
+    "revision_id": "rev_n_14_5f3a21_0",
+    "thought_path_snapshot": [
+      "Iterate through each cell and check if its value is unique within its row, column, and block. If it is, replace it with a different value while ensuring the new value maintains the anti-sudoku properties. Continue this process until at most 9 changes are made.",
+      "Identify all cells where the current number is repeated in its row, column, or block. Select one such cell and change its value to a different number that still satisfies the anti-sudoku conditions. Repeat this process up to 9 times.",
+      "Identify cells with unique values and replace them with the smallest possible number that does not violate anti-sudoku rules."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 21
+  },
+  {
+    "candidate_id": "cand_ab58d8c3fb",
+    "problem_id": "apps_4513",
+    "code": "def find_unique_cells(grid):\n    unique_cells = []\n    for i in range(9):\n        for j in range(9):\n            num = grid[i][j]\n            if grid[i].count(num) == 1 and [grid[x][j] for x in range(9)].count(num) == 1:\n                block_row = (i // 3) * 3\n                block_col = (j // 3) * 3\n                if sum(row[block_col:block_col+3].count(num) for row in grid[block_row:block_row+3]) == 1:\n                    unique_cells.append((i, j))\n    return unique_cells\n\ndef find_duplicate_cells(grid):\n    duplicate_cells = []\n    for i in range(9):\n        for j in range(9):\n            num = grid[i][j]\n            if grid[i].count(num) > 1 or [grid[x][j] for x in range(9)].count(num) > 1:\n                block_row = (i // 3) * 3\n                block_col = (j // 3) * 3\n                if sum(row[block_col:block_col+3].count(num) for row in grid[block_row:block_row+3]) > 1:\n                    duplicate_cells.append((i, j))\n    return duplicate_cells\n\ndef get_valid_numbers(grid, i, j):\n    used = set()\n    used.update(grid[i])\n    used.update([grid[x][j] for x in range(9)])\n    block_row = (i // 3) * 3\n    block_col = (j // 3) * 3\n    used.update(grid[x][block_col:block_col+3] for x in range(block_row, block_row+3))\n    return {num for num in range(1, 10)} - used\n\ndef solve(grid, max_changes=9):\n    changes = 0\n    while changes < max_changes:\n        unique_cells = find_unique_cells(grid)\n        if unique_cells:\n            i, j = unique_cells[0]\n            valid_numbers = get_valid_numbers(grid, i, j)\n            if len(valid_numbers) > 1:\n                grid[i] = grid[i][:j] + str(min(valid_numbers)) + grid[i][j+1:]\n                changes += 1\n        else:\n            break\n    \n    while changes < max_changes:\n        duplicate_cells = find_duplicate_cells(grid)\n        if duplicate_cells:\n            i, j = duplicate_cells[0]\n            valid_numbers = get_valid_numbers(grid, i, j)\n            if len(valid_numbers) > 1:\n                grid[i] = grid[i][:j] + str(min(valid_numbers)) + grid[i][j+1:]\n                changes += 1\n        else:\n            break\n    \n    return grid\n\ndef main():\n    import sys\n    input = sys.stdin.read\n    data = input().split()\n    \n    t = int(data[0])\n    results = []\n    \n    index = 1\n    for _ in range(t):\n        grid = [list(data[index+i]) for i in range(9)]\n        result_grid = solve(grid)\n        results.append('\\n'.join(''.join(row) for row in result_grid))\n        index += 9\n    \n    for result in results:\n        print(result)\n\nif __name__ == \"__main__\":\n    main()",
+    "code_hash": "3c2fc5c6c0039253",
+    "language": "python",
+    "node_id": "n_14_5f3a21",
+    "revision_id": "rev_n_14_5f3a21_1",
+    "thought_path_snapshot": [
+      "Iterate through each cell and check if its value is unique within its row, column, and block. If it is, replace it with a different value while ensuring the new value maintains the anti-sudoku properties. Continue this process until at most 9 changes are made.",
+      "Identify all cells where the current number is repeated in its row, column, or block. Select one such cell and change its value to a different number that still satisfies the anti-sudoku conditions. Repeat this process up to 9 times.",
+      "Thought-3: Identify cells with unique values and replace them with the smallest possible number that does not violate anti-sudoku rules. However, instead of always choosing the smallest number, prioritize changing cells that are part of rows, columns, or blocks with fewer unique values to maximize the chances of creating duplicates."
+    ],
+    "origin": "rethink",
+    "generation_record_id": null,
+    "created_sequence": 22
+  },
+  {
+    "candidate_id": "cand_4b2cba4953",
+    "problem_id": "apps_4513",
+    "code": "def make_anti_sudoku(sudoku):\n    def has_duplicates(lst):\n        return len(lst) != len(set(lst))\n\n    def find_changes():\n        changes = []\n        for i in range(9):\n            for j in range(9):\n                if not has_duplicates([sudoku[i][j], sudoku[j][i]] + [sudoku[x//3*3+y//3][x%3*3+y%3] for x in range(i//3*3, i//3*3+3) for y in range(j//3*3, j//3*3+3)]):\n                    changes.append((i, j))\n        return changes\n\n    changes = find_changes()\n    for _ in range(min(len(changes), 9)):\n        i, j = changes.pop()\n        new_val = str((int(sudoku[i][j]) % 9) + 1)\n        sudoku[i] = sudoku[i][:j] + new_val + sudoku[i][j+1:]\n\n    return sudoku\n\ndef solve(t, puzzles):\n    results = []\n    for puzzle in puzzles:\n        sudoku = [list(row) for row in puzzle.split('\\n')]\n        anti_sudoku = make_anti_sudoku(sudoku)\n        results.append('\\n'.join(''.join(row) for row in anti_sudoku))\n    return results\n\n# Example usage:\n# t = int(input())\n# puzzles = [input() for _ in range(t)]\n# results = solve(t, puzzles)\n# for result in results:\n#     print(result)",
+    "code_hash": "aa24acd929d1914f",
+    "language": "python",
+    "node_id": "n_9_98af99",
+    "revision_id": "rev_n_9_98af99_0",
+    "thought_path_snapshot": [
+      "To generate an anti-Sudoku, we need to strategically change at most 9 elements in the given Sudoku solution such that each row, column, and 3x3 block contains at least two equal elements. Instead of randomly changing elements, we should identify positions where changing the element will most effectively disrupt the Sudoku's structure while still satisfying the anti-Sudoku conditions. This involves selecting elements that are part of multiple constraints (rows, columns, and blocks) and changing them to create duplicates.",
+      "Iteratively replace cells with duplicates until all constraints are met."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 23
+  },
+  {
+    "candidate_id": "cand_b126f6c728",
+    "problem_id": "apps_4513",
+    "code": "def make_anti_sudoku(sudoku):\n    def has_duplicate(lst):\n        return len(set(lst)) != len(lst)\n\n    def find_duplicates(grid, row, col, block_size):\n        row_vals = grid[row]\n        col_vals = [grid[i][col] for i in range(9)]\n        block_row_start, block_col_start = (row // block_size) * block_size, (col // block_size) * block_size\n        block_vals = [grid[i][j] for i in range(block_row_start, block_row_start + block_size) for j in range(block_col_start, block_col_start + block_size)]\n        return has_duplicate(row_vals), has_duplicate(col_vals), has_duplicate(block_vals)\n\n    def change_element(grid, row, col, new_val):\n        grid[row][col] = str(new_val)\n        return grid\n\n    def solve(grid, changes=0):\n        if changes == 9:\n            return True\n        for row in range(9):\n            for col in range(9):\n                if grid[row][col] == '0':\n                    continue\n                original_val = int(grid[row][col])\n                for new_val in range(1, 10):\n                    if new_val != original_val:\n                        grid = change_element(grid, row, col, new_val)\n                        if all(find_duplicates(grid, r, c, 3) for r in range(9) for c in range(9)):\n                            if solve(grid, changes + 1):\n                                return True\n                            grid = change_element(grid, row, col, original_val)\n        return False\n\n    grid = [list(line) for line in sudoku.split('\\n')]\n    solve(grid)\n    return '\\n'.join(''.join(row) for row in grid)\n\ndef main():\n    import sys\n    input = sys.stdin.read\n    data = input().split()\n    t = int(data[0])\n    results = []\n    index = 1\n    for _ in range(t):\n        sudoku = '\\n'.join(data[index:index+9])\n        index += 9\n        result = make_anti_sudoku(sudoku)\n        results.append(result)\n    print('\\n'.join(results))\n\nif __name__ == \"__main__\":\n    main()",
+    "code_hash": "e27d62363d2826dd",
+    "language": "python",
+    "node_id": "n_9_98af99",
+    "revision_id": "rev_n_9_98af99_1",
+    "thought_path_snapshot": [
+      "To generate an anti-Sudoku, we need to strategically change at most 9 elements in the given Sudoku solution such that each row, column, and 3x3 block contains at least two equal elements. Instead of randomly changing elements, we should identify positions where changing the element will most effectively disrupt the Sudoku's structure while still satisfying the anti-Sudoku conditions. This involves selecting elements that are part of multiple constraints (rows, columns, and blocks) and changing them to create duplicates.",
+      "To generate an anti-Sudoku, we need to strategically change at most 9 elements in the given Sudoku solution such that each row, column, and 3x3 block contains at least two equal elements. Instead of randomly changing elements, we should identify positions where changing the element will most effectively disrupt the Sudoku's structure while still satisfying the anti-Sudoku conditions. This involves selecting elements that are part of multiple constraints (rows, columns, and blocks) and changing them to create duplicates. However, the current approach of checking for duplicates in a single row, column, and block is insufficient. We need to ensure that after changing an element, the entire row, column, and block contain at least two equal elements. A more effective strategy would be to select elements that are already part of duplicate pairs and change them to another value within the same row, column, or block, ensuring that the duplicate condition is maintained."
+    ],
+    "origin": "rethink",
+    "generation_record_id": null,
+    "created_sequence": 24
+  },
+  {
+    "candidate_id": "cand_51ee00a085",
+    "problem_id": "apps_4513",
+    "code": "def make_anti_sudoku(grid):\n    def swap_in_row(row_index, col1, col2):\n        if grid[row_index][col1] != grid[row_index][col2]:\n            grid[row_index][col1], grid[row_index][col2] = grid[row_index][col2], grid[row_index][col1]\n    \n    def swap_in_column(col_index, row1, row2):\n        if grid[row1][col_index] != grid[row2][col_index]:\n            grid[row1][col_index], grid[row2][col_index] = grid[row2][col_index], grid[row1][col_index]\n    \n    def swap_in_block(block_row, block_col, cell1, cell2):\n        row_offset, col_offset = block_row * 3, block_col * 3\n        if grid[row_offset + cell1 // 3][col_offset + cell1 % 3] != grid[row_offset + cell2 // 3][col_offset + cell2 % 3]:\n            grid[row_offset + cell1 // 3][col_offset + cell1 % 3], grid[row_offset + cell2 // 3][col_offset + cell2 % 3] = grid[row_offset + cell2 // 3][col_offset + cell2 % 3], grid[row_offset + cell1 // 3][col_offset + cell1 % 3]\n    \n    changes = 0\n    \n    # Check rows\n    for i in range(9):\n        counts = [0] * 10\n        for j in range(9):\n            counts[int(grid[i][j])] += 1\n            if counts[int(grid[i][j])] >= 2:\n                continue\n            for k in range(j + 1, 9):\n                if int(grid[i][k]) == int(grid[i][j]):\n                    swap_in_row(i, j, k)\n                    changes += 1\n                    break\n            if changes >= 9:\n                return\n    \n    # Check columns\n    for j in range(9):\n        counts = [0] * 10\n        for i in range(9):\n            counts[int(grid[i][j])] += 1\n            if counts[int(grid[i][j])] >= 2:\n                continue\n            for k in range(i + 1, 9):\n                if int(grid[k][j]) == int(grid[i][j]):\n                    swap_in_column(j, i, k)\n                    changes += 1\n                    break\n            if changes >= 9:\n                return\n    \n    # Check blocks\n    for block_row in range(3):\n        for block_col in range(3):\n            counts = [0] * 10\n            for i in range(3):\n                for j in range(3):\n                    counts[int(grid[block_row * 3 + i][block_col * 3 + j])] += 1\n                    if counts[int(grid[block_row * 3 + i][block_col * 3 + j])] >= 2:\n                        continue\n                    for k in range(i + 1, 3):\n                        for l in range(j + 1, 3):\n                            if int(grid[block_row * 3 + k][block_col * 3 + l]) == int(grid[block_row * 3 + i][block_col * 3 + j]):\n                                swap_in_block(block_row, block_col, i * 3 + j, k * 3 + l)\n                                changes += 1\n                                break\n                        if changes >= 9:\n                            return\n                    if changes >= 9:\n                        return\n    \n    return grid\n\ndef solve():\n    import sys\n    input = sys.stdin.read\n    data = input().split()\n    \n    t = int(data[0])\n    results = []\n    \n    index = 1\n    for _ in range(t):\n        grid = [list(data[index + i]) for i in range(9)]\n        result_grid = make_anti_sudoku(grid)\n        result = '\\n'.join(''.join(map(str, row)) for row in result_grid)\n        results.append(result)\n        index += 9\n    \n    for result in results:\n        print(result)\n\nif __name__ == \"__main__\":\n    solve()",
+    "code_hash": "322e2d78147ccc5f",
+    "language": "python",
+    "node_id": "n_12_9a3747",
+    "revision_id": "rev_n_12_9a3747_0",
+    "thought_path_snapshot": [
+      "To generate an anti-sudoku grid, we need to ensure that each row, column, and 3x3 block contains at least two equal elements. Instead of using a backtracking approach to modify the entire grid, we can focus on modifying specific cells to achieve the required condition. Here's a refined strategy:\n\n1. Identify cells in the grid that do not already meet the anti-sudoku criteria.\n2. Change these cells to a value that ensures the row, column, or block has at least two equal elements.\n3. Continue this process until at most 9 cells have been modified.\n\nThis approach ensures that we only make the minimum necessary changes to achieve the desired anti-sudoku properties.",
+      "Iterate through the grid and swap pairs of identical numbers within the same row, column, or block."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 25
+  },
+  {
+    "candidate_id": "cand_a7611f890e",
+    "problem_id": "apps_4513",
+    "code": "def make_anti_sudoku(grid):\n    def check_row(row):\n        return len(set(row)) < 9\n\n    def check_col(col):\n        return len(set(col)) < 9\n\n    def check_block(block):\n        return len(set(block)) < 9\n\n    def get_block(i, j):\n        return [grid[x][y] for x in range((i // 3) * 3, (i // 3) * 3 + 3) for y in range((j // 3) * 3, (j // 3) * 3 + 3)]\n\n    def find_changes():\n        changes = []\n        for i in range(9):\n            for j in range(9):\n                if not check_row(grid[i]) or not check_col([grid[x][j] for x in range(9)]) or not check_block(get_block(i, j)):\n                    for num in range(1, 10):\n                        if num != grid[i][j]:\n                            new_grid = [row[:] for row in grid]\n                            new_grid[i][j] = num\n                            if check_row(new_grid[i]) and check_col([new_grid[x][j] for x in range(9)]) and check_block(get_block(i, j)):\n                                changes.append((i, j, num))\n                                break\n        return changes[:9]\n\n    changes = find_changes()\n    for i, j, num in changes:\n        grid[i][j] = num\n    return grid\n\ndef solve(t, grids):\n    results = []\n    for grid in grids:\n        result = make_anti_sudoku(grid)\n        results.append(result)\n    return results\n\n# Input reading\nimport sys\ninput = sys.stdin.read\ndata = input().split()\n\nt = int(data[0])\ngrids = []\nindex = 1\nfor _ in range(t):\n    grid = [list(map(int, data[index:index+9])) for index in range(index, index+81, 9)]\n    grids.append(grid)\n\n# Solve and output\nresults = solve(t, grids)\nfor result in results:\n    for row in result:\n        print(''.join(map(str, row)))",
+    "code_hash": "f38ecdd66a3b4951",
+    "language": "python",
+    "node_id": "n_12_9a3747",
+    "revision_id": "rev_n_12_9a3747_1",
+    "thought_path_snapshot": [
+      "To generate an anti-sudoku grid, we need to ensure that each row, column, and 3x3 block contains at least two equal elements. Instead of using a backtracking approach to modify the entire grid, we can focus on modifying specific cells to achieve the required condition. Here's a refined strategy:\n\n1. Identify cells in the grid that do not already meet the anti-sudoku criteria.\n2. Change these cells to a value that ensures the row, column, or block has at least two equal elements.\n3. Continue this process until at most 9 cells have been modified.\n\nThis approach ensures that we only make the minimum necessary changes to achieve the desired anti-sudoku properties.",
+      "To generate an anti-sudoku grid, we need to ensure that each row, column, and 3x3 block contains at least two equal elements. Instead of using a backtracking approach to modify the entire grid, we can focus on modifying specific cells to achieve the required condition. Here's a refined strategy:\n\n1. Identify cells in the grid that do not already meet the anti-sudoku criteria.\n2. Change these cells to a value that ensures the row, column, or block has at least two equal elements.\n3. Continue this process until at most 9 cells have been modified.\n\nThis approach ensures that we only make the minimum necessary changes to achieve the desired anti-sudoku properties."
+    ],
+    "origin": "rethink",
+    "generation_record_id": null,
+    "created_sequence": 26
+  },
+  {
+    "candidate_id": "cand_acc18baeac",
+    "problem_id": "apps_4513",
+    "code": "def is_valid(board, row, col, num):\n    # Check if the number is not in the current row\n    for x in range(9):\n        if board[row][x] == num:\n            return False\n    \n    # Check if the number is not in the current column\n    for x in range(9):\n        if board[x][col] == num:\n            return False\n    \n    # Check if the number is not in the current 3x3 block\n    start_row = row - row % 3\n    start_col = col - col % 3\n    for i in range(3):\n        for j in range(3):\n            if board[i + start_row][j + start_col] == num:\n                return False\n    \n    return True\n\ndef find_unique_cells(board):\n    unique_cells = []\n    for i in range(9):\n        for j in range(9):\n            if len(set([board[i][k] for k in range(9)])) > 1 and \\\n               len(set([board[k][j] for k in range(9)])) > 1 and \\\n               len(set([board[i // 3 * 3 + k // 3][j // 3 * 3 + k % 3] for k in range(9)])) > 1:\n                unique_cells.append((i, j))\n    return unique_cells\n\ndef solve(board, changes=0):\n    if changes >= 9 or all(all(len(set(row)) <= 1 for row in board) for _ in range(3)):\n        return board\n    \n    unique_cells = find_unique_cells(board)\n    if not unique_cells:\n        return board\n    \n    i, j = unique_cells[0]\n    original_num = board[i][j]\n    \n    for num in range(1, 10):\n        if num != original_num and is_valid(board, i, j, num):\n            board[i][j] = num\n            result = solve(board, changes + 1)\n            if result:\n                return result\n            board[i][j] = original_num\n    \n    return None\n\ndef main():\n    import sys\n    input = sys.stdin.read\n    data = input().split()\n    \n    t = int(data[0])\n    results = []\n    \n    index = 1\n    for _ in range(t):\n        board = [list(map(int, data[index:index+9])) for index in range(index, index+81, 9)]\n        solved_board = solve(board)\n        results.append(solved_board)\n    \n    for result in results:\n        for row in result:\n            print(''.join(map(str, row)))\n\nif __name__ == \"__main__\":\n    main()",
+    "code_hash": "a98bdf53de56e4da",
+    "language": "python",
+    "node_id": "n_17_58b6ff",
+    "revision_id": "rev_n_17_58b6ff_0",
+    "thought_path_snapshot": [
+      "Iterate through each cell and check if its value is unique within its row, column, and block. If it is, replace it with a different value while ensuring the new value maintains the anti-sudoku properties. Continue this process until at most 9 changes are made.",
+      "Thought-2: Instead of replacing a cell with a random number, iterate through the possible new numbers in ascending order and select the first valid number that meets the anti-sudoku criteria. This ensures that the changes are minimal and more likely to produce a valid anti-sudoku board.",
+      "Replace each unique cell with the smallest possible number that still violates the anti-sudoku conditions."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 27
+  },
+  {
+    "candidate_id": "cand_9da3302c58",
+    "problem_id": "apps_4513",
+    "code": "def is_valid(board, row, col, num):\n    for x in range(9):\n        if board[row][x] == num or board[x][col] == num:\n            return False\n    start_row, start_col = 3 * (row // 3), 3 * (col // 3)\n    for i in range(3):\n        for j in range(3):\n            if board[i + start_row][j + start_col] == num:\n                return False\n    return True\n\ndef find_invalid_cells(board):\n    invalid_cells = []\n    for i in range(9):\n        for j in range(9):\n            if len(set([board[i][k] for k in range(9)])) == 9 and \\\n               len(set([board[k][j] for k in range(9)])) == 9 and \\\n               len(set([board[3*(i//3)+k//3][3*(j//3)+k%3] for k in range(9)])) == 9:\n                invalid_cells.append((i, j))\n    return invalid_cells\n\ndef solve(board, changes=0):\n    if changes >= 9:\n        return board\n    invalid_cells = find_invalid_cells(board)\n    if not invalid_cells:\n        return board\n    i, j = invalid_cells[0]\n    for num in range(1, 10):\n        if is_valid(board, i, j, num):\n            board[i][j] = num\n            result = solve(board, changes + 1)\n            if result:\n                return result\n            board[i][j] = 0\n    return None\n\ndef main():\n    import sys\n    input = sys.stdin.read\n    data = input().split()\n    \n    t = int(data[0])\n    results = []\n    index = 1\n    \n    for _ in range(t):\n        board = [list(map(int, list(data[index + i]))) for i in range(9)]\n        result = solve(board)\n        results.append(result)\n        index += 10\n    \n    for result in results:\n        for row in result:\n            print(''.join(map(str, row)))\n\nif __name__ == \"__main__\":\n    main()",
+    "code_hash": "f82e724b6fba71ab",
+    "language": "python",
+    "node_id": "n_17_58b6ff",
+    "revision_id": "rev_n_17_58b6ff_1",
+    "thought_path_snapshot": [
+      "Iterate through each cell and check if its value is unique within its row, column, and block. If it is, replace it with a different value while ensuring the new value maintains the anti-sudoku properties. Continue this process until at most 9 changes are made.",
+      "Thought-2: Instead of replacing a cell with a random number, iterate through the possible new numbers in ascending order and select the first valid number that meets the anti-sudoku criteria. This ensures that the changes are minimal and more likely to produce a valid anti-sudoku board.",
+      "Thought-3: Identify cells that violate the anti-sudoku conditions (i.e., cells where all numbers in their row, column, and block are unique). Replace these cells with the smallest possible number that still violates the anti-sudoku conditions. Repeat this process until at most 9 changes are made."
+    ],
+    "origin": "rethink",
+    "generation_record_id": null,
+    "created_sequence": 28
+  },
+  {
+    "candidate_id": "cand_f88f18caac",
+    "problem_id": "apps_4513",
+    "code": "import sys\nfrom collections import defaultdict\n\ndef make_anti_sudoku(sudoku):\n    def count_uniques(row, col, block):\n        return len(set(row)) + len(set(col)) + len(set(block))\n\n    def get_block(i, j):\n        return [sudoku[x][y] for x in range((i // 3) * 3, (i // 3) * 3 + 3) for y in range((j // 3) * 3, (j // 3) * 3 + 3)]\n\n    changes = []\n    for i in range(9):\n        for j in range(9):\n            if count_uniques([sudoku[i][k] for k in range(9)], [sudoku[k][j] for k in range(9)], get_block(i, j)) < 18:\n                changes.append((i, j))\n                if len(changes) == 9:\n                    break\n        if len(changes) == 9:\n            break\n\n    for i, j in changes:\n        new_val = None\n        for val in range(1, 10):\n            if val != int(sudoku[i][j]):\n                new_val = val\n                break\n        sudoku[i] = sudoku[i][:j] + str(new_val) + sudoku[i][j+1:]\n\n    return sudoku\n\ndef solve():\n    input = sys.stdin.read\n    data = input().split()\n    \n    t = int(data[0])\n    index = 1\n    results = []\n    \n    for _ in range(t):\n        sudoku = [data[index + i] for i in range(9)]\n        index += 9\n        anti_sudoku = make_anti_sudoku(sudoku)\n        results.append('\\n'.join(anti_sudoku))\n    \n    print('\\n'.join(results))\n\nif __name__ == \"__main__\":\n    solve()",
+    "code_hash": "1cdddc8a5da5414f",
+    "language": "python",
+    "node_id": "n_19_48a802",
+    "revision_id": "rev_n_19_48a802_0",
+    "thought_path_snapshot": [
+      "To generate an anti-Sudoku, we need to strategically change at most 9 elements in the given Sudoku solution such that each row, column, and 3x3 block contains at least two equal elements. Instead of randomly changing elements, we should identify positions where changing the element will most effectively disrupt the Sudoku's structure while still satisfying the anti-Sudoku conditions. This involves selecting elements that are part of multiple constraints (rows, columns, and blocks) and changing them to create duplicates.",
+      "To generate an anti-Sudoku, we need to strategically change at most 9 elements in the given Sudoku solution such that each row, column, and 3x3 block contains at least two equal elements. Instead of randomly changing elements, we should identify positions where changing the element will most effectively disrupt the Sudoku's structure while still satisfying the anti-Sudoku conditions. This involves selecting elements that are part of multiple constraints (rows, columns, and blocks) and changing them to create duplicates. Additionally, we should prioritize changing elements in rows, columns, and blocks that currently have fewer unique values to maximize the disruption.",
+      "Identify cells with low diversity and change them."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 29
+  },
+  {
+    "candidate_id": "cand_2522ec3247",
+    "problem_id": "apps_4513",
+    "code": "import sys\nfrom collections import defaultdict\n\ndef make_anti_sudoku(sudoku):\n    def get_block(i, j):\n        return (i // 3) * 3 + (j // 3)\n\n    def count_duplicates(row, col, block):\n        counts = defaultdict(int)\n        for r in range(9):\n            if r != row:\n                counts[sudoku[r][col]] += 1\n            if r != col:\n                counts[sudoku[row][r]] += 1\n            if (r // 3) != (row // 3) or (r % 3) != (col % 3):\n                counts[sudoku[(row // 3) * 3 + r % 3][(col // 3) * 3 + r // 3]] += 1\n        return counts\n\n    changes = []\n    for i in range(9):\n        for j in range(9):\n            if len(count_duplicates(i, j, get_block(i, j))) < 2:\n                for k in range(1, 10):\n                    if k != int(sudoku[i][j]):\n                        new_sudoku = [list(row) for row in sudoku]\n                        new_sudoku[i][j] = str(k)\n                        if any(len(set(new_sudoku[r])) == 1 for r in range(9)) or \\\n                           any(len(set([new_sudoku[r][c] for c in range(9)])) == 1 for c in range(9)) or \\\n                           any(len(set([new_sudoku[r][c] for r, c in zip(range(3), range(3))])) == 1 for _ in range(9)):\n                            continue\n                        changes.append((i, j, k))\n                        break\n                if len(changes) >= 9:\n                    break\n        if len(changes) >= 9:\n            break\n\n    for i, j, k in changes:\n        sudoku[i][j] = str(k)\n\n    return sudoku\n\ndef solve():\n    input = sys.stdin.read\n    data = input().split()\n    \n    t = int(data[0])\n    index = 1\n    results = []\n    \n    for _ in range(t):\n        sudoku = [data[index + i] for i in range(9)]\n        index += 9\n        anti_sudoku = make_anti_sudoku(sudoku)\n        results.append('\\n'.join(''.join(row) for row in anti_sudoku))\n    \n    print('\\n'.join(results))\n\nif __name__ == \"__main__\":\n    solve()",
+    "code_hash": "5e2ac4c95818535d",
+    "language": "python",
+    "node_id": "n_19_48a802",
+    "revision_id": "rev_n_19_48a802_1",
+    "thought_path_snapshot": [
+      "To generate an anti-Sudoku, we need to strategically change at most 9 elements in the given Sudoku solution such that each row, column, and 3x3 block contains at least two equal elements. Instead of randomly changing elements, we should identify positions where changing the element will most effectively disrupt the Sudoku's structure while still satisfying the anti-Sudoku conditions. This involves selecting elements that are part of multiple constraints (rows, columns, and blocks) and changing them to create duplicates.",
+      "To generate an anti-Sudoku, we need to strategically change at most 9 elements in the given Sudoku solution such that each row, column, and 3x3 block contains at least two equal elements. Instead of randomly changing elements, we should identify positions where changing the element will most effectively disrupt the Sudoku's structure while still satisfying the anti-Sudoku conditions. This involves selecting elements that are part of multiple constraints (rows, columns, and blocks) and changing them to create duplicates. Additionally, we should prioritize changing elements in rows, columns, and blocks that currently have fewer unique values to maximize the disruption.",
+      "Identify cells with low diversity and change them, but ensure that the change does not violate the Sudoku rules initially. Specifically, select cells where changing the value would introduce duplicates in the same row, column, or block, thereby ensuring the resulting field remains invalid."
+    ],
+    "origin": "rethink",
+    "generation_record_id": null,
+    "created_sequence": 30
+  },
+  {
+    "candidate_id": "cand_19ba13daa1",
+    "problem_id": "apps_4513",
+    "code": "def make_anti_sudoku(grid):\n    def has_duplicate(row, col, val):\n        return grid[row].count(val) > 1 or [grid[i][col] for i in range(9)].count(val) > 1\n    \n    def get_block_index(row, col):\n        return (row // 3) * 3 + (col // 3)\n    \n    def has_duplicate_in_block(block_index, val):\n        start_row = (block_index // 3) * 3\n        start_col = (block_index % 3) * 3\n        for i in range(start_row, start_row + 3):\n            for j in range(start_col, start_col + 3):\n                if grid[i][j] == val:\n                    return True\n        return False\n    \n    modified_cells = set()\n    \n    for row in range(9):\n        for col in range(9):\n            if grid[row][col] != '0':\n                continue\n            for val in range(1, 10):\n                if val != int(grid[row][col]) and not has_duplicate(row, col, val) and not has_duplicate_in_block(get_block_index(row, col), val):\n                    grid[row] = grid[row][:col] + str(val) + grid[row][col+1:]\n                    modified_cells.add((row, col))\n                    break\n            if len(modified_cells) >= 9:\n                break\n        if len(modified_cells) >= 9:\n            break\n    \n    return grid\n\ndef solve():\n    import sys\n    input = sys.stdin.read\n    data = input().split()\n    \n    t = int(data[0])\n    results = []\n    \n    index = 1\n    for _ in range(t):\n        grid = [data[index + i] for i in range(9)]\n        result_grid = make_anti_sudoku(grid)\n        results.append('\\n'.join(result_grid))\n        index += 9\n    \n    for result in results:\n        print(result)\n\nif __name__ == \"__main__\":\n    solve()",
+    "code_hash": "e57aadb978009c0b",
+    "language": "python",
+    "node_id": "n_22_fd25b5",
+    "revision_id": "rev_n_22_fd25b5_0",
+    "thought_path_snapshot": [
+      "To generate an anti-sudoku grid, we need to ensure that each row, column, and 3x3 block contains at least two equal elements. Instead of using a backtracking approach to modify the entire grid, we can focus on modifying specific cells to achieve the required condition. Here's a refined strategy:\n\n1. Identify cells in the grid that do not already meet the anti-sudoku criteria.\n2. Change these cells to a value that ensures the row, column, or block has at least two equal elements.\n3. Continue this process until at most 9 cells have been modified.\n\nThis approach ensures that we only make the minimum necessary changes to achieve the desired anti-sudoku properties.",
+      "Thought-2: Identify cells with unique values and replace them with another number within the same row, column, or block, ensuring that the replacement does not violate the anti-sudoku conditions. This approach will help in making minimal changes while ensuring the grid meets the required criteria.",
+      "Identify rows, columns, and blocks with fewer than two duplicates and replace unique values with duplicates."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 31
+  },
+  {
+    "candidate_id": "cand_537de444e3",
+    "problem_id": "apps_4513",
+    "code": "def make_anti_sudoku(grid):\n    def find_unique_cells():\n        unique_cells = []\n        for i in range(9):\n            for j in range(9):\n                if grid[i][j] == '0':\n                    continue\n                row_set = set(grid[i])\n                col_set = set(grid[x][j] for x in range(9))\n                block_set = set(grid[(i // 3) * 3 + x][(j // 3) * 3 + y] for x in range(3) for y in range(3))\n                if len(row_set) > 1 and len(col_set) > 1 and len(block_set) > 1:\n                    unique_cells.append((i, j))\n        return unique_cells\n\n    def replace_unique_with_duplicate(i, j):\n        current_value = grid[i][j]\n        for new_value in range(1, 10):\n            if str(new_value) != current_value:\n                grid[i] = grid[i][:j] + str(new_value) + grid[i][j+1:]\n                break\n\n    unique_cells = find_unique_cells()\n    for cell in unique_cells[:9]:\n        replace_unique_with_duplicate(*cell)\n\n    return grid\n\ndef solve(t, grids):\n    results = []\n    for _ in range(t):\n        grid = [list(input().strip()) for _ in range(9)]\n        anti_sudoku_grid = make_anti_sudoku(grid)\n        results.append('\\n'.join(''.join(row) for row in anti_sudoku_grid))\n    return '\\n'.join(results)\n\n# Example usage:\n# t = int(input())\n# grids = [input() for _ in range(9*t)]\n# result = solve(t, grids)\n# print(result)",
+    "code_hash": "d102a863312702c4",
+    "language": "python",
+    "node_id": "n_22_fd25b5",
+    "revision_id": "rev_n_22_fd25b5_1",
+    "thought_path_snapshot": [
+      "To generate an anti-sudoku grid, we need to ensure that each row, column, and 3x3 block contains at least two equal elements. Instead of using a backtracking approach to modify the entire grid, we can focus on modifying specific cells to achieve the required condition. Here's a refined strategy:\n\n1. Identify cells in the grid that do not already meet the anti-sudoku criteria.\n2. Change these cells to a value that ensures the row, column, or block has at least two equal elements.\n3. Continue this process until at most 9 cells have been modified.\n\nThis approach ensures that we only make the minimum necessary changes to achieve the desired anti-sudoku properties.",
+      "Thought-2: Identify cells with unique values and replace them with another number within the same row, column, or block, ensuring that the replacement does not violate the anti-sudoku conditions. This approach will help in making minimal changes while ensuring the grid meets the required criteria.",
+      "To refine the reasoning step, consider the following approach:\n\nIdentify rows, columns, and blocks with fewer than two duplicates and replace unique values with duplicates by selecting a different value within the same row, column, or block that maintains the anti-sudoku property. This ensures minimal changes while guaranteeing the grid meets the required criteria."
+    ],
+    "origin": "rethink",
+    "generation_record_id": null,
+    "created_sequence": 32
+  }
+]

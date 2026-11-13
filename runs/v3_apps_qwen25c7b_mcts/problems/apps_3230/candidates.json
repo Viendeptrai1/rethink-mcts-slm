@@ -1,0 +1,462 @@
+[
+  {
+    "candidate_id": "cand_5f3b33d49d",
+    "problem_id": "apps_3230",
+    "code": "import sys\nfrom collections import deque\nimport math\n\ndef euclidean_distance(x1, y1, x2, y2):\n    return math.sqrt((x1 - x2) ** 2 + (y1 - y2) ** 2)\n\ndef simulate_seating(R, C, grid):\n    directions = [(-1, 0), (1, 0), (0, -1), (0, 1)]\n    queue = deque()\n    visited = [[False] * C for _ in range(R)]\n\n    # Initialize the queue with all 'X' positions\n    for i in range(R):\n        for j in range(C):\n            if grid[i][j] == 'X':\n                queue.append((i, j))\n                visited[i][j] = True\n\n    explosions = 0\n\n    while queue:\n        new_queue = deque()\n        occupied = set()\n\n        while queue:\n            x, y = queue.popleft()\n            min_dist = float('inf')\n            closest_seat = None\n\n            for dx, dy in directions:\n                nx, ny = x + dx, y + dy\n                if 0 <= nx < R and 0 <= ny < C and not visited[nx][ny]:\n                    dist = euclidean_distance(x, y, nx, ny)\n                    if dist < min_dist or (dist == min_dist and (nx, ny) not in occupied):\n                        min_dist = dist\n                        closest_seat = (nx, ny)\n\n            if closest_seat:\n                new_queue.append(closest_seat)\n                visited[closest_seat[0]][closest_seat[1]] = True\n                occupied.add(closest_seat)\n            else:\n                explosions += 1\n\n        queue = new_queue\n\n    return explosions\n\nif __name__ == \"__main__\":\n    input = sys.stdin.read\n    data = input().split()\n    R = int(data[0])\n    C = int(data[1])\n    grid = [data[i+2] for i in range(R)]\n    result = simulate_seating(R, C, grid)\n    print(result)",
+    "code_hash": "d8b5ecd70e0098bd",
+    "language": "python",
+    "node_id": "n_1_25a3f6",
+    "revision_id": "rev_n_1_25a3f6_0",
+    "thought_path_snapshot": [
+      "Simulate the seating process step-by-step until no more changes occur."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 1
+  },
+  {
+    "candidate_id": "cand_9371700e43",
+    "problem_id": "apps_3230",
+    "code": "import sys\nfrom collections import deque\n\ndef min_distance_to_seat(tram, x, y):\n    R, C = len(tram), len(tram[0])\n    directions = [(-1, 0), (1, 0), (0, -1), (0, 1)]\n    queue = deque([(x, y)])\n    visited = set()\n    visited.add((x, y))\n    dist = 0\n    \n    while queue:\n        for _ in range(len(queue)):\n            cx, cy = queue.popleft()\n            if tram[cx][cy] == 'L':\n                return dist\n            for dx, dy in directions:\n                nx, ny = cx + dx, cy + dy\n                if 0 <= nx < R and 0 <= ny < C and (nx, ny) not in visited:\n                    visited.add((nx, ny))\n                    queue.append((nx, ny))\n        dist += 1\n\ndef simulate_seating(tram):\n    R, C = len(tram), len(tram[0])\n    rudeness_positions = []\n    seat_positions = []\n    \n    for i in range(R):\n        for j in range(C):\n            if tram[i][j] == 'X':\n                rudeness_positions.append((i, j))\n            elif tram[i][j] == 'L':\n                seat_positions.append((i, j))\n    \n    rudeness_queue = deque(rudeness_positions)\n    seat_taken = [False] * len(seat_positions)\n    explosions = 0\n    \n    while rudeness_queue:\n        new_rudeness_queue = deque()\n        for rx, ry in rudeness_queue:\n            min_dist = float('inf')\n            seat_index = -1\n            for i, (sx, sy) in enumerate(seat_positions):\n                if not seat_taken[i]:\n                    dist = min_distance_to_seat(tram, rx, ry)\n                    if dist < min_dist:\n                        min_dist = dist\n                        seat_index = i\n                    elif dist == min_dist:\n                        continue\n            if seat_index != -1:\n                seat_taken[seat_index] = True\n            else:\n                explosions += 1\n        rudeness_queue = new_rudeness_queue\n    \n    return explosions\n\nif __name__ == \"__main__\":\n    input = sys.stdin.read\n    data = input().split()\n    R = int(data[0])\n    C = int(data[1])\n    tram = [data[i+2] for i in range(R)]\n    result = simulate_seating(tram)\n    print(result)",
+    "code_hash": "b65796c950816acf",
+    "language": "python",
+    "node_id": "n_1_25a3f6",
+    "revision_id": "rev_n_1_25a3f6_1",
+    "thought_path_snapshot": [
+      "Simulate the seating process step-by-step until no more changes occur, but ensure that when multiple rudeness individuals are equidistant from a seat, they do not all attempt to occupy it simultaneously, leading to an explosion. Instead, handle this scenario by prioritizing the seating of the first individual to reach any given seat, thus preventing simultaneous attempts and subsequent explosions."
+    ],
+    "origin": "rethink",
+    "generation_record_id": null,
+    "created_sequence": 2
+  },
+  {
+    "candidate_id": "cand_42c76a8227",
+    "problem_id": "apps_3230",
+    "code": "import heapq\nfrom math import sqrt\n\ndef min_explosions(R, C, grid):\n    directions = [(-1, 0), (1, 0), (0, -1), (0, 1)]\n    pq = []\n    visited = set()\n    \n    # Initialize the priority queue with all 'X' positions\n    for r in range(R):\n        for c in range(C):\n            if grid[r][c] == 'X':\n                heapq.heappush(pq, (sqrt(r**2 + c**2), r, c))\n    \n    while pq:\n        dist, x, y = heapq.heappop(pq)\n        if (x, y) in visited:\n            continue\n        visited.add((x, y))\n        \n        # Check all four possible directions\n        for dx, dy in directions:\n            nx, ny = x + dx, y + dy\n            if 0 <= nx < R and 0 <= ny < C and grid[nx][ny] == 'L':\n                return 1\n    \n    return 0\n\n# Example usage:\nif __name__ == \"__main__\":\n    import sys\n    input = sys.stdin.read\n    data = input().split()\n    R = int(data[0])\n    C = int(data[1])\n    grid = [data[i+2] for i in range(R)]\n    print(min_explosions(R, C, grid))",
+    "code_hash": "fa1e227fd0cb8abe",
+    "language": "python",
+    "node_id": "n_2_2a5abb",
+    "revision_id": "rev_n_2_2a5abb_0",
+    "thought_path_snapshot": [
+      "Use a priority queue to always process the closest available seat first."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 3
+  },
+  {
+    "candidate_id": "cand_f28724e79b",
+    "problem_id": "apps_3230",
+    "code": "import sys\nfrom collections import deque\n\ndef min_distance(grid, x1, y1):\n    R, C = len(grid), len(grid[0])\n    directions = [(-1, 0), (1, 0), (0, -1), (0, 1)]\n    visited = [[False] * C for _ in range(R)]\n    queue = deque([(x1, y1, 0)])\n    visited[x1][y1] = True\n    \n    while queue:\n        x, y, dist = queue.popleft()\n        if grid[x][y] == 'L':\n            return dist\n        for dx, dy in directions:\n            nx, ny = x + dx, y + dy\n            if 0 <= nx < R and 0 <= ny < C and not visited[nx][ny]:\n                visited[nx][ny] = True\n                queue.append((nx, ny, dist + 1))\n    \n    return float('inf')\n\ndef count_explosions(grid):\n    R, C = len(grid), len(grid[0])\n    conflicts = []\n    \n    for i in range(R):\n        for j in range(C):\n            if grid[i][j] == 'X':\n                dist = min_distance(grid, i, j)\n                conflicts.append(dist)\n    \n    conflicts.sort()\n    explosions = 0\n    occupied = set()\n    \n    for dist in conflicts:\n        found_seat = False\n        for i in range(len(conflicts)):\n            if conflicts[i] == dist and i not in occupied:\n                occupied.add(i)\n                found_seat = True\n                break\n        if not found_seat:\n            explosions += 1\n    \n    return explosions\n\nif __name__ == \"__main__\":\n    input = sys.stdin.read\n    data = input().split()\n    R = int(data[0])\n    C = int(data[1])\n    grid = [data[i+2] for i in range(R)]\n    \n    result = count_explosions(grid)\n    print(result)",
+    "code_hash": "4e5b246eef59c4c9",
+    "language": "python",
+    "node_id": "n_3_80fd46",
+    "revision_id": "rev_n_3_80fd46_0",
+    "thought_path_snapshot": [
+      "Iterate over the grid and count the number of conflicts directly without simulating each movement."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 4
+  },
+  {
+    "candidate_id": "cand_146057f72d",
+    "problem_id": "apps_3230",
+    "code": "import sys\nfrom collections import deque\nimport math\n\ndef euclidean_distance(x1, y1, x2, y2):\n    return math.sqrt((x1 - x2) ** 2 + (y1 - y2) ** 2)\n\ndef min_distance_to_seat(row, col, seats):\n    min_dist = float('inf')\n    for r, c in seats:\n        dist = euclidean_distance(row, col, r, c)\n        if dist < min_dist:\n            min_dist = dist\n    return min_dist\n\ndef simulate_seating(R, C, grid):\n    seats = [(i, j) for i in range(R) for j in range(C) if grid[i][j] == 'L']\n    passengers = [(i, j) for i in range(R) for j in range(C) if grid[i][j] == 'X']\n    \n    queue = deque(passengers)\n    visited = set()\n    explosions = 0\n    \n    while queue:\n        current_passenger = queue.popleft()\n        if current_passenger in visited:\n            continue\n        \n        visited.add(current_passenger)\n        \n        min_dist = float('inf')\n        closest_seat = None\n        \n        for seat in seats:\n            dist = euclidean_distance(current_passenger[0], current_passenger[1], seat[0], seat[1])\n            if dist < min_dist:\n                min_dist = dist\n                closest_seat = seat\n        \n        if closest_seat is None:\n            continue\n        \n        if any(euclidean_distance(closest_seat[0], closest_seat[1], s[0], s[1]) == min_dist for s in seats if s != closest_seat):\n            explosions += 1\n        else:\n            seats.remove(closest_seat)\n    \n    return explosions\n\nif __name__ == \"__main__\":\n    input = sys.stdin.read\n    data = input().split()\n    \n    R = int(data[0])\n    C = int(data[1])\n    grid = [data[i+2:i+2+C] for i in range(R)]\n    \n    result = simulate_seating(R, C, grid)\n    print(result)",
+    "code_hash": "065e806a42f71902",
+    "language": "python",
+    "node_id": "n_3_80fd46",
+    "revision_id": "rev_n_3_80fd46_1",
+    "thought_path_snapshot": [
+      "Revised Thought-1: Simulate the seating process by iteratively assigning seats to the closest available passenger until no more seats can be assigned without causing an explosion. Track the number of explosions that occur during this process."
+    ],
+    "origin": "rethink",
+    "generation_record_id": null,
+    "created_sequence": 5
+  },
+  {
+    "candidate_id": "cand_6422b626fa",
+    "problem_id": "apps_3230",
+    "code": "import heapq\nfrom math import sqrt\n\ndef min_explosions(R, C, grid):\n    directions = [(-1, 0), (1, 0), (0, -1), (0, 1)]\n    pq = []\n    \n    # Initialize the priority queue with all 'X' positions\n    for r in range(R):\n        for c in range(C):\n            if grid[r][c] == 'X':\n                heapq.heappush(pq, (sqrt(r**2 + c**2), r, c))\n    \n    # Process the priority queue\n    while pq:\n        dist, x, y = heapq.heappop(pq)\n        if grid[x][y] != 'X':\n            continue\n        \n        grid[x][y] = 'S'\n        \n        for dx, dy in directions:\n            nx, ny = x + dx, y + dy\n            if 0 <= nx < R and 0 <= ny < C and grid[nx][ny] == 'L':\n                grid[nx][ny] = 'X'\n                heapq.heappush(pq, (sqrt(nx**2 + ny**2), nx, ny))\n    \n    return sum(row.count('X') for row in grid)\n\n# Example usage:\nif __name__ == \"__main__\":\n    import sys\n    input = sys.stdin.read\n    data = input().split()\n    R = int(data[0])\n    C = int(data[1])\n    grid = [list(data[i+2]) for i in range(R)]\n    print(min_explosions(R, C, grid))",
+    "code_hash": "49f2eaf84c13832a",
+    "language": "python",
+    "node_id": "n_4_a63d6b",
+    "revision_id": "rev_n_4_a63d6b_0",
+    "thought_path_snapshot": [
+      "Use a priority queue to always process the closest available seat first.",
+      "Simulate the seating process step-by-step using a priority queue."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 6
+  },
+  {
+    "candidate_id": "cand_44b1b88852",
+    "problem_id": "apps_3230",
+    "code": "import heapq\nfrom math import sqrt\n\ndef min_explosions(R, C, grid):\n    directions = [(-1, 0), (1, 0), (0, -1), (0, 1)]\n    pq = []\n    \n    # Initialize the priority queue with all 'X' positions\n    for r in range(R):\n        for c in range(C):\n            if grid[r][c] == 'X':\n                heapq.heappush(pq, (sqrt(r**2 + c**2), r, c))\n    \n    while pq:\n        _, x, y = heapq.heappop(pq)\n        if grid[x][y] != 'X':\n            continue\n        \n        grid[x][y] = '.'\n        \n        for dx, dy in directions:\n            nx, ny = x + dx, y + dy\n            if 0 <= nx < R and 0 <= ny < C and grid[nx][ny] == 'L':\n                grid[nx][ny] = 'X'\n                heapq.heappush(pq, (sqrt(nx**2 + ny**2), nx, ny))\n    \n    return len([cell for row in grid for cell in row if cell == 'X'])\n\n# Example usage:\nif __name__ == \"__main__\":\n    import sys\n    input = sys.stdin.read\n    data = input().split()\n    R = int(data[0])\n    C = int(data[1])\n    grid = [list(data[i+2]) for i in range(R)]\n    print(min_explosions(R, C, grid))",
+    "code_hash": "a10c40015c0681fb",
+    "language": "python",
+    "node_id": "n_4_a63d6b",
+    "revision_id": "rev_n_4_a63d6b_1",
+    "thought_path_snapshot": [
+      "Use a priority queue to always process the closest available seat first.",
+      "Thought-2: Re-evaluate the logic for updating the grid and re-pushing positions into the priority queue. Ensure that only valid moves are considered and that the priority queue is updated correctly after each move."
+    ],
+    "origin": "rethink",
+    "generation_record_id": null,
+    "created_sequence": 7
+  },
+  {
+    "candidate_id": "cand_56412d386a",
+    "problem_id": "apps_3230",
+    "code": "import sys\nfrom collections import deque\n\ndef min_distance(x1, y1, x2, y2):\n    return ((x1 - x2) ** 2 + (y1 - y2) ** 2) ** 0.5\n\ndef simulate_tram_seating(R, C, grid):\n    directions = [(-1, 0), (1, 0), (0, -1), (0, 1)]\n    queue = deque()\n    visited = [[False] * C for _ in range(R)]\n\n    # Initialize the queue with all 'X' positions\n    for i in range(R):\n        for j in range(C):\n            if grid[i][j] == 'X':\n                queue.append((i, j))\n                visited[i][j] = True\n\n    explosions = 0\n\n    while queue:\n        new_queue = deque()\n        occupied = set()\n\n        while queue:\n            x, y = queue.popleft()\n            for dx, dy in directions:\n                nx, ny = x + dx, y + dy\n                if 0 <= nx < R and 0 <= ny < C and not visited[nx][ny]:\n                    visited[nx][ny] = True\n                    if grid[nx][ny] == 'L':\n                        if (nx, ny) not in occupied:\n                            occupied.add((nx, ny))\n                            new_queue.append((nx, ny))\n                    else:\n                        new_queue.append((nx, ny))\n\n        if len(occupied) > 1:\n            explosions += 1\n\n        queue = new_queue\n\n    return explosions\n\nif __name__ == \"__main__\":\n    input = sys.stdin.read\n    data = input().split()\n    \n    R = int(data[0])\n    C = int(data[1])\n    grid = [data[i+2] for i in range(R)]\n    \n    result = simulate_tram_seating(R, C, grid)\n    print(result)",
+    "code_hash": "b074d7f9b8e829af",
+    "language": "python",
+    "node_id": "n_7_773458",
+    "revision_id": "rev_n_7_773458_0",
+    "thought_path_snapshot": [
+      "Simulate the seating process step-by-step until no more changes occur, but ensure that when multiple rudeness individuals are equidistant from a seat, they do not all attempt to occupy it simultaneously, leading to an explosion. Instead, handle this scenario by prioritizing the seating of the first individual to reach any given seat, thus preventing simultaneous attempts and subsequent explosions.",
+      "Revisit the logic for handling equidistant seats."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 8
+  },
+  {
+    "candidate_id": "cand_499bb0d05a",
+    "problem_id": "apps_3230",
+    "code": "import sys\nfrom collections import deque, defaultdict\n\ndef euclidean_distance(x1, y1, x2, y2):\n    return ((x1 - x2) ** 2 + (y1 - y2) ** 2) ** 0.5\n\ndef simulate_tram_seating(R, C, grid):\n    directions = [(-1, 0), (1, 0), (0, -1), (0, 1)]\n    queue = deque()\n    seats = defaultdict(list)\n    \n    # Initialize the queue with all rude passengers\n    for i in range(R):\n        for j in range(C):\n            if grid[i][j] == 'X':\n                queue.append((i, j))\n    \n    # Find all empty seats and calculate distances to all rude passengers\n    for i in range(R):\n        for j in range(C):\n            if grid[i][j] == 'L':\n                for x, y in queue:\n                    dist = euclidean_distance(i, j, x, y)\n                    seats[(i, j)].append((dist, x, y))\n    \n    # Process the queue to find the first person to reach each seat\n    while queue:\n        x, y = queue.popleft()\n        min_dist = float('inf')\n        target_seat = None\n        \n        for seat, dists in seats.items():\n            dists.sort()\n            if dists[0][0] < min_dist:\n                min_dist = dists[0][0]\n                target_seat = seat\n        \n        if target_seat:\n            grid[target_seat[0]][target_seat[1]] = 'S'\n            del seats[target_seat]\n            for seat, dists in seats.items():\n                dists = [(d, x, y) for d, x, y in dists if (x, y) != (x, y)]\n                seats[seat] = dists\n    \n    # Count the number of explosions\n    explosions = sum(1 for row in grid for cell in row if cell == 'X')\n    \n    return explosions\n\n# Read input\ninput = sys.stdin.read\ndata = input().split()\n\nR = int(data[0])\nC = int(data[1])\n\ngrid = []\nindex = 2\nfor _ in range(R):\n    grid.append(list(data[index]))\n    index += 1\n\n# Calculate and print the result\nresult = simulate_tram_seating(R, C, grid)\nprint(result)",
+    "code_hash": "5bb291f5cd648630",
+    "language": "python",
+    "node_id": "n_7_773458",
+    "revision_id": "rev_n_7_773458_1",
+    "thought_path_snapshot": [
+      "Simulate the seating process step-by-step until no more changes occur, but ensure that when multiple rudeness individuals are equidistant from a seat, they do not all attempt to occupy it simultaneously, leading to an explosion. Instead, handle this scenario by prioritizing the seating of the first individual to reach any given seat, thus preventing simultaneous attempts and subsequent explosions.",
+      "Revised Thought-2: Ensure that when multiple rude passengers are equidistant from a seat, only the first one to reach that seat actually occupies it, preventing simultaneous attempts and subsequent explosions. This can be achieved by processing the queue in a way that respects the order of arrival, ensuring that only the first occupant of a seat remains, and others continue searching for the next available seat."
+    ],
+    "origin": "rethink",
+    "generation_record_id": null,
+    "created_sequence": 9
+  },
+  {
+    "candidate_id": "cand_519494b16b",
+    "problem_id": "apps_3230",
+    "code": "import sys\nfrom collections import deque, defaultdict\nimport heapq\n\ndef min_distance_to_seat(R, C, grid):\n    directions = [(-1, 0), (1, 0), (0, -1), (0, 1)]\n    pq = []\n    visited = set()\n    \n    # Find all 'X' positions and add them to the priority queue\n    for i in range(R):\n        for j in range(C):\n            if grid[i][j] == 'X':\n                heapq.heappush(pq, (0, i, j))\n                visited.add((i, j))\n    \n    # Process the priority queue\n    while pq:\n        dist, x, y = heapq.heappop(pq)\n        if grid[x][y] == 'L':\n            return dist\n        \n        for dx, dy in directions:\n            nx, ny = x + dx, y + dy\n            if 0 <= nx < R and 0 <= ny < C and (nx, ny) not in visited:\n                visited.add((nx, ny))\n                heapq.heappush(pq, (dist + 1, nx, ny))\n    \n    return float('inf')\n\ndef main():\n    R, C = map(int, input().split())\n    grid = [input().strip() for _ in range(R)]\n    \n    total_explosions = 0\n    \n    while True:\n        min_dist = min_distance_to_seat(R, C, grid)\n        if min_dist == float('inf'):\n            break\n        total_explosions += 1\n    \n    print(total_explosions)\n\nif __name__ == \"__main__\":\n    main()",
+    "code_hash": "2a0b6c723d289bab",
+    "language": "python",
+    "node_id": "n_5_5ad602",
+    "revision_id": "rev_n_5_5ad602_0",
+    "thought_path_snapshot": [
+      "Use a priority queue to always process the closest available seat first.",
+      "Use BFS to find the shortest path to the nearest available seat for each person."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 10
+  },
+  {
+    "candidate_id": "cand_d1e068f1b5",
+    "problem_id": "apps_3230",
+    "code": "import sys\nfrom collections import deque\n\ndef min_explosions(R, C, grid):\n    directions = [(-1, 0), (1, 0), (0, -1), (0, 1)]\n    pq = []\n    visited = [[False] * C for _ in range(R)]\n\n    # Initialize the priority queue with all 'X' positions\n    for r in range(R):\n        for c in range(C):\n            if grid[r][c] == 'X':\n                pq.append((r, c, 0))\n                visited[r][c] = True\n\n    def bfs(start_r, start_c):\n        queue = deque([(start_r, start_c)])\n        while queue:\n            r, c = queue.popleft()\n            for dr, dc in directions:\n                nr, nc = r + dr, c + dc\n                if 0 <= nr < R and 0 <= nc < C and not visited[nr][nc]:\n                    visited[nr][nc] = True\n                    if grid[nr][nc] == 'L':\n                        return abs(nr - start_r) + abs(nc - start_c)\n                    queue.append((nr, nc))\n        return float('inf')\n\n    explosions = 0\n    while pq:\n        r, c, dist = pq.pop(0)\n        if grid[r][c] == 'L':\n            continue\n        min_dist = bfs(r, c)\n        if min_dist != float('inf'):\n            explosions += 1\n            for dr, dc in directions:\n                nr, nc = r + dr, c + dc\n                if 0 <= nr < R and 0 <= nc < C and not visited[nr][nc]:\n                    visited[nr][nc] = True\n                    if grid[nr][nc] == 'L':\n                        pq.append((nr, nc, 0))\n\n    return explosions\n\n# Read input\ninput = sys.stdin.read\ndata = input().split()\n\nR = int(data[0])\nC = int(data[1])\ngrid = data[2:]\n\n# Calculate and print the result\nprint(min_explosions(R, C, grid))",
+    "code_hash": "869c54f99f2b139a",
+    "language": "python",
+    "node_id": "n_5_5ad602",
+    "revision_id": "rev_n_5_5ad602_1",
+    "thought_path_snapshot": [
+      "Use a priority queue to always process the closest available seat first.",
+      "Thought-2 (revised): Instead of using BFS to find the shortest path for each person individually, use a single BFS traversal to identify all reachable seats from each person simultaneously. This approach ensures that we efficiently determine the minimum distances for all persons in a single pass, reducing the overall complexity and avoiding potential timeouts."
+    ],
+    "origin": "rethink",
+    "generation_record_id": null,
+    "created_sequence": 11
+  },
+  {
+    "candidate_id": "cand_368bbfcd64",
+    "problem_id": "apps_3230",
+    "code": "import heapq\nfrom collections import deque\n\ndef min_distance(x1, y1, x2, y2):\n    return ((x1 - x2) ** 2 + (y1 - y2) ** 2) ** 0.5\n\ndef count_explosions(R, C, grid):\n    directions = [(-1, 0), (1, 0), (0, -1), (0, 1)]\n    pq = []\n    visited = set()\n    \n    # Initialize the priority queue with all 'X' positions\n    for i in range(R):\n        for j in range(C):\n            if grid[i][j] == 'X':\n                heapq.heappush(pq, (min_distance(i, j, R//2, C//2), i, j))\n    \n    while pq:\n        _, x, y = heapq.heappop(pq)\n        if (x, y) in visited:\n            continue\n        visited.add((x, y))\n        \n        # Check adjacent seats\n        for dx, dy in directions:\n            nx, ny = x + dx, y + dy\n            if 0 <= nx < R and 0 <= ny < C and grid[nx][ny] == 'L':\n                return 1\n    \n    return 0\n\n# Example usage:\nif __name__ == \"__main__\":\n    import sys\n    input = sys.stdin.read\n    data = input().split()\n    R = int(data[0])\n    C = int(data[1])\n    grid = [data[i+2] for i in range(R)]\n    print(count_explosions(R, C, grid))",
+    "code_hash": "51cba347233a67f0",
+    "language": "python",
+    "node_id": "n_6_5e6aed",
+    "revision_id": "rev_n_6_5e6aed_0",
+    "thought_path_snapshot": [
+      "Use a priority queue to always process the closest available seat first.",
+      "Track visited seats to avoid multiple attempts on the same seat."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 12
+  },
+  {
+    "candidate_id": "cand_4ca739a808",
+    "problem_id": "apps_3230",
+    "code": "import heapq\nfrom math import sqrt\n\ndef min_explosions(R, C, grid):\n    directions = [(-1, 0), (1, 0), (0, -1), (0, 1)]\n    pq = []\n    \n    # Initialize the priority queue with all 'X' positions\n    for r in range(R):\n        for c in range(C):\n            if grid[r][c] == 'X':\n                heapq.heappush(pq, (sqrt(r**2 + c**2), r, c))\n    \n    while pq:\n        dist, x, y = heapq.heappop(pq)\n        \n        # Check if the position is still occupied by 'X'\n        if grid[x][y] != 'X':\n            continue\n        \n        # Mark the position as seated\n        grid[x][y] = 'L'\n        \n        # Push all adjacent empty seats into the priority queue\n        for dx, dy in directions:\n            nx, ny = x + dx, y + dy\n            if 0 <= nx < R and 0 <= ny < C and grid[nx][ny] == 'L':\n                heapq.heappush(pq, (sqrt(nx**2 + ny**2), nx, ny))\n    \n    return len([cell for row in grid for cell in row if cell == 'X'])\n\n# Example usage:\nif __name__ == \"__main__\":\n    import sys\n    input = sys.stdin.read\n    data = input().split()\n    R = int(data[0])\n    C = int(data[1])\n    grid = [list(data[i+2]) for i in range(R)]\n    print(min_explosions(R, C, grid))",
+    "code_hash": "e862f71c6af0c5f5",
+    "language": "python",
+    "node_id": "n_10_187464",
+    "revision_id": "rev_n_10_187464_0",
+    "thought_path_snapshot": [
+      "Use a priority queue to always process the closest available seat first.",
+      "Thought-2: Re-evaluate the logic for updating the grid and re-pushing positions into the priority queue. Ensure that only valid moves are considered and that the priority queue is updated correctly after each move.",
+      "Revisit the logic for handling equal distances."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 13
+  },
+  {
+    "candidate_id": "cand_26619faa58",
+    "problem_id": "apps_3230",
+    "code": "import heapq\nfrom math import sqrt\n\ndef min_explosions(R, C, grid):\n    directions = [(-1, 0), (1, 0), (0, -1), (0, 1)]\n    pq = []\n    \n    # Initialize the priority queue with all 'X' positions\n    for r in range(R):\n        for c in range(C):\n            if grid[r][c] == 'X':\n                heapq.heappush(pq, (sqrt(r**2 + c**2), r, c))\n    \n    def get_distance(x1, y1, x2, y2):\n        return sqrt((x1 - x2)**2 + (y1 - y2)**2)\n    \n    while pq:\n        _, x, y = heapq.heappop(pq)\n        if grid[x][y] != 'X':\n            continue\n        \n        grid[x][y] = 'L'\n        \n        for dx, dy in directions:\n            nx, ny = x + dx, y + dy\n            if 0 <= nx < R and 0 <= ny < C and grid[nx][ny] == 'X':\n                new_dist = get_distance(nx, ny, x, y)\n                heapq.heappush(pq, (new_dist, nx, ny))\n    \n    return sum(row.count('X') for row in grid)\n\n# Example usage:\nif __name__ == \"__main__\":\n    import sys\n    input = sys.stdin.read\n    data = input().split()\n    R = int(data[0])\n    C = int(data[1])\n    grid = [list(data[i+2]) for i in range(R)]\n    print(min_explosions(R, C, grid))",
+    "code_hash": "7cb10b2d825bd586",
+    "language": "python",
+    "node_id": "n_10_187464",
+    "revision_id": "rev_n_10_187464_1",
+    "thought_path_snapshot": [
+      "Use a priority queue to always process the closest available seat first.",
+      "Thought-2: Re-evaluate the logic for updating the grid and re-pushing positions into the priority queue. Ensure that only valid moves are considered and that the priority queue is updated correctly after each move.",
+      "Revised Thought-3: When processing a seat, ensure that only the closest available seat is pushed back into the priority queue. If multiple seats are equally close, do not push any of them back into the queue to avoid unnecessary explosions. This approach ensures that only the closest seat is processed at each step, preventing premature seating of other passengers."
+    ],
+    "origin": "rethink",
+    "generation_record_id": null,
+    "created_sequence": 14
+  },
+  {
+    "candidate_id": "cand_d4530584df",
+    "problem_id": "apps_3230",
+    "code": "import heapq\nfrom collections import deque\n\ndef min_distance(x1, y1, x2, y2):\n    return ((x1 - x2) ** 2 + (y1 - y2) ** 2) ** 0.5\n\ndef find_nearest_seat(seats, x, y):\n    min_dist = float('inf')\n    nearest_seat = None\n    for sx, sy in seats:\n        dist = min_distance(x, y, sx, sy)\n        if dist < min_dist:\n            min_dist = dist\n            nearest_seat = (sx, sy)\n    return nearest_seat\n\ndef simulate_tram_seating(R, C, grid):\n    seats = [(i, j) for i in range(R) for j in range(C) if grid[i][j] == 'L']\n    rude_passengers = [(i, j) for i in range(R) for j in range(C) if grid[i][j] == 'X']\n    \n    visited = set()\n    explosions = 0\n    \n    while rude_passengers:\n        pq = []\n        for rx, ry in rude_passengers:\n            nearest_seat = find_nearest_seat(seats, rx, ry)\n            if nearest_seat not in visited:\n                heapq.heappush(pq, (min_distance(rx, ry, nearest_seat[0], nearest_seat[1]), rx, ry))\n        \n        if pq:\n            _, rx, ry = heapq.heappop(pq)\n            nearest_seat = find_nearest_seat(seats, rx, ry)\n            if nearest_seat not in visited:\n                visited.add(nearest_seat)\n                rude_passengers.remove((rx, ry))\n            else:\n                explosions += 1\n        else:\n            break\n    \n    return explosions\n\n# Example usage:\nif __name__ == \"__main__\":\n    import sys\n    input = sys.stdin.read\n    data = input().split()\n    R = int(data[0])\n    C = int(data[1])\n    grid = [data[2+i*C:(i+1)*C] for i in range(R)]\n    result = simulate_tram_seating(R, C, grid)\n    print(result)",
+    "code_hash": "59a574939b477aff",
+    "language": "python",
+    "node_id": "n_13_72c84a",
+    "revision_id": "rev_n_13_72c84a_0",
+    "thought_path_snapshot": [
+      "Use a priority queue to always process the closest available seat first.",
+      "Track visited seats to avoid multiple attempts on the same seat.",
+      "Simulate the seating process step-by-step, updating the positions of rude passengers based on the nearest available seat."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 15
+  },
+  {
+    "candidate_id": "cand_c6fbc73750",
+    "problem_id": "apps_3230",
+    "code": "import heapq\nfrom collections import defaultdict, deque\n\ndef min_distance_to_seat(grid, x, y):\n    R, C = len(grid), len(grid[0])\n    directions = [(-1, 0), (1, 0), (0, -1), (0, 1)]\n    visited = [[False] * C for _ in range(R)]\n    queue = deque([(x, y, 0)])\n    visited[x][y] = True\n    \n    while queue:\n        cx, cy, dist = queue.popleft()\n        if grid[cx][cy] == 'L':\n            return dist\n        for dx, dy in directions:\n            nx, ny = cx + dx, cy + dy\n            if 0 <= nx < R and 0 <= ny < C and not visited[nx][ny]:\n                visited[nx][ny] = True\n                queue.append((nx, ny, dist + 1))\n    \n    return float('inf')\n\ndef count_explosions(grid):\n    R, C = len(grid), len(grid[0])\n    nearest_seats = {}\n    for i in range(R):\n        for j in range(C):\n            if grid[i][j] == 'X':\n                nearest_seats[(i, j)] = min_distance_to_seat(grid, i, j)\n    \n    pq = []\n    for pos, dist in nearest_seats.items():\n        heapq.heappush(pq, (dist, pos))\n    \n    visited = set()\n    explosions = 0\n    \n    while pq:\n        _, pos = heapq.heappop(pq)\n        if pos in visited:\n            continue\n        visited.add(pos)\n        \n        x, y = pos\n        if grid[x][y] == 'L':\n            continue\n        \n        grid[x] = grid[x][:y] + 'L' + grid[x][y+1:]\n        \n        for dx, dy in [(-1, 0), (1, 0), (0, -1), (0, 1)]:\n            nx, ny = x + dx, y + dy\n            if 0 <= nx < R and 0 <= ny < C and (nx, ny) not in visited:\n                new_pos = (nx, ny)\n                if new_pos not in nearest_seats:\n                    nearest_seats[new_pos] = min_distance_to_seat(grid, nx, ny)\n                heapq.heappush(pq, (nearest_seats[new_pos], new_pos))\n        \n        explosions += 1\n    \n    return explosions\n\n# Example usage:\nif __name__ == \"__main__\":\n    import sys\n    input = sys.stdin.read\n    data = input().split()\n    R = int(data[0])\n    C = int(data[1])\n    grid = [data[i+2] for i in range(R)]\n    print(count_explosions(grid))",
+    "code_hash": "ac7f061cb2c9dfa4",
+    "language": "python",
+    "node_id": "n_13_72c84a",
+    "revision_id": "rev_n_13_72c84a_1",
+    "thought_path_snapshot": [
+      "Use a priority queue to always process the closest available seat first.",
+      "Track visited seats to avoid multiple attempts on the same seat.",
+      "Thought-3: Instead of finding the nearest seat for each rude passenger individually within the main loop, preprocess the grid to create a dictionary mapping each cell to its nearest unoccupied seat. This way, you can efficiently retrieve the nearest seat for any passenger without recalculating distances repeatedly. Additionally, use a set to keep track of visited seats to ensure each seat is only considered once."
+    ],
+    "origin": "rethink",
+    "generation_record_id": null,
+    "created_sequence": 16
+  },
+  {
+    "candidate_id": "cand_14caa19846",
+    "problem_id": "apps_3230",
+    "code": "import sys\nfrom collections import deque, defaultdict\nimport heapq\n\ndef min_distance_to_seat(r, c, grid):\n    directions = [(-1, 0), (1, 0), (0, -1), (0, 1)]\n    dist = [[float('inf')] * c for _ in range(r)]\n    pq = []\n    \n    for i in range(r):\n        for j in range(c):\n            if grid[i][j] == 'X':\n                heapq.heappush(pq, (0, i, j))\n                dist[i][j] = 0\n    \n    while pq:\n        d, x, y = heapq.heappop(pq)\n        if d > dist[x][y]:\n            continue\n        for dx, dy in directions:\n            nx, ny = x + dx, y + dy\n            if 0 <= nx < r and 0 <= ny < c and grid[nx][ny] != '.':\n                new_d = d + ((nx - x) ** 2 + (ny - y) ** 2) ** 0.5\n                if new_d < dist[nx][ny]:\n                    dist[nx][ny] = new_d\n                    heapq.heappush(pq, (new_d, nx, ny))\n    \n    return dist\n\ndef simulate_seating(r, c, grid):\n    dist = min_distance_to_seat(r, c, grid)\n    seats = set()\n    explosions = 0\n    \n    while True:\n        changes = False\n        for i in range(r):\n            for j in range(c):\n                if grid[i][j] == 'X' and (i, j) not in seats:\n                    min_dist = float('inf')\n                    min_seat = None\n                    for sx, sy in seats:\n                        d = ((sx - i) ** 2 + (sy - j) ** 2) ** 0.5\n                        if d < min_dist:\n                            min_dist = d\n                            min_seat = (sx, sy)\n                    if min_dist == dist[i][j]:\n                        seats.add((i, j))\n                        changes = True\n                    elif min_dist < dist[i][j]:\n                        dist[i][j] = min_dist\n                        min_seat = (i, j)\n                        changes = True\n                    if len(seats) >= 2 and min_seat in seats:\n                        explosions += 1\n                        seats.remove(min_seat)\n        \n        if not changes:\n            break\n    \n    return explosions\n\ndef main():\n    r, c = map(int, input().split())\n    grid = [input().strip() for _ in range(r)]\n    result = simulate_seating(r, c, grid)\n    print(result)\n\nif __name__ == \"__main__\":\n    main()",
+    "code_hash": "3d4b07781ad6e1df",
+    "language": "python",
+    "node_id": "n_8_c52924",
+    "revision_id": "rev_n_8_c52924_0",
+    "thought_path_snapshot": [
+      "Simulate the seating process step-by-step until no more changes occur, but ensure that when multiple rudeness individuals are equidistant from a seat, they do not all attempt to occupy it simultaneously, leading to an explosion. Instead, handle this scenario by prioritizing the seating of the first individual to reach any given seat, thus preventing simultaneous attempts and subsequent explosions.",
+      "Ensure the priority queue is used correctly to manage rudeness individuals."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 17
+  },
+  {
+    "candidate_id": "cand_3b262bd3a1",
+    "problem_id": "apps_3230",
+    "code": "import sys\nfrom collections import deque, defaultdict\nimport heapq\n\ndef min_distance_to_seat(r, c, grid):\n    directions = [(-1, 0), (1, 0), (0, -1), (0, 1)]\n    queue = deque()\n    visited = set()\n    distances = [[float('inf')] * c for _ in range(r)]\n\n    for i in range(r):\n        for j in range(c):\n            if grid[i][j] == 'X':\n                queue.append((i, j))\n                visited.add((i, j))\n                distances[i][j] = 0\n\n    while queue:\n        x, y = queue.popleft()\n        for dx, dy in directions:\n            nx, ny = x + dx, y + dy\n            if 0 <= nx < r and 0 <= ny < c and (nx, ny) not in visited:\n                visited.add((nx, ny))\n                distances[nx][ny] = distances[x][y] + 1\n                queue.append((nx, ny))\n\n    return distances\n\ndef simulate_seating(r, c, grid):\n    distances = min_distance_to_seat(r, c, grid)\n    seat_positions = []\n    for i in range(r):\n        for j in range(c):\n            if grid[i][j] == 'L':\n                seat_positions.append((distances[i][j], i, j))\n\n    seat_heap = []\n    for dist, i, j in seat_positions:\n        heapq.heappush(seat_heap, (dist, i, j))\n\n    rude_passengers = []\n    for i in range(r):\n        for j in range(c):\n            if grid[i][j] == 'X':\n                rude_passengers.append((distances[i][j], i, j))\n\n    rude_heap = []\n    for dist, i, j in rude_passengers:\n        heapq.heappush(rude_heap, (dist, i, j))\n\n    explosions = 0\n    while rude_heap:\n        _, rx, ry = heapq.heappop(rude_heap)\n        if grid[rx][ry] != 'X':\n            continue\n\n        seat_found = False\n        while seat_heap:\n            sd, sx, sy = heapq.heappop(seat_heap)\n            if sd > distances[rx][ry]:\n                break\n            if grid[sx][sy] == 'L':\n                grid[sx][sy] = 'X'\n                seat_found = True\n                break\n\n        if not seat_found:\n            explosions += 1\n\n    return explosions\n\nif __name__ == \"__main__\":\n    input = sys.stdin.read\n    data = input().split()\n    R = int(data[0])\n    C = int(data[1])\n    grid = [data[i+2] for i in range(R)]\n    result = simulate_seating(R, C, grid)\n    print(result)",
+    "code_hash": "ad64fc8db53e9a68",
+    "language": "python",
+    "node_id": "n_8_c52924",
+    "revision_id": "rev_n_8_c52924_1",
+    "thought_path_snapshot": [
+      "Simulate the seating process step-by-step until no more changes occur, but ensure that when multiple rudeness individuals are equidistant from a seat, they do not all attempt to occupy it simultaneously, leading to an explosion. Instead, handle this scenario by prioritizing the seating of the first individual to reach any given seat, thus preventing simultaneous attempts and subsequent explosions.",
+      "Ensure the priority queue is used correctly to manage rudeness individuals by always selecting the nearest available seat to a rude passenger, ensuring that no two rude passengers can simultaneously occupy the same seat, thus avoiding simultaneous attempts and subsequent explosions."
+    ],
+    "origin": "rethink",
+    "generation_record_id": null,
+    "created_sequence": 18
+  },
+  {
+    "candidate_id": "cand_4c6f9d5662",
+    "problem_id": "apps_3230",
+    "code": "import sys\nfrom collections import deque, defaultdict\nimport heapq\n\ndef min_distance(x1, y1, x2, y2):\n    return ((x1 - x2) ** 2 + (y1 - y2) ** 2) ** 0.5\n\ndef bfs(R, C, grid):\n    directions = [(-1, 0), (1, 0), (0, -1), (0, 1)]\n    queue = []\n    visited = set()\n    for i in range(R):\n        for j in range(C):\n            if grid[i][j] == 'X':\n                heapq.heappush(queue, (min_distance(i, j, R//2, C//2), i, j))\n    \n    explosions = 0\n    while queue:\n        dist, x, y = heapq.heappop(queue)\n        if (x, y) in visited:\n            continue\n        visited.add((x, y))\n        \n        found_seat = False\n        for dx, dy in directions:\n            nx, ny = x + dx, y + dy\n            if 0 <= nx < R and 0 <= ny < C and grid[nx][ny] == 'L':\n                grid[nx][ny] = 'X'\n                found_seat = True\n                break\n        \n        if not found_seat:\n            explosions += 1\n    \n    return explosions\n\nif __name__ == \"__main__\":\n    R, C = map(int, input().split())\n    grid = [input().strip() for _ in range(R)]\n    result = bfs(R, C, grid)\n    print(result)",
+    "code_hash": "7eaf7eb6fbfb6d9d",
+    "language": "python",
+    "node_id": "n_14_dd8d2b",
+    "revision_id": "rev_n_14_dd8d2b_0",
+    "thought_path_snapshot": [
+      "Use a priority queue to always process the closest available seat first.",
+      "Track visited seats to avoid multiple attempts on the same seat.",
+      "Use a breadth-first search (BFS) approach to explore all possible seating scenarios and count the number of explosions."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 19
+  },
+  {
+    "candidate_id": "cand_3333c019e4",
+    "problem_id": "apps_3230",
+    "code": "import heapq\nfrom collections import deque\n\ndef min_explosions(R, C, grid):\n    directions = [(-1, 0), (1, 0), (0, -1), (0, 1)]\n    pq = []\n    visited = set()\n    \n    # Initialize the priority queue with all empty seats\n    for r in range(R):\n        for c in range(C):\n            if grid[r][c] == 'L':\n                heapq.heappush(pq, (r, c))\n    \n    while pq:\n        x, y = heapq.heappop(pq)\n        if (x, y) in visited:\n            continue\n        \n        visited.add((x, y))\n        \n        # Check adjacent seats\n        for dx, dy in directions:\n            nx, ny = x + dx, y + dy\n            if 0 <= nx < R and 0 <= ny < C and grid[nx][ny] == 'X':\n                return 1\n    \n    return 0\n\n# Example usage:\nif __name__ == \"__main__\":\n    import sys\n    input = sys.stdin.read\n    data = input().split()\n    R = int(data[0])\n    C = int(data[1])\n    grid = [data[i+2] for i in range(R)]\n    print(min_explosions(R, C, grid))",
+    "code_hash": "a86d912b39971243",
+    "language": "python",
+    "node_id": "n_14_dd8d2b",
+    "revision_id": "rev_n_14_dd8d2b_1",
+    "thought_path_snapshot": [
+      "Use a priority queue to always process the closest available seat first.",
+      "Track visited seats to avoid multiple attempts on the same seat.",
+      "Thought-3: Use a priority queue to always process the closest available seat first, but ensure that the seat is not already occupied by another passenger. This can be done by checking if the seat is marked as 'X' before attempting to occupy it. If the seat is already occupied, skip it and move to the next closest seat."
+    ],
+    "origin": "rethink",
+    "generation_record_id": null,
+    "created_sequence": 20
+  },
+  {
+    "candidate_id": "cand_1fe4f8e976",
+    "problem_id": "apps_3230",
+    "code": "import heapq\nfrom math import sqrt\n\ndef min_explosions(R, C, grid):\n    directions = [(-1, 0), (1, 0), (0, -1), (0, 1)]\n    pq = []\n    \n    # Initialize the priority queue with all 'X' positions\n    for r in range(R):\n        for c in range(C):\n            if grid[r][c] == 'X':\n                heapq.heappush(pq, (sqrt(r**2 + c**2), r, c))\n    \n    while pq:\n        _, r, c = heapq.heappop(pq)\n        if grid[r][c] != 'X':\n            continue\n        \n        grid[r][c] = '.'\n        \n        for dr, dc in directions:\n            nr, nc = r + dr, c + dc\n            if 0 <= nr < R and 0 <= nc < C and grid[nr][nc] == 'L':\n                grid[nr][nc] = 'X'\n                heapq.heappush(pq, (sqrt(nr**2 + nc**2), nr, nc))\n    \n    return sum(row.count('X') for row in grid)\n\n# Example usage:\nif __name__ == \"__main__\":\n    import sys\n    input = sys.stdin.read\n    data = input().split()\n    R = int(data[0])\n    C = int(data[1])\n    grid = [list(data[i+2]) for i in range(R)]\n    print(min_explosions(R, C, grid))",
+    "code_hash": "d80ad5fa01868d60",
+    "language": "python",
+    "node_id": "n_11_1ff2fb",
+    "revision_id": "rev_n_11_1ff2fb_0",
+    "thought_path_snapshot": [
+      "Use a priority queue to always process the closest available seat first.",
+      "Thought-2: Re-evaluate the logic for updating the grid and re-pushing positions into the priority queue. Ensure that only valid moves are considered and that the priority queue is updated correctly after each move.",
+      "Ensure proper handling of the priority queue updates."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 21
+  },
+  {
+    "candidate_id": "cand_b24b2c3eda",
+    "problem_id": "apps_3230",
+    "code": "import heapq\nfrom math import sqrt\n\ndef min_explosions(R, C, grid):\n    directions = [(-1, 0), (1, 0), (0, -1), (0, 1)]\n    pq = []\n    \n    # Initialize the priority queue with all 'X' positions\n    for r in range(R):\n        for c in range(C):\n            if grid[r][c] == 'X':\n                heapq.heappush(pq, (sqrt(r**2 + c**2), r, c))\n    \n    while pq:\n        _, r, c = heapq.heappop(pq)\n        if grid[r][c] != 'X':\n            continue\n        \n        grid[r][c] = '.'\n        \n        for dr, dc in directions:\n            nr, nc = r + dr, c + dc\n            if 0 <= nr < R and 0 <= nc < C and grid[nr][nc] == 'L':\n                grid[nr][nc] = 'X'\n                heapq.heappush(pq, (sqrt(nr**2 + nc**2), nr, nc))\n    \n    return sum(row.count('X') for row in grid)\n\n# Example usage:\nif __name__ == \"__main__\":\n    import sys\n    input = sys.stdin.read\n    data = input().split()\n    R = int(data[0])\n    C = int(data[1])\n    grid = [list(data[i+2]) for i in range(R)]\n    print(min_explosions(R, C, grid))",
+    "code_hash": "d80ad5fa01868d60",
+    "language": "python",
+    "node_id": "n_11_1ff2fb",
+    "revision_id": "rev_n_11_1ff2fb_1",
+    "thought_path_snapshot": [
+      "Use a priority queue to always process the closest available seat first.",
+      "Thought-2: Re-evaluate the logic for updating the grid and re-pushing positions into the priority queue. Ensure that only valid moves are considered and that the priority queue is updated correctly after each move.",
+      "Ensure that the priority queue is updated correctly after each move, considering only valid moves and avoiding unnecessary re-pushes of the same position."
+    ],
+    "origin": "rethink",
+    "generation_record_id": null,
+    "created_sequence": 22
+  },
+  {
+    "candidate_id": "cand_055f1cb5c2",
+    "problem_id": "apps_3230",
+    "code": "import sys\nfrom collections import deque\n\ndef min_explosions(R, C, grid):\n    directions = [(-1, 0), (1, 0), (0, -1), (0, 1)]\n    pq = []\n    visited = [[False] * C for _ in range(R)]\n\n    # Initialize the priority queue with all 'X' positions\n    for r in range(R):\n        for c in range(C):\n            if grid[r][c] == 'X':\n                pq.append((r, c, 0))\n\n    while pq:\n        x, y, dist = heapq.heappop(pq)\n        if visited[x][y]:\n            continue\n        visited[x][y] = True\n\n        # Check all four possible directions\n        for dx, dy in directions:\n            nx, ny = x + dx, y + dy\n            if 0 <= nx < R and 0 <= ny < C and not visited[nx][ny]:\n                if grid[nx][ny] == 'L':\n                    return dist + 1\n                elif grid[nx][ny] == '.':\n                    heapq.heappush(pq, (nx, ny, dist + 1))\n\n    return 0\n\n# Read input\ninput = sys.stdin.read\ndata = input().split()\nR = int(data[0])\nC = int(data[1])\ngrid = data[2:]\n\n# Calculate and print the result\nprint(min_explosions(R, C, grid))",
+    "code_hash": "2f86652b39d91390",
+    "language": "python",
+    "node_id": "n_16_98e1e7",
+    "revision_id": "rev_n_16_98e1e7_0",
+    "thought_path_snapshot": [
+      "Use a priority queue to always process the closest available seat first.",
+      "Thought-2 (revised): Instead of using BFS to find the shortest path for each person individually, use a single BFS traversal to identify all reachable seats from each person simultaneously. This approach ensures that we efficiently determine the minimum distances for all persons in a single pass, reducing the overall complexity and avoiding potential timeouts.",
+      "Revisit the BFS implementation to ensure it correctly handles multiple 'X's aiming for the same 'L'."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 23
+  },
+  {
+    "candidate_id": "cand_a7c8fb798e",
+    "problem_id": "apps_3230",
+    "code": "from collections import deque\nimport heapq\n\ndef min_explosions(R, C, grid):\n    directions = [(-1, 0), (1, 0), (0, -1), (0, 1)]\n    pq = []\n    \n    # Find all X positions and add them to the priority queue\n    for r in range(R):\n        for c in range(C):\n            if grid[r][c] == 'X':\n                heapq.heappush(pq, (r, c))\n    \n    # Initialize visited set to keep track of occupied seats\n    visited = set()\n    \n    while pq:\n        x, y = heapq.heappop(pq)\n        \n        # Check all four possible directions\n        for dx, dy in directions:\n            nx, ny = x + dx, y + dy\n            \n            # Check boundaries and if the cell is empty\n            if 0 <= nx < R and 0 <= ny < C and grid[nx][ny] == 'L' and (nx, ny) not in visited:\n                visited.add((nx, ny))\n                \n                # Check if this seat was already being contested\n                if any((nx, ny) == (px, py) for px, py in pq):\n                    return 1\n    \n    return 0\n\n# Example usage:\nif __name__ == \"__main__\":\n    import sys\n    input = sys.stdin.read\n    data = input().split()\n    \n    R = int(data[0])\n    C = int(data[1])\n    grid = [data[i+2] for i in range(R)]\n    \n    result = min_explosions(R, C, grid)\n    print(result)",
+    "code_hash": "17ef514583d29913",
+    "language": "python",
+    "node_id": "n_16_98e1e7",
+    "revision_id": "rev_n_16_98e1e7_1",
+    "thought_path_snapshot": [
+      "Use a priority queue to always process the closest available seat first.",
+      "Thought-2 (revised): Instead of using BFS to find the shortest path for each person individually, use a single BFS traversal to identify all reachable seats from each person simultaneously. This approach ensures that we efficiently determine the minimum distances for all persons in a single pass, reducing the overall complexity and avoiding potential timeouts.",
+      "Revisit the BFS implementation to ensure it correctly handles multiple 'X's aiming for the same 'L'. Specifically, modify the BFS to track the nearest 'L' for each 'X' and handle cases where multiple 'X's reach the same 'L' simultaneously by marking the seat as unavailable and continuing the BFS until no more moves can be made."
+    ],
+    "origin": "rethink",
+    "generation_record_id": null,
+    "created_sequence": 24
+  },
+  {
+    "candidate_id": "cand_ddde3b701b",
+    "problem_id": "apps_3230",
+    "code": "import heapq\nfrom collections import defaultdict\n\ndef min_explosions(R, C, tram):\n    directions = [(-1, 0), (1, 0), (0, -1), (0, 1)]\n    pq = []\n    visited = set()\n    \n    # Initialize the priority queue with all empty seats\n    for r in range(R):\n        for c in range(C):\n            if tram[r][c] == 'L':\n                heapq.heappush(pq, (r, c))\n                visited.add((r, c))\n    \n    explosions = 0\n    \n    while pq:\n        x, y = heapq.heappop(pq)\n        \n        # Check all four possible directions\n        for dx, dy in directions:\n            nx, ny = x + dx, y + dy\n            \n            # Check if the new position is within bounds and not visited\n            if 0 <= nx < R and 0 <= ny < C and (nx, ny) not in visited:\n                if tram[nx][ny] == 'X':\n                    explosions += 1\n                    visited.add((nx, ny))\n                    break\n                elif tram[nx][ny] == 'L':\n                    heapq.heappush(pq, (nx, ny))\n                    visited.add((nx, ny))\n    \n    return explosions\n\n# Example usage:\nif __name__ == \"__main__\":\n    import sys\n    input = sys.stdin.read\n    data = input().split()\n    R = int(data[0])\n    C = int(data[1])\n    tram = [data[i+2] for i in range(R)]\n    print(min_explosions(R, C, tram))",
+    "code_hash": "ed13e9da5e9c7c0a",
+    "language": "python",
+    "node_id": "n_15_ecee44",
+    "revision_id": "rev_n_15_ecee44_0",
+    "thought_path_snapshot": [
+      "Use a priority queue to always process the closest available seat first.",
+      "Track visited seats to avoid multiple attempts on the same seat.",
+      "Implement a dynamic programming solution where each state represents the current configuration of the tram and the number of explosions required to reach that state."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 25
+  },
+  {
+    "candidate_id": "cand_a76965ede1",
+    "problem_id": "apps_3230",
+    "code": "import sys\nfrom collections import deque, defaultdict\nimport heapq\n\ndef euclidean_distance(x1, y1, x2, y2):\n    return ((x1 - x2) ** 2 + (y1 - y2) ** 2) ** 0.5\n\ndef min_explosions(R, C, grid):\n    directions = [(-1, 0), (1, 0), (0, -1), (0, 1)]\n    pq = []\n    visited = set()\n    \n    # Initialize the priority queue with all available seats\n    for i in range(R):\n        for j in range(C):\n            if grid[i][j] == 'L':\n                heapq.heappush(pq, (euclidean_distance(i, j, 0, 0), i, j))\n    \n    explosions = 0\n    \n    while pq:\n        dist, x, y = heapq.heappop(pq)\n        \n        if (x, y) in visited:\n            continue\n        \n        visited.add((x, y))\n        \n        # Check if any adjacent seat is occupied by another passenger\n        for dx, dy in directions:\n            nx, ny = x + dx, y + dy\n            if 0 <= nx < R and 0 <= ny < C and grid[nx][ny] == 'X':\n                explosions += 1\n                break\n    \n    return explosions\n\n# Read input\ninput = sys.stdin.read\ndata = input().split()\n\nR = int(data[0])\nC = int(data[1])\n\ngrid = []\nindex = 2\nfor _ in range(R):\n    row = list(data[index])\n    grid.append(row)\n    index += 1\n\n# Calculate the minimum number of explosions\nresult = min_explosions(R, C, grid)\n\n# Print the result\nprint(result)",
+    "code_hash": "9d532a35185dbdb8",
+    "language": "python",
+    "node_id": "n_19_3096ad",
+    "revision_id": "rev_n_19_3096ad_0",
+    "thought_path_snapshot": [
+      "Use a priority queue to always process the closest available seat first.",
+      "Track visited seats to avoid multiple attempts on the same seat.",
+      "Thought-3: Use a priority queue to always process the closest available seat first, but ensure that the seat is not already occupied by another passenger. This can be done by checking if the seat is marked as 'X' before attempting to occupy it. If the seat is already occupied, skip it and move to the next closest seat.",
+      "Simulate the seating process step-by-step using a breadth-first search (BFS) approach. Start by identifying all available seats and then simulate the movement of passengers based on the Euclidean distance. Keep track of the number of explosions until no more movements occur."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 26
+  },
+  {
+    "candidate_id": "cand_956e415c81",
+    "problem_id": "apps_3230",
+    "code": "import sys\nfrom collections import deque, defaultdict\nimport heapq\n\ndef min_explosions(R, C, grid):\n    directions = [(-1, 0), (1, 0), (0, -1), (0, 1)]\n    pq = []\n    visited = set()\n    \n    # Initialize the priority queue with all 'X' positions\n    for r in range(R):\n        for c in range(C):\n            if grid[r][c] == 'X':\n                heapq.heappush(pq, (r, c))\n                visited.add((r, c))\n    \n    def get_distance(r1, c1, r2, c2):\n        return ((r1 - r2) ** 2 + (c1 - c2) ** 2) ** 0.5\n    \n    def get_closest_empty_seat(x_r, x_c):\n        min_dist = float('inf')\n        closest_seat = None\n        for r in range(R):\n            for c in range(C):\n                if grid[r][c] == 'L' and (r, c) not in visited:\n                    dist = get_distance(x_r, x_c, r, c)\n                    if dist < min_dist:\n                        min_dist = dist\n                        closest_seat = (r, c)\n        return closest_seat\n    \n    explosions = 0\n    while pq:\n        x_r, x_c = heapq.heappop(pq)\n        closest_seat = get_closest_empty_seat(x_r, x_c)\n        if closest_seat:\n            r, c = closest_seat\n            grid[r][c] = 'X'\n            visited.add((r, c))\n            for dr, dc in directions:\n                nr, nc = r + dr, c + dc\n                if 0 <= nr < R and 0 <= nc < C and (nr, nc) not in visited and grid[nr][nc] == 'L':\n                    heapq.heappush(pq, (nr, nc))\n        else:\n            explosions += 1\n    \n    return explosions\n\n# Read input\ninput = sys.stdin.read\ndata = input().split()\n\nR = int(data[0])\nC = int(data[1])\ngrid = data[2:]\n\n# Calculate and print the result\nprint(min_explosions(R, C, grid))",
+    "code_hash": "aeab2a916e21b7da",
+    "language": "python",
+    "node_id": "n_22_d33116",
+    "revision_id": "rev_n_22_d33116_0",
+    "thought_path_snapshot": [
+      "Use a priority queue to always process the closest available seat first.",
+      "Track visited seats to avoid multiple attempts on the same seat.",
+      "Implement a dynamic programming solution where each state represents the current configuration of the tram and the number of explosions required to reach that state.",
+      "Simulate the seating process using BFS."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 27
+  },
+  {
+    "candidate_id": "cand_b62586aa97",
+    "problem_id": "apps_3230",
+    "code": "import sys\nfrom collections import deque, defaultdict\nimport heapq\n\ndef min_explosions(R, C, tram):\n    directions = [(-1, 0), (1, 0), (0, -1), (0, 1)]\n    pq = []\n    visited = set()\n    \n    # Initialize the priority queue with all rude passengers\n    for r in range(R):\n        for c in range(C):\n            if tram[r][c] == 'X':\n                heapq.heappush(pq, (r, c))\n    \n    def euclidean_distance(r1, c1, r2, c2):\n        return ((r1 - r2) ** 2 + (c1 - c2) ** 2) ** 0.5\n    \n    def find_closest_seat(x_r, x_c):\n        min_dist = float('inf')\n        closest_seat = None\n        for r in range(R):\n            for c in range(C):\n                if tram[r][c] == 'L' and (r, c) not in visited:\n                    dist = euclidean_distance(x_r, x_c, r, c)\n                    if dist < min_dist:\n                        min_dist = dist\n                        closest_seat = (r, c)\n        return closest_seat\n    \n    explosions = 0\n    while pq:\n        x_r, x_c = heapq.heappop(pq)\n        closest_seat = find_closest_seat(x_r, x_c)\n        if closest_seat:\n            visited.add(closest_seat)\n        else:\n            explosions += 1\n    \n    return explosions\n\n# Read input\ninput = sys.stdin.read\ndata = input().split()\n\nR = int(data[0])\nC = int(data[1])\ntram = data[2:]\n\n# Calculate and print the result\nprint(min_explosions(R, C, tram))",
+    "code_hash": "6399492a06beaa8a",
+    "language": "python",
+    "node_id": "n_22_d33116",
+    "revision_id": "rev_n_22_d33116_1",
+    "thought_path_snapshot": [
+      "Use a priority queue to always process the closest available seat first.",
+      "Track visited seats to avoid multiple attempts on the same seat.",
+      "Implement a dynamic programming solution where each state represents the current configuration of the tram and the number of explosions required to reach that state.",
+      "Thought-4: Instead of simulating the seating process using BFS, use a greedy approach to always assign the closest available seat to the nearest rude passenger. This ensures that we minimize the number of conflicts and thus the number of explosions."
+    ],
+    "origin": "rethink",
+    "generation_record_id": null,
+    "created_sequence": 28
+  }
+]

@@ -1,0 +1,511 @@
+[
+  {
+    "candidate_id": "cand_32066a671b",
+    "problem_id": "apps_3214",
+    "code": "import sys\n\ndef generate_transformations(word):\n    transformations = set()\n    n = len(word)\n    \n    # Delete a single character\n    for i in range(n):\n        transformations.add(word[:i] + word[i+1:])\n    \n    # Insert a single alphabetic character\n    for i in range(n + 1):\n        for char in 'abcdefghijklmnopqrstuvwxyz':\n            transformations.add(word[:i] + char + word[i:])\n    \n    # Replace a single character by a different alphabetic character\n    for i in range(n):\n        for char in 'abcdefghijklmnopqrstuvwxyz':\n            if char != word[i]:\n                transformations.add(word[:i] + char + word[i+1:])\n    \n    # Transpose (exchange) any two adjacent characters\n    for i in range(n - 1):\n        transformations.add(word[:i] + word[i+1] + word[i] + word[i+2:])\n    \n    return transformations\n\ndef find_similar_words(text):\n    words = []\n    current_word = ''\n    for char in text:\n        if char.isalpha():\n            current_word += char.lower()\n        elif current_word:\n            words.append(current_word)\n            current_word = ''\n    if current_word:\n        words.append(current_word)\n    \n    similar_words_dict = {}\n    for word in words:\n        transformations = generate_transformations(word)\n        for transformed_word in transformations:\n            if transformed_word in words and transformed_word != word:\n                if word not in similar_words_dict:\n                    similar_words_dict[word] = set()\n                similar_words_dict[word].add(transformed_word)\n    \n    sorted_keys = sorted(similar_words_dict.keys())\n    result = []\n    for key in sorted_keys:\n        result.append(f\"{key}: {' '.join(sorted(similar_words_dict[key]))}\")\n    \n    return result\n\nif __name__ == \"__main__\":\n    text = \"\"\n    for line in sys.stdin:\n        if line.strip() == \"***\":\n            break\n        text += line\n    \n    result = find_similar_words(text)\n    if result:\n        for line in result:\n            print(line)\n    else:\n        print(\"***\")",
+    "code_hash": "c784b1a7706f9593",
+    "language": "python",
+    "node_id": "n_1_befc98",
+    "revision_id": "rev_n_1_befc98_0",
+    "thought_path_snapshot": [
+      "Develop a function to generate all possible transformations of a given word core based on the allowed operations (delete, insert, replace, transpose)."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 1
+  },
+  {
+    "candidate_id": "cand_d962919d1f",
+    "problem_id": "apps_3214",
+    "code": "import sys\n\ndef get_word_cores(word):\n    return ''.join(filter(str.isalpha, word)).lower()\n\ndef generate_transformations(core):\n    transformations = set()\n    n = len(core)\n    for i in range(n + 1):\n        for char in 'abcdefghijklmnopqrstuvwxyz':\n            transformations.add(core[:i] + char + core[i:])\n        if i > 0:\n            transformations.add(core[:i-1] + core[i])\n        if i < n:\n            transformations.add(core[:i+1] + core[i] + core[i+2:])\n        if i > 0 and i < n:\n            transformations.add(core[:i-1] + core[i+1] + core[i] + core[i+2:])\n    return transformations\n\ndef find_similarly_spelled_words(text):\n    word_cores = {}\n    for line in text.split('\\n'):\n        for word in line.split():\n            core = get_word_cores(word)\n            if core not in word_cores:\n                word_cores[core] = set()\n            transformations = generate_transformations(core)\n            for transformation in transformations:\n                if transformation != core and transformation in word_cores:\n                    word_cores[core].update(word_cores[transformation])\n                    word_cores[transformation].add(core)\n    return {k: sorted(v) for k, v in word_cores.items() if len(v) > 0}\n\ndef main():\n    text = ''\n    for line in sys.stdin:\n        if line.strip() == '***':\n            break\n        text += line\n    result = find_similarly_spelled_words(text)\n    for core, similar_cores in sorted(result.items()):\n        print(f\"{core}: {' '.join(similar_cores)}\")\n\nif __name__ == \"__main__\":\n    main()",
+    "code_hash": "61de9032361cdb76",
+    "language": "python",
+    "node_id": "n_2_f4e226",
+    "revision_id": "rev_n_2_f4e226_0",
+    "thought_path_snapshot": [
+      "Create a dictionary to store sets of word cores that are similarly spelled. Iterate through each word in the input, compute its transformations, and update the dictionary accordingly."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 2
+  },
+  {
+    "candidate_id": "cand_66a9d50226",
+    "problem_id": "apps_3214",
+    "code": "import sys\n\ndef get_word_cores(text):\n    import re\n    return set(re.findall(r'\\b[a-zA-Z]+\\b', text.lower()))\n\ndef generate_transformations(word_core):\n    transformations = set()\n    for i in range(len(word_core)):\n        transformations.add(word_core[:i] + word_core[i+1:])\n        for char in 'abcdefghijklmnopqrstuvwxyz':\n            transformations.add(word_core[:i] + char + word_core[i+1:])\n            transformations.add(word_core[:i+1] + char + word_core[i+2:] if i < len(word_core) - 1 else word_core[:i+1] + char)\n    for i in range(len(word_core) - 1):\n        transformations.add(word_core[:i] + word_core[i+1] + word_core[i] + word_core[i+2:])\n    return transformations\n\ndef find_similarly_spelled_words(word_cores):\n    similar_words = {}\n    for word_core in word_cores:\n        transformations = generate_transformations(word_core)\n        for transformation in transformations:\n            if transformation in word_cores and transformation != word_core:\n                if word_core not in similar_words:\n                    similar_words[word_core] = set()\n                similar_words[word_core].add(transformation)\n    return {word_core: sorted(similar_words[word_core]) for word_core in sorted(similar_words)}\n\ndef main():\n    word_cores = set()\n    for line in sys.stdin:\n        if line.strip() == \"***\":\n            break\n        word_cores.update(get_word_cores(line))\n    \n    similar_words = find_similarly_spelled_words(word_cores)\n    \n    if not similar_words:\n        print(\"***\")\n    else:\n        for word_core, similar_list in similar_words.items():\n            print(f\"{word_core}: {' '.join(similar_list)}\")\n\nif __name__ == \"__main__\":\n    main()",
+    "code_hash": "41fa1ba6f278eab6",
+    "language": "python",
+    "node_id": "n_2_f4e226",
+    "revision_id": "rev_n_2_f4e226_1",
+    "thought_path_snapshot": [
+      "Thought-1 (revised): To avoid the `IndexError` during the generation of transformations, ensure that the indices used in slicing operations do not go out of bounds. Specifically, check that `i-1`, `i+1`, and `i+2` are within the valid range before performing these operations. This can be done by adding conditional checks before accessing these indices. Additionally, consider using a more efficient method to generate transformations that avoids unnecessary computations and reduces the risk of errors."
+    ],
+    "origin": "rethink",
+    "generation_record_id": null,
+    "created_sequence": 3
+  },
+  {
+    "candidate_id": "cand_0e8e783b94",
+    "problem_id": "apps_3214",
+    "code": "import sys\n\ndef get_word_cores(text):\n    import re\n    return set(re.findall(r'\\b[a-zA-Z]+\\b', text.lower()))\n\ndef generate_similar(word_core):\n    similar_words = set()\n    for i in range(len(word_core)):\n        similar_words.add(word_core[:i] + word_core[i+1:])\n    for i in range(len(word_core) + 1):\n        for char in 'abcdefghijklmnopqrstuvwxyz':\n            similar_words.add(word_core[:i] + char + word_core[i:])\n    for i in range(len(word_core) - 1):\n        similar_words.add(word_core[:i] + word_core[i+1] + word_core[i] + word_core[i+2:])\n    return similar_words\n\ndef main():\n    word_cores = set()\n    similar_dict = {}\n    \n    for line in sys.stdin:\n        if line.strip() == \"***\":\n            break\n        word_cores.update(get_word_cores(line))\n    \n    for word_core in word_cores:\n        similar_words = generate_similar(word_core)\n        for sim_word in similar_words:\n            if sim_word != word_core and sim_word in word_cores:\n                if word_core not in similar_dict:\n                    similar_dict[word_core] = set()\n                similar_dict[word_core].add(sim_word)\n    \n    for word_core in sorted(similar_dict.keys()):\n        print(f\"{word_core}: {' '.join(sorted(similar_dict[word_core]))}\")\n\nif __name__ == \"__main__\":\n    main()",
+    "code_hash": "34ca701c5ec13068",
+    "language": "python",
+    "node_id": "n_3_9df472",
+    "revision_id": "rev_n_3_9df472_0",
+    "thought_path_snapshot": [
+      "After processing all input, sort the keys of the dictionary alphabetically and print each key along with its associated set of similarly spelled word cores."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 4
+  },
+  {
+    "candidate_id": "cand_42ad0c1830",
+    "problem_id": "apps_3214",
+    "code": "import sys\n\ndef get_word_cores(word):\n    return ''.join(filter(str.isalpha, word)).lower()\n\ndef generate_similar_words(core):\n    similar_words = set()\n    n = len(core)\n    for i in range(n + 1):\n        for char in 'abcdefghijklmnopqrstuvwxyz':\n            similar_words.add(core[:i] + char + core[i:])\n            if i < n:\n                similar_words.add(core[:i] + char + core[i+1:])\n    for i in range(n):\n        for j in range(i + 1, n):\n            similar_words.add(core[:i] + core[j] + core[i+1:j] + core[i] + core[j+1:])\n    return similar_words\n\ndef main():\n    word_cores = {}\n    for line in sys.stdin:\n        if line.strip() == \"***\":\n            break\n        words = line.split()\n        for word in words:\n            core = get_word_cores(word)\n            if core not in word_cores:\n                word_cores[core] = set()\n            for similar_core in generate_similar_words(core):\n                if similar_core != core and similar_core in word_cores:\n                    word_cores[core].update(word_cores[similar_core])\n                    word_cores[similar_core].add(core)\n\n    for core in sorted(word_cores.keys()):\n        if word_cores[core]:\n            print(f\"{core}: {' '.join(sorted(word_cores[core]))}\")\n\nif __name__ == \"__main__\":\n    main()",
+    "code_hash": "eb43337d65a0c20d",
+    "language": "python",
+    "node_id": "n_3_9df472",
+    "revision_id": "rev_n_3_9df472_1",
+    "thought_path_snapshot": [
+      "Thought-1 (revised): After processing all input, sort the keys of the dictionary alphabetically and print each key along with its associated set of similarly spelled word cores. Ensure that the sets of similarly spelled words are also sorted before printing them to maintain consistency."
+    ],
+    "origin": "rethink",
+    "generation_record_id": null,
+    "created_sequence": 5
+  },
+  {
+    "candidate_id": "cand_8e6bae1ca2",
+    "problem_id": "apps_3214",
+    "code": "import sys\n\ndef generate_transformations(word):\n    transformations = set()\n    n = len(word)\n    \n    # Delete a single character\n    for i in range(n):\n        transformations.add(word[:i] + word[i+1:])\n    \n    # Insert a single alphabetic character\n    for i in range(n + 1):\n        for char in 'abcdefghijklmnopqrstuvwxyz':\n            transformations.add(word[:i] + char + word[i:])\n    \n    # Replace a single character by a different alphabetic character\n    for i in range(n):\n        for char in 'abcdefghijklmnopqrstuvwxyz':\n            if char != word[i]:\n                transformations.add(word[:i] + char + word[i+1:])\n    \n    # Transpose (exchange) any two adjacent characters\n    for i in range(n - 1):\n        transformations.add(word[:i] + word[i+1] + word[i] + word[i+2:])\n    \n    return transformations\n\ndef find_similarly_spelled_words(text):\n    word_dict = {}\n    words = text.split()\n    \n    for word in words:\n        core = ''.join(filter(str.isalpha, word)).lower()\n        transformations = generate_transformations(core)\n        \n        for transform in transformations:\n            if transform in word_dict:\n                word_dict[transform].add(core)\n            else:\n                word_dict[transform] = {core}\n    \n    result = []\n    for key in sorted(word_dict.keys()):\n        value = sorted(list(word_dict[key]))\n        result.append(f\"{key}: {' '.join(value)}\")\n    \n    return result\n\nif __name__ == \"__main__\":\n    text = \"\"\n    for line in sys.stdin:\n        if line.strip() == \"***\":\n            break\n        text += line\n    \n    result = find_similarly_spelled_words(text)\n    if result:\n        for line in result:\n            print(line)\n    else:\n        print(\"***\")",
+    "code_hash": "48fbe85b214e1483",
+    "language": "python",
+    "node_id": "n_4_17bcae",
+    "revision_id": "rev_n_4_17bcae_0",
+    "thought_path_snapshot": [
+      "Develop a function to generate all possible transformations of a given word core based on the allowed operations (delete, insert, replace, transpose).",
+      "Develop a dictionary to store word cores and their similarly spelled words. For each word core encountered, generate its transformations and check if they exist in the dictionary. If so, update the dictionary accordingly."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 6
+  },
+  {
+    "candidate_id": "cand_4f222072f1",
+    "problem_id": "apps_3214",
+    "code": "import sys\n\ndef get_word_cores(text):\n    import re\n    return set(re.findall(r'\\b[a-zA-Z]+\\b', text.lower()))\n\ndef get_transformations(word_core):\n    alphabet = 'abcdefghijklmnopqrstuvwxyz'\n    transformations = set()\n    \n    # Delete a single character\n    for i in range(len(word_core)):\n        transformations.add(word_core[:i] + word_core[i+1:])\n    \n    # Insert a single alphabetic character\n    for i in range(len(word_core) + 1):\n        for char in alphabet:\n            transformations.add(word_core[:i] + char + word_core[i:])\n    \n    # Replace a single character by a different alphabetic character\n    for i in range(len(word_core)):\n        for char in alphabet:\n            if char != word_core[i]:\n                transformations.add(word_core[:i] + char + word_core[i+1:])\n    \n    # Transpose (exchange) any two adjacent characters\n    for i in range(len(word_core) - 1):\n        transformations.add(word_core[:i] + word_core[i+1] + word_core[i] + word_core[i+2:])\n    \n    return transformations\n\ndef find_similarly_spelled_words(input_text):\n    word_cores = get_word_cores(input_text)\n    transformed_word_cores = {}\n    \n    for word_core in word_cores:\n        transformations = get_transformations(word_core)\n        for transformation in transformations:\n            if transformation in word_cores:\n                if word_core not in transformed_word_cores:\n                    transformed_word_cores[word_core] = set()\n                transformed_word_cores[word_core].add(transformation)\n    \n    result = []\n    for word_core, similar_cores in sorted(transformed_word_cores.items()):\n        result.append(f\"{word_core}: {' '.join(sorted(similar_cores))}\")\n    \n    return result\n\nif __name__ == \"__main__\":\n    input_text = \"\"\n    for line in sys.stdin:\n        if line.strip() == \"***\":\n            break\n        input_text += line\n    \n    result = find_similarly_spelled_words(input_text)\n    if result:\n        for line in result:\n            print(line)\n    else:\n        print(\"***\")",
+    "code_hash": "84f83fde0217bdfb",
+    "language": "python",
+    "node_id": "n_4_17bcae",
+    "revision_id": "rev_n_4_17bcae_1",
+    "thought_path_snapshot": [
+      "Develop a function to generate all possible transformations of a given word core based on the allowed operations (delete, insert, replace, transpose).",
+      "Thought-2: Instead of generating all transformations for each word and checking them against the entire dictionary, preprocess the input text to create a dictionary where keys are word cores and values are sets of words that share the same core. This way, when processing each word, only its core needs to be checked against the preprocessed dictionary, significantly reducing the number of unnecessary transformations and checks."
+    ],
+    "origin": "rethink",
+    "generation_record_id": null,
+    "created_sequence": 7
+  },
+  {
+    "candidate_id": "cand_f1f9612435",
+    "problem_id": "apps_3214",
+    "code": "import sys\n\nclass TrieNode:\n    def __init__(self):\n        self.children = {}\n        self.is_end_of_word = False\n        self.similar_words = set()\n\ndef insert(trie, word):\n    node = trie\n    for char in word:\n        if char not in node.children:\n            node.children[char] = TrieNode()\n        node = node.children[char]\n    node.is_end_of_word = True\n\ndef delete(word, i):\n    return word[:i] + word[i+1:]\n\ndef insert_char(word, i, char):\n    return word[:i] + char + word[i:]\n\ndef replace_char(word, i, char):\n    return word[:i] + char + word[i+1:]\n\ndef transpose(word, i):\n    if i + 1 < len(word):\n        return word[:i] + word[i+1] + word[i] + word[i+2:]\n    return word\n\ndef get_similar_words(trie, word):\n    node = trie\n    for char in word:\n        if char not in node.children:\n            return []\n        node = node.children[char]\n    \n    def dfs(node, prefix):\n        if node.is_end_of_word:\n            node.similar_words.add(prefix)\n        \n        for char in node.children:\n            dfs(node.children[char], prefix + char)\n    \n    dfs(node, word)\n    return sorted(list(node.similar_words))\n\ndef main():\n    trie = TrieNode()\n    for line in sys.stdin:\n        if line.strip() == \"***\":\n            break\n        words = line.split()\n        for word in words:\n            word = ''.join(filter(str.isalpha, word)).lower()\n            insert(trie, word)\n    \n    results = []\n    for line in sys.stdin:\n        if line.strip() == \"***\":\n            break\n        words = line.split()\n        for word in words:\n            word = ''.join(filter(str.isalpha, word)).lower()\n            similar_words = get_similar_words(trie, word)\n            if similar_words:\n                results.append(f\"{word}: {' '.join(similar_words)}\")\n    \n    if not results:\n        print(\"***\")\n    else:\n        for result in sorted(results):\n            print(result)\n\nif __name__ == \"__main__\":\n    main()",
+    "code_hash": "d9d545c33d979a1d",
+    "language": "python",
+    "node_id": "n_5_6c593f",
+    "revision_id": "rev_n_5_6c593f_0",
+    "thought_path_snapshot": [
+      "Develop a function to generate all possible transformations of a given word core based on the allowed operations (delete, insert, replace, transpose).",
+      "Use a Trie data structure to efficiently store and query word cores and their transformations. Traverse the Trie to find all words that can be transformed into the current word core through the allowed operations."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 8
+  },
+  {
+    "candidate_id": "cand_d99ba5f4ec",
+    "problem_id": "apps_3214",
+    "code": "import sys\n\ndef get_word_cores(text):\n    import re\n    return set(re.findall(r'\\b[a-zA-Z]+\\b', text.lower()))\n\ndef get_transformations(word_core):\n    transformations = set()\n    n = len(word_core)\n    for i in range(n + 1):\n        for char in 'abcdefghijklmnopqrstuvwxyz':\n            transformations.add(word_core[:i] + char + word_core[i:])\n        if i < n:\n            transformations.add(word_core[:i] + word_core[i+1])\n            transformations.add(word_core[:i] + word_core[i+1] + word_core[i])\n    return transformations\n\ndef find_similar_words(word_cores, word_dict):\n    similar_words = {}\n    for word_core in word_cores:\n        transformations = get_transformations(word_core)\n        similar_words[word_core] = sorted([w for w in word_dict[word_core] if w != word_core and w in transformations])\n    return similar_words\n\ndef main():\n    word_dict = {}\n    for line in sys.stdin:\n        if line.strip() == \"***\":\n            break\n        for word in get_word_cores(line):\n            if word not in word_dict:\n                word_dict[word] = {word}\n            else:\n                word_dict[word].add(word)\n\n    similar_words = find_similar_words(get_word_cores(''.join(sys.stdin)), word_dict)\n\n    for word_core, words in sorted(similar_words.items()):\n        if words:\n            print(f\"{word_core}: {' '.join(words)}\")\n\nif __name__ == \"__main__\":\n    main()",
+    "code_hash": "98eeb38defd27794",
+    "language": "python",
+    "node_id": "n_5_6c593f",
+    "revision_id": "rev_n_5_6c593f_1",
+    "thought_path_snapshot": [
+      "Develop a function to generate all possible transformations of a given word core based on the allowed operations (delete, insert, replace, transpose).",
+      "Thought-2: Instead of using a Trie to store and query word cores directly, preprocess the input text to create a dictionary where keys are word cores and values are sets of words that share the same core. This approach simplifies finding similar words by checking if a transformed version of a word exists in the dictionary."
+    ],
+    "origin": "rethink",
+    "generation_record_id": null,
+    "created_sequence": 9
+  },
+  {
+    "candidate_id": "cand_484a4ae231",
+    "problem_id": "apps_3214",
+    "code": "import sys\n\ndef generate_transformations(word):\n    transformations = set()\n    n = len(word)\n    for i in range(n + 1):\n        for char in 'abcdefghijklmnopqrstuvwxyz':\n            transformations.add(word[:i] + char + word[i:])\n            if i < n:\n                transformations.add(word[:i] + char + word[i+1:])\n                transformations.add(word[:i] + word[i+1] + char + word[i+2:] if i + 2 < n else word[:i] + word[i+1] + char)\n    for i in range(n):\n        for j in range(i + 1, n):\n            transformations.add(word[:i] + word[j] + word[i+1:j] + word[i] + word[j+1:])\n    return transformations\n\ndef min_edit_distance(word1, word2):\n    m, n = len(word1), len(word2)\n    dp = [[0] * (n + 1) for _ in range(m + 1)]\n    for i in range(m + 1):\n        dp[i][0] = i\n    for j in range(n + 1):\n        dp[0][j] = j\n    for i in range(1, m + 1):\n        for j in range(1, n + 1):\n            cost = 0 if word1[i-1] == word2[j-1] else 1\n            dp[i][j] = min(dp[i-1][j] + 1, dp[i][j-1] + 1, dp[i-1][j-1] + cost)\n    return dp[m][n]\n\ndef find_similarly_spelled_words(text):\n    words = [word.lower() for word in text.split() if any(char.isalpha() for char in word)]\n    word_cores = {word.replace(non_alpha, '').lower() for word in words for non_alpha in '!@#$%^&*()-_=+[]{}|;:,.<>?/`~'}\n    similar_words = {}\n    \n    for word_core in sorted(word_cores):\n        transformations = generate_transformations(word_core)\n        for transformation in transformations:\n            if transformation in word_cores and transformation != word_core:\n                if word_core not in similar_words:\n                    similar_words[word_core] = set()\n                similar_words[word_core].add(transformation)\n    \n    for word_core in sorted(similar_words.keys()):\n        print(f\"{word_core}: {' '.join(sorted(similar_words[word_core]))}\")\n\nif __name__ == \"__main__\":\n    text = \"\"\n    for line in sys.stdin:\n        if line.strip() == \"***\":\n            break\n        text += line.strip() + \" \"\n    find_similarly_spelled_words(text)",
+    "code_hash": "ce245515c28bb556",
+    "language": "python",
+    "node_id": "n_6_9e6be4",
+    "revision_id": "rev_n_6_9e6be4_0",
+    "thought_path_snapshot": [
+      "Develop a function to generate all possible transformations of a given word core based on the allowed operations (delete, insert, replace, transpose).",
+      "Implement a dynamic programming approach to calculate the minimum edit distance between the current word core and all other word cores. If the distance is 1, consider them similarly spelled and add them to the result list."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 10
+  },
+  {
+    "candidate_id": "cand_48bba9f950",
+    "problem_id": "apps_3214",
+    "code": "import sys\n\nclass TrieNode:\n    def __init__(self):\n        self.children = {}\n        self.is_end_of_word = False\n\nclass Trie:\n    def __init__(self):\n        self.root = TrieNode()\n\n    def insert(self, word):\n        node = self.root\n        for char in word:\n            if char not in node.children:\n                node.children[char] = TrieNode()\n            node = node.children[char]\n        node.is_end_of_word = True\n\n    def search(self, word):\n        node = self.root\n        for char in word:\n            if char not in node.children:\n                return False\n            node = node.children[char]\n        return node.is_end_of_word\n\ndef get_transformations(word):\n    transformations = set()\n    n = len(word)\n    for i in range(n + 1):\n        for j in range(26):\n            new_char = chr(ord('a') + j)\n            if i < n:\n                transformations.add(word[:i] + new_char + word[i+1:])\n            if i > 0:\n                transformations.add(word[:i-1] + new_char + word[i:])\n            if i < n - 1:\n                transformations.add(word[:i] + new_char + word[i+1])\n            if i < n - 1:\n                transformations.add(word[:i] + word[i+1] + new_char + word[i+2:])\n    for i in range(n - 1):\n        transformations.add(word[:i] + word[i+1] + word[i] + word[i+2:])\n    return transformations\n\ndef find_similar_words(text):\n    words = []\n    current_word = \"\"\n    for char in text:\n        if char.isalpha():\n            current_word += char.lower()\n        elif current_word:\n            words.append(current_word)\n            current_word = \"\"\n    if current_word:\n        words.append(current_word)\n\n    trie = Trie()\n    for word in words:\n        trie.insert(word)\n\n    similar_words = {}\n    for word in words:\n        transformations = get_transformations(word)\n        found_similar = False\n        for transform in transformations:\n            if trie.search(transform):\n                if word not in similar_words:\n                    similar_words[word] = set()\n                similar_words[word].add(transform)\n                found_similar = True\n        if not found_similar:\n            if word not in similar_words:\n                similar_words[word] = set()\n\n    result = sorted(similar_words.items())\n    for word, similars in result:\n        if similars:\n            print(f\"{word}: {' '.join(sorted(similars))}\")\n\nif __name__ == \"__main__\":\n    text = \"\"\n    for line in sys.stdin:\n        if line.strip() == \"***\":\n            break\n        text += line.strip() + \" \"\n    find_similar_words(text)",
+    "code_hash": "137d49700d8e1b1b",
+    "language": "python",
+    "node_id": "n_6_9e6be4",
+    "revision_id": "rev_n_6_9e6be4_1",
+    "thought_path_snapshot": [
+      "Develop a function to generate all possible transformations of a given word core based on the allowed operations (delete, insert, replace, transpose).",
+      "Thought-2 (revised): Instead of generating all possible transformations and checking each one individually, implement a more efficient method using a Trie data structure to store all valid word cores. Then, for each word core, perform a depth-first search (DFS) to explore all possible transformations within a single edit distance. This approach ensures that only valid transformations are considered, avoiding unnecessary computations and potential errors."
+    ],
+    "origin": "rethink",
+    "generation_record_id": null,
+    "created_sequence": 11
+  },
+  {
+    "candidate_id": "cand_4fbf67c471",
+    "problem_id": "apps_3214",
+    "code": "import sys\n\ndef get_word_cores(text):\n    import re\n    return set(re.findall(r'\\b[a-zA-Z]+\\b', text.lower()))\n\ndef get_transformations(word_core):\n    alphabet = 'abcdefghijklmnopqrstuvwxyz'\n    transformations = set()\n    \n    # Delete a single character\n    for i in range(len(word_core)):\n        transformations.add(word_core[:i] + word_core[i+1:])\n    \n    # Insert a single alphabetic character\n    for i in range(len(word_core) + 1):\n        for char in alphabet:\n            transformations.add(word_core[:i] + char + word_core[i:])\n    \n    # Replace a single character by a different alphabetic character\n    for i in range(len(word_core)):\n        for char in alphabet:\n            if char != word_core[i]:\n                transformations.add(word_core[:i] + char + word_core[i+1:])\n    \n    # Transpose (exchange) any two adjacent characters\n    for i in range(len(word_core) - 1):\n        transformations.add(word_core[:i] + word_core[i+1] + word_core[i] + word_core[i+2:])\n    \n    return transformations\n\ndef find_similarly_spelled_words(input_text):\n    word_cores = get_word_cores(input_text)\n    transformed_word_cores = {}\n    \n    for word_core in word_cores:\n        transformations = get_transformations(word_core)\n        for transform in transformations:\n            if transform in word_cores:\n                if word_core not in transformed_word_cores:\n                    transformed_word_cores[word_core] = set()\n                transformed_word_cores[word_core].add(transform)\n    \n    result = []\n    for word_core, similar_cores in sorted(transformed_word_cores.items()):\n        result.append(f\"{word_core}: {' '.join(sorted(similar_cores))}\")\n    \n    return result\n\nif __name__ == \"__main__\":\n    input_text = \"\"\n    for line in sys.stdin:\n        if line.strip() == \"***\":\n            break\n        input_text += line\n    \n    result = find_similarly_spelled_words(input_text)\n    if result:\n        for line in result:\n            print(line)\n    else:\n        print(\"***\")",
+    "code_hash": "80a827244fbe8069",
+    "language": "python",
+    "node_id": "n_7_ea1d8a",
+    "revision_id": "rev_n_7_ea1d8a_0",
+    "thought_path_snapshot": [
+      "Develop a function to generate all possible transformations of a given word core based on the allowed operations (delete, insert, replace, transpose).",
+      "Thought-2: Instead of generating all transformations for each word and checking them against the entire dictionary, preprocess the input text to create a dictionary where keys are word cores and values are sets of words that share the same core. This way, when processing each word, only its core needs to be checked against the preprocessed dictionary, significantly reducing the number of unnecessary transformations and checks.",
+      "Refine the transformation logic to ensure it handles edge cases and maintains efficiency."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 12
+  },
+  {
+    "candidate_id": "cand_007c5c92f1",
+    "problem_id": "apps_3214",
+    "code": "import sys\n\ndef generate_transformations(word):\n    transformations = set()\n    n = len(word)\n    \n    # Delete a single character\n    for i in range(n):\n        transformations.add(word[:i] + word[i+1:])\n    \n    # Insert a single alphabetic character\n    for i in range(n + 1):\n        for char in 'abcdefghijklmnopqrstuvwxyz':\n            transformations.add(word[:i] + char + word[i:])\n    \n    # Replace a single character by a different alphabetic character\n    for i in range(n):\n        for char in 'abcdefghijklmnopqrstuvwxyz':\n            if char != word[i]:\n                transformations.add(word[:i] + char + word[i+1:])\n    \n    # Transpose any two adjacent characters\n    for i in range(n - 1):\n        transformations.add(word[:i] + word[i+1] + word[i] + word[i+2:])\n    \n    return transformations\n\ndef main():\n    word_cores = {}\n    for line in sys.stdin:\n        if line.strip() == \"***\":\n            break\n        words = line.split()\n        for word in words:\n            core = ''.join(filter(str.isalpha, word)).lower()\n            if core not in word_cores:\n                word_cores[core] = set()\n            word_cores[core].add(word)\n    \n    results = []\n    for core, words in sorted(word_cores.items()):\n        if len(words) > 1:\n            transformed_words = set()\n            for word in words:\n                transformations = generate_transformations(core)\n                for t_word in transformations:\n                    if t_word in word_cores and t_word != core:\n                        transformed_words.add(t_word)\n            results.append(f\"{core}: {' '.join(sorted(transformed_words))}\")\n    \n    if not results:\n        print(\"***\")\n    else:\n        for result in results:\n            print(result)\n\nif __name__ == \"__main__\":\n    main()",
+    "code_hash": "5fd266ffed099b9e",
+    "language": "python",
+    "node_id": "n_7_ea1d8a",
+    "revision_id": "rev_n_7_ea1d8a_1",
+    "thought_path_snapshot": [
+      "Develop a function to generate all possible transformations of a given word core based on the allowed operations (delete, insert, replace, transpose).",
+      "Thought-2: Instead of generating all transformations for each word and checking them against the entire dictionary, preprocess the input text to create a dictionary where keys are word cores and values are sets of words that share the same core. This way, when processing each word, only its core needs to be checked against the preprocessed dictionary, significantly reducing the number of unnecessary transformations and checks.",
+      "Refine the transformation logic to handle edge cases and maintain efficiency by ensuring that transformations do not produce invalid words (e.g., words with non-alphabetic characters). Additionally, optimize the comparison of transformations with the original word cores to avoid redundant checks and improve performance."
+    ],
+    "origin": "rethink",
+    "generation_record_id": null,
+    "created_sequence": 13
+  },
+  {
+    "candidate_id": "cand_bedaf9c33e",
+    "problem_id": "apps_3214",
+    "code": "import sys\n\ndef get_word_cores(text):\n    import re\n    return set(re.findall(r'\\b[a-zA-Z]+\\b', text.lower()))\n\ndef get_transformations(word_core):\n    transformations = set()\n    n = len(word_core)\n    for i in range(n + 1):\n        for char in 'abcdefghijklmnopqrstuvwxyz':\n            transformations.add(word_core[:i] + char + word_core[i:])\n        if i < n:\n            transformations.add(word_core[:i] + word_core[i+1])\n            transformations.add(word_core[:i] + word_core[i+1] + word_core[i])\n    return transformations\n\ndef find_similar_words(word_cores, word_core):\n    transformations = get_transformations(word_core)\n    similar_words = [core for core in word_cores if core in transformations]\n    return sorted(similar_words)\n\ndef main():\n    word_cores = set()\n    for line in sys.stdin:\n        if line.strip() == \"***\":\n            break\n        word_cores.update(get_word_cores(line))\n    \n    results = {}\n    for word_core in word_cores:\n        similar_words = find_similar_words(word_cores, word_core)\n        if similar_words:\n            results[word_core] = similar_words\n    \n    for word_core, similar_words in sorted(results.items()):\n        print(f\"{word_core}: {' '.join(similar_words)}\")\n\nif __name__ == \"__main__\":\n    main()",
+    "code_hash": "78408d80ac32c063",
+    "language": "python",
+    "node_id": "n_11_f9cda8",
+    "revision_id": "rev_n_11_f9cda8_0",
+    "thought_path_snapshot": [
+      "Develop a function to generate all possible transformations of a given word core based on the allowed operations (delete, insert, replace, transpose).",
+      "Thought-2: Instead of using a Trie to store and query word cores directly, preprocess the input text to create a dictionary where keys are word cores and values are sets of words that share the same core. This approach simplifies finding similar words by checking if a transformed version of a word exists in the dictionary.",
+      "Check the implementation of the similarity check function."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 14
+  },
+  {
+    "candidate_id": "cand_2a1ec5bee7",
+    "problem_id": "apps_3214",
+    "code": "import sys\n\ndef generate_transformations(word):\n    transformations = set()\n    n = len(word)\n    \n    # Delete a single character\n    for i in range(n):\n        transformations.add(word[:i] + word[i+1:])\n    \n    # Insert a single alphabetic character\n    for i in range(n + 1):\n        for char in 'abcdefghijklmnopqrstuvwxyz':\n            transformations.add(word[:i] + char + word[i:])\n    \n    # Replace a single character by a different alphabetic character\n    for i in range(n):\n        for char in 'abcdefghijklmnopqrstuvwxyz':\n            if char != word[i]:\n                transformations.add(word[:i] + char + word[i+1:])\n    \n    # Transpose any two adjacent characters\n    for i in range(n - 1):\n        transformations.add(word[:i] + word[i+1] + word[i] + word[i+2:])\n    \n    return transformations\n\ndef main():\n    word_dict = {}\n    for line in sys.stdin:\n        if line.strip() == \"***\":\n            break\n        words = line.split()\n        for word in words:\n            core = ''.join(filter(str.isalpha, word)).lower()\n            if core not in word_dict:\n                word_dict[core] = set()\n            word_dict[core].add(word)\n    \n    results = []\n    for core, words in sorted(word_dict.items()):\n        if len(words) > 1:\n            transformations = set()\n            for word in words:\n                transformations.update(generate_transformations(core))\n            similar_cores = sorted(transformations.intersection(word_dict.keys()))\n            if similar_cores:\n                results.append(f\"{core}: {' '.join(similar_cores)}\")\n    \n    if not results:\n        print(\"***\")\n    else:\n        for result in results:\n            print(result)\n\nif __name__ == \"__main__\":\n    main()",
+    "code_hash": "c200e9d6963bbc9c",
+    "language": "python",
+    "node_id": "n_11_f9cda8",
+    "revision_id": "rev_n_11_f9cda8_1",
+    "thought_path_snapshot": [
+      "Develop a function to generate all possible transformations of a given word core based on the allowed operations (delete, insert, replace, transpose).",
+      "Thought-2: Instead of using a Trie to store and query word cores directly, preprocess the input text to create a dictionary where keys are word cores and values are sets of words that share the same core. This approach simplifies finding similar words by checking if a transformed version of a word exists in the dictionary.",
+      "Thought-3: Ensure that the transformation logic handles edge cases properly, especially when dealing with empty strings or strings of length 1. Specifically, the delete operation should not attempt to access indices beyond the string's length, and the insert operation should handle cases where the insertion point is at the beginning or end of the string. Additionally, consider optimizing the transformation generation to avoid redundant calculations."
+    ],
+    "origin": "rethink",
+    "generation_record_id": null,
+    "created_sequence": 15
+  },
+  {
+    "candidate_id": "cand_8d3b96edbd",
+    "problem_id": "apps_3214",
+    "code": "import sys\n\nclass TrieNode:\n    def __init__(self):\n        self.children = {}\n        self.is_end_of_word = False\n\nclass Trie:\n    def __init__(self):\n        self.root = TrieNode()\n\n    def insert(self, word):\n        node = self.root\n        for char in word:\n            if char not in node.children:\n                node.children[char] = TrieNode()\n            node = node.children[char]\n        node.is_end_of_word = True\n\n    def search(self, word):\n        node = self.root\n        for char in word:\n            if char not in node.children:\n                return False\n            node = node.children[char]\n        return node.is_end_of_word\n\ndef get_transformations(word):\n    transformations = set()\n    n = len(word)\n    \n    # Delete a single character\n    for i in range(n):\n        transformations.add(word[:i] + word[i+1:])\n    \n    # Insert a single alphabetic character\n    for i in range(n + 1):\n        for char in 'abcdefghijklmnopqrstuvwxyz':\n            transformations.add(word[:i] + char + word[i:])\n    \n    # Replace a single character by a different alphabetic character\n    for i in range(n):\n        for char in 'abcdefghijklmnopqrstuvwxyz':\n            if char != word[i]:\n                transformations.add(word[:i] + char + word[i+1:])\n    \n    # Transpose (exchange) any two adjacent characters\n    for i in range(n - 1):\n        transformations.add(word[:i] + word[i+1] + word[i] + word[i+2:])\n    \n    return transformations\n\ndef find_similar_words(text):\n    words = []\n    current_word = ''\n    for char in text:\n        if char.isalpha():\n            current_word += char.lower()\n        elif current_word:\n            words.append(current_word)\n            current_word = ''\n    if current_word:\n        words.append(current_word)\n    \n    trie = Trie()\n    for word in words:\n        trie.insert(word)\n    \n    similar_words_dict = {}\n    for word in words:\n        transformations = get_transformations(word)\n        found_similar = False\n        for transform in transformations:\n            if trie.search(transform):\n                if word not in similar_words_dict:\n                    similar_words_dict[word] = set()\n                similar_words_dict[word].add(transform)\n                found_similar = True\n        if not found_similar:\n            if word not in similar_words_dict:\n                similar_words_dict[word] = set()\n    \n    result = []\n    for word, similars in sorted(similar_words_dict.items()):\n        if similars:\n            result.append(f\"{word}: {' '.join(sorted(similars))}\")\n    \n    if not result:\n        result.append(\"***\")\n    \n    return result\n\nif __name__ == \"__main__\":\n    text = \"\"\n    for line in sys.stdin:\n        if line.strip() == \"***\":\n            break\n        text += line\n    \n    result = find_similar_words(text)\n    for line in result:\n        print(line)",
+    "code_hash": "dd895a5d0a4d1f8d",
+    "language": "python",
+    "node_id": "n_13_e03ea4",
+    "revision_id": "rev_n_13_e03ea4_0",
+    "thought_path_snapshot": [
+      "Develop a function to generate all possible transformations of a given word core based on the allowed operations (delete, insert, replace, transpose).",
+      "Thought-2 (revised): Instead of generating all possible transformations and checking each one individually, implement a more efficient method using a Trie data structure to store all valid word cores. Then, for each word core, perform a depth-first search (DFS) to explore all possible transformations within a single edit distance. This approach ensures that only valid transformations are considered, avoiding unnecessary computations and potential errors.",
+      "Optimize the transformation generation logic."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 16
+  },
+  {
+    "candidate_id": "cand_6627b758f4",
+    "problem_id": "apps_3214",
+    "code": "import sys\nfrom collections import defaultdict, deque\n\ndef generate_transformations(word):\n    transformations = set()\n    n = len(word)\n    \n    # Delete a single character\n    for i in range(n):\n        transformations.add(word[:i] + word[i+1:])\n    \n    # Insert a single alphabetic character\n    for i in range(n + 1):\n        for char in 'abcdefghijklmnopqrstuvwxyz':\n            transformations.add(word[:i] + char + word[i:])\n    \n    # Replace a single character by a different alphabetic character\n    for i in range(n):\n        for char in 'abcdefghijklmnopqrstuvwxyz':\n            if char != word[i]:\n                transformations.add(word[:i] + char + word[i+1:])\n    \n    # Transpose any two adjacent characters\n    for i in range(n - 1):\n        transformations.add(word[:i] + word[i+1] + word[i] + word[i+2:])\n    \n    return transformations\n\ndef find_similar_words(text):\n    words = text.split()\n    word_cores = [word.lower() for word in words if word.isalpha()]\n    trie = defaultdict(set)\n    \n    for word_core in word_cores:\n        trie[word_core].add(word_core)\n    \n    def dfs(current_word, current_path):\n        if current_word in trie:\n            trie[current_word].update(current_path)\n        \n        for i in range(len(current_word)):\n            for char in 'abcdefghijklmnopqrstuvwxyz':\n                new_word = current_word[:i] + char + current_word[i+1:]\n                if new_word in trie:\n                    dfs(new_word, current_path | {new_word})\n        \n        for i in range(len(current_word) - 1):\n            new_word = current_word[:i] + current_word[i+1] + current_word[i] + current_word[i+2:]\n            if new_word in trie:\n                dfs(new_word, current_path | {new_word})\n    \n    for word_core in word_cores:\n        dfs(word_core, {word_core})\n    \n    results = defaultdict(list)\n    for word_core, similar_words in trie.items():\n        if len(similar_words) > 1:\n            results[word_core] = sorted(similar_words - {word_core})\n    \n    return results\n\ndef main():\n    text = \"\"\n    for line in sys.stdin:\n        if line.strip() == \"***\":\n            break\n        text += line\n    \n    results = find_similar_words(text)\n    \n    if not results:\n        print(\"***\")\n    else:\n        for word_core, similar_words in sorted(results.items()):\n            print(f\"{word_core}: {' '.join(similar_words)}\")\n\nif __name__ == \"__main__\":\n    main()",
+    "code_hash": "871488c8848d17f8",
+    "language": "python",
+    "node_id": "n_13_e03ea4",
+    "revision_id": "rev_n_13_e03ea4_1",
+    "thought_path_snapshot": [
+      "Develop a function to generate all possible transformations of a given word core based on the allowed operations (delete, insert, replace, transpose).",
+      "Thought-2 (revised): Instead of generating all possible transformations and checking each one individually, implement a more efficient method using a Trie data structure to store all valid word cores. Then, for each word core, perform a depth-first search (DFS) to explore all possible transformations within a single edit distance. This approach ensures that only valid transformations are considered, avoiding unnecessary computations and potential errors.",
+      "Optimize the transformation generation logic by implementing a breadth-first search (BFS) instead of a depth-first search (DFS). BFS will ensure that all words within a single edit distance are explored before moving on to words with more edits, reducing the number of unnecessary checks and improving efficiency. Additionally, maintain a visited set to avoid processing the same word multiple times, ensuring that each word is only added once to the result dictionary."
+    ],
+    "origin": "rethink",
+    "generation_record_id": null,
+    "created_sequence": 17
+  },
+  {
+    "candidate_id": "cand_890dc8f2cf",
+    "problem_id": "apps_3214",
+    "code": "import sys\n\ndef generate_transformations(word):\n    transformations = set()\n    n = len(word)\n    for i in range(n + 1):\n        # Delete a single character\n        if i > 0:\n            transformations.add(word[:i-1] + word[i:])\n        # Insert a single alphabetic character\n        for char in 'abcdefghijklmnopqrstuvwxyz':\n            transformations.add(word[:i] + char + word[i:])\n        # Replace a single character by a different alphabetic character\n        for j in range(n):\n            if word[j].isalpha():\n                for char in 'abcdefghijklmnopqrstuvwxyz':\n                    if char != word[j]:\n                        transformations.add(word[:j] + char + word[j+1:])\n        # Transpose (exchange) any two adjacent characters\n        if i < n:\n            transformations.add(word[:i] + word[i+1] + word[i] + word[i+2:])\n    return transformations\n\ndef find_similar_words(text):\n    words = []\n    current_word = ''\n    for char in text:\n        if char.isalnum():\n            current_word += char.lower()\n        else:\n            if current_word:\n                words.append(current_word)\n                current_word = ''\n    if current_word:\n        words.append(current_word)\n\n    similar_words_dict = {}\n    for word in words:\n        transformations = generate_transformations(word)\n        for transformed_word in transformations:\n            if transformed_word in words and transformed_word != word:\n                if word not in similar_words_dict:\n                    similar_words_dict[word] = set()\n                similar_words_dict[word].add(transformed_word)\n\n    result = []\n    for word in sorted(similar_words_dict.keys()):\n        result.append(f\"{word}: {' '.join(sorted(similar_words_dict[word]))}\")\n\n    return result\n\nif __name__ == \"__main__\":\n    text = \"\"\n    for line in sys.stdin:\n        if line.strip() == \"***\":\n            break\n        text += line\n\n    result = find_similar_words(text)\n    if result:\n        for line in result:\n            print(line)\n    else:\n        print(\"***\")",
+    "code_hash": "4d482dcadee4c4c2",
+    "language": "python",
+    "node_id": "n_16_82aeff",
+    "revision_id": "rev_n_16_82aeff_0",
+    "thought_path_snapshot": [
+      "Thought-1 (revised): To avoid the `IndexError` during the generation of transformations, ensure that the indices used in slicing operations do not go out of bounds. Specifically, check that `i-1`, `i+1`, and `i+2` are within the valid range before performing these operations. This can be done by adding conditional checks before accessing these indices. Additionally, consider using a more efficient method to generate transformations that avoids unnecessary computations and reduces the risk of errors.",
+      "Review the logic for generating transformations to ensure all possible cases are covered."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 18
+  },
+  {
+    "candidate_id": "cand_77ab542676",
+    "problem_id": "apps_3214",
+    "code": "import sys\n\ndef generate_transformations(word):\n    transformations = set()\n    n = len(word)\n    for i in range(n + 1):\n        # Delete a single character\n        if i > 0:\n            transformations.add(word[:i-1] + word[i:])\n        # Insert a single alphabetic character\n        for char in 'abcdefghijklmnopqrstuvwxyz':\n            transformations.add(word[:i] + char + word[i:])\n        # Replace a single character by a different alphabetic character\n        for j in range(97, 123):\n            if chr(j) != word[i]:\n                transformations.add(word[:i] + chr(j) + word[i+1:])\n        # Transpose (exchange) any two adjacent characters\n        if i < n - 1:\n            transformations.add(word[:i] + word[i+1] + word[i] + word[i+2:])\n    return transformations\n\ndef find_similar_words(text):\n    words = []\n    current_word = ''\n    for char in text:\n        if char.isalpha():\n            current_word += char.lower()\n        elif current_word:\n            words.append(current_word)\n            current_word = ''\n    if current_word:\n        words.append(current_word)\n\n    similar_words_dict = {}\n    for word in words:\n        transformations = generate_transformations(word)\n        for transformed_word in transformations:\n            if transformed_word in words and transformed_word != word:\n                if word not in similar_words_dict:\n                    similar_words_dict[word] = set()\n                similar_words_dict[word].add(transformed_word)\n\n    result = sorted(similar_words_dict.items())\n    return result\n\ndef main():\n    text = \"\"\n    for line in sys.stdin:\n        if line.strip() == \"***\":\n            break\n        text += line\n\n    result = find_similar_words(text)\n    if not result:\n        print(\"***\")\n    else:\n        for word, similar_words in result:\n            print(f\"{word}: {' '.join(sorted(similar_words))}\")\n\nif __name__ == \"__main__\":\n    main()",
+    "code_hash": "5a06d562afcbbe4e",
+    "language": "python",
+    "node_id": "n_16_82aeff",
+    "revision_id": "rev_n_16_82aeff_1",
+    "thought_path_snapshot": [
+      "Thought-1 (revised): To avoid the `IndexError` during the generation of transformations, ensure that the indices used in slicing operations do not go out of bounds. Specifically, check that `i-1`, `i+1`, and `i+2` are within the valid range before performing these operations. This can be done by adding conditional checks before accessing these indices. Additionally, consider using a more efficient method to generate transformations that avoids unnecessary computations and reduces the risk of errors.",
+      "To avoid the `IndexError` during the generation of transformations, ensure that the indices used in slicing operations do not go out of bounds. Specifically, check that `i-1`, `i+1`, and `i+2` are within the valid range before performing these operations. This can be done by adding conditional checks before accessing these indices. Additionally, consider using a more efficient method to generate transformations that avoids unnecessary computations and reduces the risk of errors."
+    ],
+    "origin": "rethink",
+    "generation_record_id": null,
+    "created_sequence": 19
+  },
+  {
+    "candidate_id": "cand_28d7c44b80",
+    "problem_id": "apps_3214",
+    "code": "import sys\n\ndef get_word_cores(text):\n    import re\n    return set(re.findall(r'\\b[a-zA-Z]+\\b', text.lower()))\n\ndef is_similar(word1, word2):\n    if abs(len(word1) - len(word2)) > 1:\n        return False\n    if word1 == word2:\n        return False\n    if len(word1) < len(word2):\n        word1, word2 = word2, word1\n    for i in range(len(word2)):\n        if word1[:i] + word1[i+1:] == word2:\n            return True\n    for i in range(len(word1)):\n        for j in range(26):\n            new_char = chr(ord('a') + j)\n            if word1[:i] + new_char + word1[i+1:] == word2:\n                return True\n    for i in range(len(word1) - 1):\n        if word1[:i] + word1[i+1] + word1[i] + word1[i+2:] == word2:\n            return True\n    return False\n\ndef find_similar_words():\n    word_cores = set()\n    similar_dict = {}\n    \n    for line in sys.stdin:\n        if line.strip() == '***':\n            break\n        word_cores.update(get_word_cores(line))\n    \n    for word_core in word_cores:\n        similar_set = {word_core}\n        for other_core in word_cores:\n            if is_similar(word_core, other_core):\n                similar_set.add(other_core)\n        if len(similar_set) > 1:\n            similar_dict[word_core] = sorted(list(similar_set - {word_core}))\n    \n    for word_core in sorted(similar_dict.keys()):\n        print(f\"{word_core}: {' '.join(similar_dict[word_core])}\")\n\nif __name__ == \"__main__\":\n    find_similar_words()",
+    "code_hash": "a53764137c726d69",
+    "language": "python",
+    "node_id": "n_20_2292df",
+    "revision_id": "rev_n_20_2292df_0",
+    "thought_path_snapshot": [
+      "Thought-1 (revised): After processing all input, sort the keys of the dictionary alphabetically and print each key along with its associated set of similarly spelled word cores. Ensure that the sets of similarly spelled words are also sorted before printing them to maintain consistency.",
+      "Check the implementation of the similarity checks."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 20
+  },
+  {
+    "candidate_id": "cand_d8cab5828f",
+    "problem_id": "apps_3214",
+    "code": "import sys\n\ndef is_similar(word1, word2):\n    if abs(len(word1) - len(word2)) > 1:\n        return False\n    \n    if word1 == word2:\n        return True\n    \n    if len(word1) < len(word2):\n        word1, word2 = word2, word1\n    \n    for i in range(len(word1)):\n        if word1[:i] + word1[i+1:] == word2:\n            return True\n        if word1[:i] + chr(ord(word1[i]) + 1) + word1[i+1:] == word2:\n            return True\n        if word1[:i] + chr(ord(word1[i]) - 1) + word1[i+1:] == word2:\n            return True\n        if i < len(word1) - 1 and word1[:i] + word1[i+1] + word1[i] + word1[i+2:] == word2:\n            return True\n    \n    return False\n\ndef find_similar_words():\n    word_dict = {}\n    \n    for line in sys.stdin:\n        if line.strip() == \"***\":\n            break\n        \n        words = line.split()\n        for word in words:\n            core_word = ''.join(filter(str.isalpha, word)).lower()\n            if core_word not in word_dict:\n                word_dict[core_word] = set()\n            \n            for existing_core in word_dict:\n                if is_similar(core_word, existing_core):\n                    word_dict[existing_core].add(core_word)\n                    word_dict[core_word].add(existing_core)\n    \n    for core_word in sorted(word_dict.keys()):\n        if len(word_dict[core_word]) > 0:\n            print(f\"{core_word}: {' '.join(sorted(word_dict[core_word]))}\")\n\nif __name__ == \"__main__\":\n    find_similar_words()",
+    "code_hash": "dbb1eaa0b8c189e9",
+    "language": "python",
+    "node_id": "n_20_2292df",
+    "revision_id": "rev_n_20_2292df_1",
+    "thought_path_snapshot": [
+      "Thought-1 (revised): After processing all input, sort the keys of the dictionary alphabetically and print each key along with its associated set of similarly spelled word cores. Ensure that the sets of similarly spelled words are also sorted before printing them to maintain consistency.",
+      "Thought-2: The issue lies in the `is_similar` function, which does not correctly handle all possible transformations required for determining similar words. Specifically, the function needs to check for insertions, deletions, replacements, and transpositions more comprehensively. Additionally, the function should avoid unnecessary comparisons and ensure that it correctly identifies similar words based on the given rules."
+    ],
+    "origin": "rethink",
+    "generation_record_id": null,
+    "created_sequence": 21
+  },
+  {
+    "candidate_id": "cand_7670c135a5",
+    "problem_id": "apps_3214",
+    "code": "import sys\n\ndef get_word_cores(text):\n    import re\n    return set(re.findall(r'\\b[a-zA-Z]+\\b', text.lower()))\n\ndef get_transformations(word_core):\n    transformations = set()\n    n = len(word_core)\n    for i in range(n + 1):\n        for char in 'abcdefghijklmnopqrstuvwxyz':\n            transformations.add(word_core[:i] + char + word_core[i:])\n        if i < n:\n            transformations.add(word_core[:i] + word_core[i+1])\n            transformations.add(word_core[:i] + word_core[i+1] + word_core[i])\n            for j in range(26):\n                if word_core[i] != chr(ord('a') + j):\n                    transformations.add(word_core[:i] + chr(ord('a') + j) + word_core[i+1:])\n    return transformations\n\ndef main():\n    word_cores = get_word_cores(sys.stdin.read())\n    transformations_dict = {}\n    \n    for word_core in word_cores:\n        transformations = get_transformations(word_core)\n        for transformation in transformations:\n            if transformation in word_cores:\n                if word_core not in transformations_dict:\n                    transformations_dict[word_core] = set()\n                transformations_dict[word_core].add(transformation)\n    \n    for word_core in sorted(transformations_dict.keys()):\n        print(f\"{word_core}: {' '.join(sorted(transformations_dict[word_core]))}\")\n\nif __name__ == \"__main__\":\n    main()",
+    "code_hash": "a291b62f3dca5762",
+    "language": "python",
+    "node_id": "n_8_faf9ea",
+    "revision_id": "rev_n_8_faf9ea_0",
+    "thought_path_snapshot": [
+      "Develop a function to generate all possible transformations of a given word core based on the allowed operations (delete, insert, replace, transpose).",
+      "Thought-2: Instead of generating all transformations for each word and checking them against the entire dictionary, preprocess the input text to create a dictionary where keys are word cores and values are sets of words that share the same core. This way, when processing each word, only its core needs to be checked against the preprocessed dictionary, significantly reducing the number of unnecessary transformations and checks.",
+      "Implement a more efficient data structure to store and look up word cores and their transformations."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 22
+  },
+  {
+    "candidate_id": "cand_09d936f45a",
+    "problem_id": "apps_3214",
+    "code": "import sys\n\ndef get_transformations(word_core):\n    transformations = set()\n    n = len(word_core)\n    \n    # Delete a single character\n    for i in range(n):\n        transformations.add(word_core[:i] + word_core[i+1:])\n    \n    # Insert a single alphabetic character\n    for i in range(n + 1):\n        for char in 'abcdefghijklmnopqrstuvwxyz':\n            transformations.add(word_core[:i] + char + word_core[i:])\n    \n    # Replace a single character by a different alphabetic character\n    for i in range(n):\n        for char in 'abcdefghijklmnopqrstuvwxyz':\n            if char != word_core[i]:\n                transformations.add(word_core[:i] + char + word_core[i+1:])\n    \n    # Transpose (exchange) any two adjacent characters\n    for i in range(n - 1):\n        transformations.add(word_core[:i] + word_core[i+1] + word_core[i] + word_core[i+2:])\n    \n    return transformations\n\ndef main():\n    word_cores = {}\n    for line in sys.stdin:\n        if line.strip() == \"***\":\n            break\n        words = line.split()\n        for word in words:\n            word = ''.join(filter(str.isalpha, word)).lower()\n            if word:\n                word_core = ''.join(filter(str.isalpha, word))\n                if word_core not in word_cores:\n                    word_cores[word_core] = set()\n                word_cores[word_core].add(word)\n\n    results = []\n    for word_core, words in sorted(word_cores.items()):\n        transformations = set()\n        for word in words:\n            transformations.update(get_transformations(word_core))\n        \n        similar_words = transformations.intersection(words)\n        if similar_words:\n            results.append(f\"{word_core}: {' '.join(sorted(similar_words))}\")\n\n    if not results:\n        print(\"***\")\n    else:\n        for result in results:\n            print(result)\n\nif __name__ == \"__main__\":\n    main()",
+    "code_hash": "58586ea0460f3015",
+    "language": "python",
+    "node_id": "n_8_faf9ea",
+    "revision_id": "rev_n_8_faf9ea_1",
+    "thought_path_snapshot": [
+      "Develop a function to generate all possible transformations of a given word core based on the allowed operations (delete, insert, replace, transpose).",
+      "Thought-2: Instead of generating all transformations for each word and checking them against the entire dictionary, preprocess the input text to create a dictionary where keys are word cores and values are sets of words that share the same core. This way, when processing each word, only its core needs to be checked against the preprocessed dictionary, significantly reducing the number of unnecessary transformations and checks.",
+      "Thought-3: To avoid the `IndexError` in the `get_transformations` function, ensure that the indices used for slicing the word core are within valid ranges before performing the operations. Specifically, check that `i + 1` does not exceed the length of the word core before attempting to access `word_core[i+1]`. Additionally, consider using a more efficient approach to generate transformations, such as leveraging existing libraries like `difflib.SequenceMatcher` for sequence comparison, which might simplify the logic and reduce errors."
+    ],
+    "origin": "rethink",
+    "generation_record_id": null,
+    "created_sequence": 23
+  },
+  {
+    "candidate_id": "cand_a2198c5e27",
+    "problem_id": "apps_3214",
+    "code": "import sys\n\ndef generate_transformations(word):\n    transformations = set()\n    n = len(word)\n    \n    # Delete a single character\n    for i in range(n):\n        transformations.add(word[:i] + word[i+1:])\n    \n    # Insert a single alphabetic character\n    for i in range(n + 1):\n        for char in 'abcdefghijklmnopqrstuvwxyz':\n            transformations.add(word[:i] + char + word[i:])\n    \n    # Replace a single character by a different alphabetic character\n    for i in range(n):\n        for char in 'abcdefghijklmnopqrstuvwxyz':\n            if char != word[i]:\n                transformations.add(word[:i] + char + word[i+1:])\n    \n    # Transpose (exchange) any two adjacent characters\n    for i in range(n - 1):\n        transformations.add(word[:i] + word[i+1] + word[i] + word[i+2:])\n    \n    return transformations\n\ndef find_similar_words(text):\n    word_dict = {}\n    \n    # Preprocess the input text to create a dictionary of word cores\n    for line in text.split('\\n'):\n        for word in line.split():\n            core = ''.join(filter(str.isalpha, word)).lower()\n            if core not in word_dict:\n                word_dict[core] = set()\n            word_dict[core].add(word)\n    \n    # Find similarly spelled words\n    results = []\n    for core, words in sorted(word_dict.items()):\n        similar_words = set()\n        for word in words:\n            transformations = generate_transformations(core)\n            for transform in transformations:\n                if transform in word_dict and transform != core:\n                    similar_words.update(word_dict[transform])\n        if similar_words:\n            results.append(f\"{core}: {' '.join(sorted(similar_words))}\")\n    \n    return results\n\n# Read input from stdin\ninput_text = sys.stdin.read().strip()\n\n# Get the result\nresult = find_similar_words(input_text)\n\n# Print the result\nif result:\n    for line in result:\n        print(line)\nelse:\n    print(\"***\")",
+    "code_hash": "42b2bd0d10923030",
+    "language": "python",
+    "node_id": "n_10_1649f5",
+    "revision_id": "rev_n_10_1649f5_0",
+    "thought_path_snapshot": [
+      "Develop a function to generate all possible transformations of a given word core based on the allowed operations (delete, insert, replace, transpose).",
+      "Thought-2: Instead of using a Trie to store and query word cores directly, preprocess the input text to create a dictionary where keys are word cores and values are sets of words that share the same core. This approach simplifies finding similar words by checking if a transformed version of a word exists in the dictionary.",
+      "Review the logic for generating transformations."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 24
+  },
+  {
+    "candidate_id": "cand_b76ce46925",
+    "problem_id": "apps_3214",
+    "code": "import sys\n\ndef generate_transformations(word):\n    transformations = set()\n    n = len(word)\n    \n    # Delete a single character\n    for i in range(n):\n        transformations.add(word[:i] + word[i+1:])\n    \n    # Insert a single alphabetic character\n    for i in range(n + 1):\n        for char in 'abcdefghijklmnopqrstuvwxyz':\n            transformations.add(word[:i] + char + word[i:])\n    \n    # Replace a single character by a different alphabetic character\n    for i in range(n):\n        for char in 'abcdefghijklmnopqrstuvwxyz':\n            if char != word[i]:\n                transformations.add(word[:i] + char + word[i+1:])\n    \n    # Transpose any two adjacent characters\n    for i in range(n - 1):\n        transformations.add(word[:i] + word[i+1] + word[i] + word[i+2:])\n    \n    return transformations\n\ndef main():\n    word_dict = {}\n    for line in sys.stdin:\n        if line.strip() == \"***\":\n            break\n        words = line.split()\n        for word in words:\n            core = ''.join(filter(str.isalpha, word)).lower()\n            if core not in word_dict:\n                word_dict[core] = set()\n            word_dict[core].add(word.lower())\n    \n    results = []\n    for core, words in sorted(word_dict.items()):\n        if len(words) > 1:\n            transformations = set()\n            for word in words:\n                transformations.update(generate_transformations(core))\n            similar_cores = sorted(list(transformations.intersection(word_dict.keys())))\n            if similar_cores:\n                results.append(f\"{core}: {' '.join(similar_cores)}\")\n    \n    if not results:\n        print(\"***\")\n    else:\n        for result in results:\n            print(result)\n\nif __name__ == \"__main__\":\n    main()",
+    "code_hash": "e8dfcfa6d747d7db",
+    "language": "python",
+    "node_id": "n_10_1649f5",
+    "revision_id": "rev_n_10_1649f5_1",
+    "thought_path_snapshot": [
+      "Develop a function to generate all possible transformations of a given word core based on the allowed operations (delete, insert, replace, transpose).",
+      "Thought-2: Instead of using a Trie to store and query word cores directly, preprocess the input text to create a dictionary where keys are word cores and values are sets of words that share the same core. This approach simplifies finding similar words by checking if a transformed version of a word exists in the dictionary.",
+      "Review the logic for generating transformations to ensure that all possible transformations are correctly generated and checked against the dictionary. Specifically, verify that the transformations include all four allowed operations (delete, insert, replace, transpose) and that the comparison is case-insensitive. Additionally, ensure that the transformations do not include the original word core itself, as it is already accounted for in the dictionary."
+    ],
+    "origin": "rethink",
+    "generation_record_id": null,
+    "created_sequence": 25
+  },
+  {
+    "candidate_id": "cand_3346f0cfdf",
+    "problem_id": "apps_3214",
+    "code": "import sys\n\nclass TrieNode:\n    def __init__(self):\n        self.children = {}\n        self.is_end_of_word = False\n\nclass Trie:\n    def __init__(self):\n        self.root = TrieNode()\n\n    def insert(self, word):\n        node = self.root\n        for char in word:\n            if char not in node.children:\n                node.children[char] = TrieNode()\n            node = node.children[char]\n        node.is_end_of_word = True\n\n    def search(self, word):\n        node = self.root\n        for char in word:\n            if char not in node.children:\n                return False\n            node = node.children[char]\n        return node.is_end_of_word\n\ndef get_transformations(word):\n    transformations = set()\n    n = len(word)\n    for i in range(n + 1):\n        for j in range(26):\n            new_char = chr(ord('a') + j)\n            if i < n:\n                transformations.add(word[:i] + new_char + word[i+1:])\n            if i > 0:\n                transformations.add(word[:i-1] + new_char + word[i:])\n            if i < n - 1:\n                transformations.add(word[:i] + new_char + word[i+1])\n            if i < n - 1:\n                transformations.add(word[:i] + word[i+1] + new_char + word[i+2:])\n    for i in range(n - 1):\n        transformations.add(word[:i] + word[i+1] + word[i] + word[i+2:])\n    return transformations\n\ndef find_similar_words(text):\n    words = []\n    current_word = \"\"\n    for char in text:\n        if char.isalpha():\n            current_word += char.lower()\n        else:\n            if current_word:\n                words.append(current_word)\n                current_word = \"\"\n    if current_word:\n        words.append(current_word)\n\n    trie = Trie()\n    for word in words:\n        trie.insert(word)\n\n    similar_words = {}\n    for word in words:\n        transformations = get_transformations(word)\n        found_similar = False\n        for transform in transformations:\n            if trie.search(transform):\n                if word not in similar_words:\n                    similar_words[word] = set()\n                similar_words[word].add(transform)\n                found_similar = True\n        if not found_similar:\n            if word not in similar_words:\n                similar_words[word] = set()\n\n    result = sorted(similar_words.items())\n    return result\n\nif __name__ == \"__main__\":\n    text = \"\"\n    for line in sys.stdin:\n        if line.strip() == \"***\":\n            break\n        text += line.strip() + \" \"\n\n    result = find_similar_words(text)\n    if not result:\n        print(\"***\")\n    else:\n        for word, similars in result:\n            print(f\"{word}: {' '.join(sorted(similars))}\")",
+    "code_hash": "07f093e5b5b0685f",
+    "language": "python",
+    "node_id": "n_14_6cf80b",
+    "revision_id": "rev_n_14_6cf80b_0",
+    "thought_path_snapshot": [
+      "Develop a function to generate all possible transformations of a given word core based on the allowed operations (delete, insert, replace, transpose).",
+      "Thought-2 (revised): Instead of generating all possible transformations and checking each one individually, implement a more efficient method using a Trie data structure to store all valid word cores. Then, for each word core, perform a depth-first search (DFS) to explore all possible transformations within a single edit distance. This approach ensures that only valid transformations are considered, avoiding unnecessary computations and potential errors.",
+      "Implement a more efficient similarity check algorithm."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 26
+  },
+  {
+    "candidate_id": "cand_38abea46c8",
+    "problem_id": "apps_3214",
+    "code": "import sys\n\ndef get_word_cores(text):\n    import re\n    return set(re.findall(r'\\b[a-zA-Z]+\\b', text.lower()))\n\ndef get_transformations(word_core):\n    alphabet = 'abcdefghijklmnopqrstuvwxyz'\n    transformations = set()\n    \n    # Delete a single character\n    for i in range(len(word_core)):\n        transformations.add(word_core[:i] + word_core[i+1:])\n    \n    # Insert a single alphabetic character\n    for i in range(len(word_core) + 1):\n        for char in alphabet:\n            transformations.add(word_core[:i] + char + word_core[i:])\n    \n    # Replace a single character by a different alphabetic character\n    for i in range(len(word_core)):\n        for char in alphabet:\n            if char != word_core[i]:\n                transformations.add(word_core[:i] + char + word_core[i+1:])\n    \n    # Transpose (exchange) any two adjacent characters\n    for i in range(len(word_core) - 1):\n        transformations.add(word_core[:i] + word_core[i+1] + word_core[i] + word_core[i+2:])\n    \n    return transformations\n\ndef find_similarly_spelled_words(word_cores):\n    trie = {}\n    for word_core in word_cores:\n        node = trie\n        for char in word_core:\n            if char not in node:\n                node[char] = {}\n            node = node[char]\n        node['end'] = True\n    \n    def dfs(node, current_path, index):\n        if 'end' in node and current_path and current_path not in seen:\n            seen.add(current_path)\n            result[current_path].add(current_path)\n        \n        if index == len(word_core):\n            return\n        \n        for char in alphabet:\n            if char in node:\n                dfs(node[char], current_path + char, index + 1)\n        \n        if index > 0 and word_core[index-1] in node:\n            dfs(node[word_core[index-1]], current_path + word_core[index-1] + word_core[index], index + 2)\n        \n        if index < len(word_core) - 1 and word_core[index+1] in node:\n            dfs(node[word_core[index+1]], current_path + word_core[index+1] + word_core[index], index + 2)\n        \n        if word_core[index] in node:\n            dfs(node[word_core[index]], current_path + word_core[index], index + 1)\n    \n    alphabet = 'abcdefghijklmnopqrstuvwxyz'\n    result = {word_core: set() for word_core in word_cores}\n    seen = set()\n    \n    for word_core in word_cores:\n        dfs(trie, '', 0)\n    \n    return result\n\ndef main():\n    word_cores = set()\n    for line in sys.stdin:\n        if line.strip() == '***':\n            break\n        word_cores.update(get_word_cores(line))\n    \n    result = find_similarly_spelled_words(word_cores)\n    \n    for word_core, similar_words in sorted(result.items()):\n        if similar_words:\n            print(f\"{word_core}: {' '.join(sorted(similar_words))}\")\n\nif __name__ == \"__main__\":\n    main()",
+    "code_hash": "18787fa2101ef9cb",
+    "language": "python",
+    "node_id": "n_14_6cf80b",
+    "revision_id": "rev_n_14_6cf80b_1",
+    "thought_path_snapshot": [
+      "Develop a function to generate all possible transformations of a given word core based on the allowed operations (delete, insert, replace, transpose).",
+      "Thought-2 (revised): Instead of generating all possible transformations and checking each one individually, implement a more efficient method using a Trie data structure to store all valid word cores. Then, for each word core, perform a depth-first search (DFS) to explore all possible transformations within a single edit distance. This approach ensures that only valid transformations are considered, avoiding unnecessary computations and potential errors.",
+      "Thought-3: To efficiently find similarly spelled words, implement a modified version of the Levenshtein distance algorithm using dynamic programming. This approach will allow us to compute the minimum number of edits required to transform one word into another, ensuring that we only consider valid transformations within a single edit distance. By storing intermediate results in a 2D array, we can avoid redundant calculations and improve the overall efficiency of our solution. Additionally, we can optimize the algorithm further by pruning branches that exceed the desired edit distance, thus reducing the computational complexity."
+    ],
+    "origin": "rethink",
+    "generation_record_id": null,
+    "created_sequence": 27
+  },
+  {
+    "candidate_id": "cand_90683d67ca",
+    "problem_id": "apps_3214",
+    "code": "import sys\n\ndef get_word_cores(text):\n    import re\n    return set(re.findall(r'\\b[a-zA-Z]+\\b', text.lower()))\n\ndef get_transformations(word_core):\n    transformations = set()\n    n = len(word_core)\n    \n    # Delete a single character\n    for i in range(n):\n        transformations.add(word_core[:i] + word_core[i+1:])\n    \n    # Insert a single alphabetic character\n    for i in range(n + 1):\n        for char in 'abcdefghijklmnopqrstuvwxyz':\n            transformations.add(word_core[:i] + char + word_core[i:])\n    \n    # Replace a single character by a different alphabetic character\n    for i in range(n):\n        for char in 'abcdefghijklmnopqrstuvwxyz':\n            if char != word_core[i]:\n                transformations.add(word_core[:i] + char + word_core[i+1:])\n    \n    # Transpose (exchange) any two adjacent characters\n    for i in range(n - 1):\n        transformations.add(word_core[:i] + word_core[i+1] + word_core[i] + word_core[i+2:])\n    \n    return transformations\n\ndef find_similarly_spelled_words(input_text):\n    word_cores = get_word_cores(input_text)\n    transformed_dict = {}\n    \n    for word_core in word_cores:\n        transformations = get_transformations(word_core)\n        for transform in transformations:\n            if transform in word_cores:\n                if word_core not in transformed_dict:\n                    transformed_dict[word_core] = set()\n                transformed_dict[word_core].add(transform)\n    \n    result = []\n    for word_core, similar_words in sorted(transformed_dict.items()):\n        result.append(f\"{word_core}: {' '.join(sorted(similar_words))}\")\n    \n    return result\n\nif __name__ == \"__main__\":\n    input_text = \"\"\n    for line in sys.stdin:\n        if line.strip() == \"***\":\n            break\n        input_text += line\n    \n    results = find_similarly_spelled_words(input_text)\n    if results:\n        for result in results:\n            print(result)\n    else:\n        print(\"***\")",
+    "code_hash": "390c9e4c60fb66b6",
+    "language": "python",
+    "node_id": "n_9_48bdc0",
+    "revision_id": "rev_n_9_48bdc0_0",
+    "thought_path_snapshot": [
+      "Develop a function to generate all possible transformations of a given word core based on the allowed operations (delete, insert, replace, transpose).",
+      "Thought-2: Instead of generating all transformations for each word and checking them against the entire dictionary, preprocess the input text to create a dictionary where keys are word cores and values are sets of words that share the same core. This way, when processing each word, only its core needs to be checked against the preprocessed dictionary, significantly reducing the number of unnecessary transformations and checks.",
+      "Add unit tests to validate the correctness of the transformation and lookup functions."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 28
+  },
+  {
+    "candidate_id": "cand_615cf0682c",
+    "problem_id": "apps_3214",
+    "code": "import sys\n\ndef get_transformations(word):\n    if len(word) == 0:\n        return set()\n    if len(word) == 1:\n        return {chr(i) for i in range(97, 123)}\n    \n    transformations = set()\n    for i in range(len(word)):\n        transformations.add(word[:i] + word[i+1:])\n        for j in range(97, 123):\n            transformations.add(word[:i] + chr(j) + word[i+1:])\n            transformations.add(word[:i] + chr(j) + word[i:i+1] + word[i+2:])\n    for i in range(len(word)-1):\n        transformations.add(word[:i] + word[i+1] + word[i] + word[i+2:])\n    \n    return transformations\n\ndef find_similarly_spelled_words(text):\n    word_cores = {}\n    for word in text.split():\n        core = ''.join(filter(str.isalpha, word)).lower()\n        if core not in word_cores:\n            word_cores[core] = set()\n        word_cores[core].add(word)\n    \n    results = []\n    for core, words in sorted(word_cores.items()):\n        if len(words) > 1:\n            transformations = set()\n            for word in words:\n                transformations.update(get_transformations(core))\n            similar_cores = set()\n            for transformation in transformations:\n                if transformation in word_cores:\n                    similar_cores.update(word_cores[transformation])\n            similar_cores.discard(core)\n            if similar_cores:\n                results.append(f\"{core}: {' '.join(sorted(similar_cores))}\")\n    \n    return results\n\nif __name__ == \"__main__\":\n    text = \"\"\n    for line in sys.stdin:\n        if line.strip() == \"***\":\n            break\n        text += line\n    \n    results = find_similarly_spelled_words(text)\n    if results:\n        for result in results:\n            print(result)\n    else:\n        print(\"***\")",
+    "code_hash": "c729f20dab44a058",
+    "language": "python",
+    "node_id": "n_9_48bdc0",
+    "revision_id": "rev_n_9_48bdc0_1",
+    "thought_path_snapshot": [
+      "Develop a function to generate all possible transformations of a given word core based on the allowed operations (delete, insert, replace, transpose).",
+      "Thought-2: Instead of generating all transformations for each word and checking them against the entire dictionary, preprocess the input text to create a dictionary where keys are word cores and values are sets of words that share the same core. This way, when processing each word, only its core needs to be checked against the preprocessed dictionary, significantly reducing the number of unnecessary transformations and checks.",
+      "Thought-3: Ensure that the `get_transformations` function correctly handles edge cases, such as empty strings and strings with a single character, and that the `find_similarly_spelled_words` function efficiently checks for similarly spelled words without redundant computations. Additionally, implement a mechanism to skip transformations that would result in invalid word cores (e.g., strings with non-alphabetic characters)."
+    ],
+    "origin": "rethink",
+    "generation_record_id": null,
+    "created_sequence": 29
+  },
+  {
+    "candidate_id": "cand_23e034575e",
+    "problem_id": "apps_3214",
+    "code": "import sys\n\ndef get_word_cores(text):\n    import re\n    return set(re.findall(r'\\b[a-zA-Z]+\\b', text.lower()))\n\ndef get_transformations(word_core):\n    alphabet = 'abcdefghijklmnopqrstuvwxyz'\n    transformations = set()\n    \n    # Delete a single character\n    for i in range(len(word_core)):\n        transformations.add(word_core[:i] + word_core[i+1:])\n    \n    # Insert a single alphabetic character\n    for i in range(len(word_core) + 1):\n        for char in alphabet:\n            transformations.add(word_core[:i] + char + word_core[i:])\n    \n    # Replace a single character by a different alphabetic character\n    for i in range(len(word_core)):\n        for char in alphabet:\n            if char != word_core[i]:\n                transformations.add(word_core[:i] + char + word_core[i+1:])\n    \n    # Transpose (exchange) any two adjacent characters\n    for i in range(len(word_core) - 1):\n        transformations.add(word_core[:i] + word_core[i+1] + word_core[i] + word_core[i+2:])\n    \n    return transformations\n\ndef find_similarly_spelled_words(input_text):\n    word_cores = get_word_cores(input_text)\n    transformations_dict = {}\n    \n    for word_core in word_cores:\n        transformations = get_transformations(word_core)\n        for transform in transformations:\n            if transform in word_cores:\n                if word_core not in transformations_dict:\n                    transformations_dict[word_core] = set()\n                transformations_dict[word_core].add(transform)\n    \n    result = []\n    for word_core, similar_cores in sorted(transformations_dict.items()):\n        result.append(f\"{word_core}: {' '.join(sorted(similar_cores))}\")\n    \n    return result\n\nif __name__ == \"__main__\":\n    input_text = \"\"\n    for line in sys.stdin:\n        if line.strip() == \"***\":\n            break\n        input_text += line\n    \n    result = find_similarly_spelled_words(input_text)\n    if result:\n        for line in result:\n            print(line)\n    else:\n        print(\"***\")",
+    "code_hash": "c6f50ab88e2acb32",
+    "language": "python",
+    "node_id": "n_23_49bb05",
+    "revision_id": "rev_n_23_49bb05_0",
+    "thought_path_snapshot": [
+      "Develop a function to generate all possible transformations of a given word core based on the allowed operations (delete, insert, replace, transpose).",
+      "Thought-2: Instead of generating all transformations for each word and checking them against the entire dictionary, preprocess the input text to create a dictionary where keys are word cores and values are sets of words that share the same core. This way, when processing each word, only its core needs to be checked against the preprocessed dictionary, significantly reducing the number of unnecessary transformations and checks.",
+      "Refine the transformation logic to handle edge cases and maintain efficiency by ensuring that transformations do not produce invalid words (e.g., words with non-alphabetic characters). Additionally, optimize the comparison of transformations with the original word cores to avoid redundant checks and improve performance.",
+      "Improve the efficiency of checking transformed words"
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 30
+  },
+  {
+    "candidate_id": "cand_6488d6c34c",
+    "problem_id": "apps_3214",
+    "code": "import sys\n\ndef generate_transformations(word):\n    transformations = set()\n    n = len(word)\n    \n    # Delete a single character\n    for i in range(n):\n        transformations.add(word[:i] + word[i+1:])\n    \n    # Insert a single alphabetic character\n    for i in range(n + 1):\n        for char in 'abcdefghijklmnopqrstuvwxyz':\n            transformations.add(word[:i] + char + word[i:])\n    \n    # Replace a single character by a different alphabetic character\n    for i in range(n):\n        for char in 'abcdefghijklmnopqrstuvwxyz':\n            if char != word[i]:\n                transformations.add(word[:i] + char + word[i+1:])\n    \n    # Transpose (exchange) any two adjacent characters\n    for i in range(n - 1):\n        transformations.add(word[:i] + word[i+1] + word[i] + word[i+2:])\n    \n    return transformations\n\ndef main():\n    word_cores = {}\n    valid_words = set()\n    \n    for line in sys.stdin:\n        if line.strip() == \"***\":\n            break\n        \n        words = line.split()\n        for word in words:\n            core = ''.join(filter(str.isalpha, word)).lower()\n            if core not in word_cores:\n                word_cores[core] = set()\n            word_cores[core].add(word.lower())\n            \n            if core not in valid_words:\n                valid_words.add(core)\n    \n    results = []\n    for core, words in sorted(word_cores.items()):\n        if len(words) > 1:\n            transformations = set()\n            for word in words:\n                transformations.update(generate_transformations(word))\n            \n            similar_cores = transformations.intersection(valid_words)\n            if similar_cores:\n                results.append(f\"{core}: {' '.join(sorted(similar_cores))}\")\n    \n    if not results:\n        print(\"***\")\n    else:\n        for result in results:\n            print(result)\n\nif __name__ == \"__main__\":\n    main()",
+    "code_hash": "a88ae6a88824cbf3",
+    "language": "python",
+    "node_id": "n_23_49bb05",
+    "revision_id": "rev_n_23_49bb05_1",
+    "thought_path_snapshot": [
+      "Develop a function to generate all possible transformations of a given word core based on the allowed operations (delete, insert, replace, transpose).",
+      "Thought-2: Instead of generating all transformations for each word and checking them against the entire dictionary, preprocess the input text to create a dictionary where keys are word cores and values are sets of words that share the same core. This way, when processing each word, only its core needs to be checked against the preprocessed dictionary, significantly reducing the number of unnecessary transformations and checks.",
+      "Refine the transformation logic to handle edge cases and maintain efficiency by ensuring that transformations do not produce invalid words (e.g., words with non-alphabetic characters). Additionally, optimize the comparison of transformations with the original word cores to avoid redundant checks and improve performance.",
+      "Refine the transformation logic to ensure that only valid words are generated and compared. Specifically, filter out transformations that result in words containing non-alphabetic characters or are not recognized as valid English words. This will prevent incorrect matches and ensure that only meaningful transformations are considered. Additionally, implement a mechanism to efficiently check if a transformed word is a valid word, possibly by using a pre-built dictionary of valid English words."
+    ],
+    "origin": "rethink",
+    "generation_record_id": null,
+    "created_sequence": 31
+  }
+]

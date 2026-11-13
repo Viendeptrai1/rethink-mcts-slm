@@ -1,0 +1,526 @@
+[
+  {
+    "candidate_id": "cand_88880ca6b8",
+    "problem_id": "apps_2176",
+    "code": "from sys import stdin, stdout\nimport math\n\nMOD = 998244353\n\ndef count_inversions(arr):\n    def merge_sort_and_count(arr):\n        if len(arr) <= 1:\n            return arr, 0\n        mid = len(arr) // 2\n        left, left_inv = merge_sort_and_count(arr[:mid])\n        right, right_inv = merge_sort_and_count(arr[mid:])\n        merged, split_inv = merge_and_count(left, right)\n        return merged, (left_inv + right_inv + split_inv) % MOD\n    \n    def merge_and_count(left, right):\n        result = []\n        i = j = inv_count = 0\n        while i < len(left) and j < len(right):\n            if left[i] <= right[j]:\n                result.append(left[i])\n                i += 1\n            else:\n                result.append(right[j])\n                j += 1\n                inv_count += (len(left) - i)\n        result.extend(left[i:])\n        result.extend(right[j:])\n        return result, inv_count\n    \n    _, inv_count = merge_sort_and_count(arr)\n    return inv_count\n\ndef solve(n, pairs):\n    first_elements = [pair[0] for pair in pairs]\n    second_elements = [pair[1] for pair in pairs]\n    \n    inv_first = count_inversions(first_elements)\n    inv_second = count_inversions(second_elements)\n    \n    total_permutations = pow(2, n, MOD)\n    bad_permutations = (pow(2, inv_first, MOD) + pow(2, inv_second, MOD)) % MOD\n    \n    good_permutations = (total_permutations - bad_permutations + MOD) % MOD\n    return good_permutations\n\n# Input reading\ninput = stdin.read\ndata = input().split()\nn = int(data[0])\npairs = [(int(data[2*i+1]), int(data[2*i+2])) for i in range(n)]\n\n# Output the result\nstdout.write(str(solve(n, pairs)) + '\\n')",
+    "code_hash": "4381da4f3eed37ca",
+    "language": "python",
+    "node_id": "n_1_e9a369",
+    "revision_id": "rev_n_1_e9a369_0",
+    "thought_path_snapshot": [
+      "Count inversions in both dimensions separately and use inclusion-exclusion principle."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 1
+  },
+  {
+    "candidate_id": "cand_150b16f0bd",
+    "problem_id": "apps_2176",
+    "code": "MOD = 998244353\n\ndef merge_sort_and_count(arr):\n    if len(arr) <= 1:\n        return arr, 0\n    \n    mid = len(arr) // 2\n    left, left_inv = merge_sort_and_count(arr[:mid])\n    right, right_inv = merge_sort_and_count(arr[mid:])\n    \n    merged, split_inv = merge_and_count(left, right)\n    \n    return merged, (left_inv + right_inv + split_inv) % MOD\n\ndef merge_and_count(left, right):\n    result = []\n    i = j = inv_count = 0\n    \n    while i < len(left) and j < len(right):\n        if left[i][0] <= right[j][0]:\n            result.append(left[i])\n            i += 1\n        else:\n            result.append(right[j])\n            j += 1\n            inv_count += len(left) - i\n    \n    result.extend(left[i:])\n    result.extend(right[j:])\n    \n    return result, inv_count\n\ndef count_good_permutations(n, s):\n    first_elements = [(a, i) for i, (a, b) in enumerate(s)]\n    second_elements = [(b, i) for i, (a, b) in enumerate(s)]\n    \n    first_inv, _ = merge_sort_and_count(first_elements)\n    second_inv, _ = merge_sort_and_count(second_elements)\n    \n    total_inv = (first_inv + second_inv) % MOD\n    good_permutations = pow(2, n, MOD) - (total_inv + MOD) % MOD\n    \n    return good_permutations\n\n# Input reading\nimport sys\ninput = sys.stdin.read\ndata = input().split()\n\nn = int(data[0])\ns = [(int(data[2*i+1]), int(data[2*i+2])) for i in range(n)]\n\n# Output the result\nprint(count_good_permutations(n, s))",
+    "code_hash": "59b2fd3c0b04ed6e",
+    "language": "python",
+    "node_id": "n_1_e9a369",
+    "revision_id": "rev_n_1_e9a369_1",
+    "thought_path_snapshot": [
+      "Count inversions in both dimensions separately using a modified merge sort algorithm, but ensure that the merge step correctly counts inversions when merging two sorted subarrays. Use inclusion-exclusion principle to calculate the number of good permutations."
+    ],
+    "origin": "rethink",
+    "generation_record_id": null,
+    "created_sequence": 2
+  },
+  {
+    "candidate_id": "cand_6069ccea13",
+    "problem_id": "apps_2176",
+    "code": "from collections import defaultdict\nimport sys\n\nMOD = 998244353\n\ndef factorial(n):\n    result = 1\n    for i in range(2, n + 1):\n        result = (result * i) % MOD\n    return result\n\ndef inverse_factorial(n):\n    return pow(factorial(n), MOD - 2, MOD)\n\ndef count_good_permutations(n, pairs):\n    # Count occurrences of each value in the first and second positions\n    first_count = defaultdict(int)\n    second_count = defaultdict(int)\n    \n    for a, b in pairs:\n        first_count[a] += 1\n        second_count[b] += 1\n    \n    # Calculate the number of ways to arrange the pairs such that they are not sorted\n    total_ways = factorial(n)\n    invalid_first_sorted = 1\n    invalid_second_sorted = 1\n    \n    for count in first_count.values():\n        invalid_first_sorted = (invalid_first_sorted * inverse_factorial(count)) % MOD\n    \n    for count in second_count.values():\n        invalid_second_sorted = (invalid_second_sorted * inverse_factorial(count)) % MOD\n    \n    # Total valid permutations\n    valid_permutations = (total_ways - invalid_first_sorted - invalid_second_sorted + MOD) % MOD\n    \n    return valid_permutations\n\n# Read input\ninput = sys.stdin.read\ndata = input().split()\n\nn = int(data[0])\npairs = []\n\nfor i in range(n):\n    a = int(data[2 * i + 1])\n    b = int(data[2 * i + 2])\n    pairs.append((a, b))\n\n# Output the result\nprint(count_good_permutations(n, pairs))",
+    "code_hash": "0b3dffecf801877c",
+    "language": "python",
+    "node_id": "n_2_97dbbf",
+    "revision_id": "rev_n_2_97dbbf_0",
+    "thought_path_snapshot": [
+      "Sort the sequence based on the first element and count valid permutations using combinatorial methods."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 3
+  },
+  {
+    "candidate_id": "cand_5e9df87194",
+    "problem_id": "apps_2176",
+    "code": "from collections import Counter\nfrom math import factorial\n\nMOD = 998244353\n\ndef count_good_permutations(n, s):\n    def count_sorted_by_first():\n        cnt = Counter(a for a, _ in s)\n        return sum(factorial(v) for v in cnt.values()) % MOD\n    \n    def count_sorted_by_second():\n        cnt = Counter(b for _, b in s)\n        return sum(factorial(v) for v in cnt.values()) % MOD\n    \n    def count_both_sorted():\n        cnt_a = Counter(a for a, _ in s)\n        cnt_b = Counter(b for _, b in s)\n        return sum(min(cnt_a[a], cnt_b[b]) for a, b in s) % MOD\n    \n    total_permutations = factorial(n)\n    sorted_by_first = count_sorted_by_first()\n    sorted_by_second = count_sorted_by_second()\n    both_sorted = count_both_sorted()\n    \n    result = (total_permutations - sorted_by_first - sorted_by_second + both_sorted) % MOD\n    return result\n\n# Input reading\nimport sys\ninput = sys.stdin.read\ndata = input().split()\n\nn = int(data[0])\ns = [(int(data[i*2+1]), int(data[i*2+2])) for i in range(n)]\n\n# Output the result\nprint(count_good_permutations(n, s))",
+    "code_hash": "ea707ed90b184ed1",
+    "language": "python",
+    "node_id": "n_2_97dbbf",
+    "revision_id": "rev_n_2_97dbbf_1",
+    "thought_path_snapshot": [
+      "Revised Thought-1: Instead of directly counting valid permutations, consider counting all permutations and subtracting those that are invalid due to being sorted by either the first or second elements. However, this approach needs careful handling to avoid double-counting permutations that are invalid in both ways. Use inclusion-exclusion principle to correctly account for these cases."
+    ],
+    "origin": "rethink",
+    "generation_record_id": null,
+    "created_sequence": 4
+  },
+  {
+    "candidate_id": "cand_3e7c67ede0",
+    "problem_id": "apps_2176",
+    "code": "MOD = 998244353\n\ndef count_good_permutations(n, s):\n    dp = [[0] * (n + 1) for _ in range(2)]\n    dp[0][0] = 1\n    \n    for i in range(n):\n        new_dp = [[0] * (n + 1) for _ in range(2)]\n        for j in range(n + 1):\n            if dp[0][j]:\n                new_dp[0][max(j, s[i][0])] += dp[0][j]\n                new_dp[1][max(j, s[i][1])] += dp[0][j]\n            if dp[1][j]:\n                new_dp[0][min(j, s[i][0])] += dp[1][j]\n                new_dp[1][min(j, s[i][1])] += dp[1][j]\n        dp = new_dp\n    \n    return (dp[0][n] + dp[1][n]) % MOD\n\n# Input reading\nimport sys\ninput = sys.stdin.read\ndata = input().split()\n\nn = int(data[0])\ns = []\nfor i in range(n):\n    a = int(data[2 * i + 1])\n    b = int(data[2 * i + 2])\n    s.append((a, b))\n\n# Output result\nprint(count_good_permutations(n, s))",
+    "code_hash": "1fc99313096aff63",
+    "language": "python",
+    "node_id": "n_3_14531a",
+    "revision_id": "rev_n_3_14531a_0",
+    "thought_path_snapshot": [
+      "Use dynamic programming to keep track of valid states while iterating through the sequence."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 5
+  },
+  {
+    "candidate_id": "cand_cb2611576e",
+    "problem_id": "apps_2176",
+    "code": "from sys import stdin, stdout\nimport math\n\nMOD = 998244353\n\ndef factorial(n):\n    if n == 0 or n == 1:\n        return 1\n    result = 1\n    for i in range(2, n + 1):\n        result = (result * i) % MOD\n    return result\n\ndef mod_inverse(a, m=MOD):\n    return pow(a, m - 2, m)\n\ndef count_good_permutations(n, pairs):\n    def count_inversions(arr):\n        inv_count = 0\n        temp_arr = [0] * n\n        merge_sort_and_count(arr, temp_arr, 0, n - 1, inv_count)\n        return inv_count\n\n    def merge_sort_and_count(arr, temp_arr, left, right, inv_count):\n        if left < right:\n            mid = (left + right) // 2\n            inv_count += merge_sort_and_count(arr, temp_arr, left, mid, inv_count)\n            inv_count += merge_sort_and_count(arr, temp_arr, mid + 1, right, inv_count)\n            inv_count += merge_and_count(arr, temp_arr, left, mid, right)\n        return inv_count\n\n    def merge_and_count(arr, temp_arr, left, mid, right):\n        i = left\n        j = mid + 1\n        k = left\n        inv_count = 0\n        while i <= mid and j <= right:\n            if arr[i][0] <= arr[j][0]:\n                temp_arr[k] = arr[i]\n                i += 1\n            else:\n                temp_arr[k] = arr[j]\n                inv_count += (mid - i + 1)\n                j += 1\n            k += 1\n        while i <= mid:\n            temp_arr[k] = arr[i]\n            i += 1\n            k += 1\n        while j <= right:\n            temp_arr[k] = arr[j]\n            j += 1\n            k += 1\n        for i in range(left, right + 1):\n            arr[i] = temp_arr[i]\n        return inv_count\n\n    def count_valid_permutations(inversions):\n        if inversions == 0:\n            return 1\n        total_permutations = factorial(n)\n        inversions_mod = inversions % MOD\n        return (total_permutations * mod_inverse(factorial(inversions_mod))) % MOD\n\n    inversions_by_first = count_inversions(pairs)\n    inversions_by_second = count_inversions([(b, a) for a, b in pairs])\n\n    good_permutations = (count_valid_permutations(inversions_by_first) + \n                         count_valid_permutations(inversions_by_second)) % MOD\n\n    return good_permutations\n\ndef main():\n    n = int(stdin.readline().strip())\n    pairs = []\n    for _ in range(n):\n        a, b = map(int, stdin.readline().strip().split())\n        pairs.append((a, b))\n\n    result = count_good_permutations(n, pairs)\n    stdout.write(str(result) + '\\n')\n\nif __name__ == \"__main__\":\n    main()",
+    "code_hash": "b4d4ca35ab122f17",
+    "language": "python",
+    "node_id": "n_3_14531a",
+    "revision_id": "rev_n_3_14531a_1",
+    "thought_path_snapshot": [
+      "Revised Thought-1: Instead of using dynamic programming to directly count good permutations, consider sorting the sequence by both criteria (first and second elements) and then counting the number of ways to permute the sequence such that it does not become sorted in either order. This involves calculating the number of inversions in the sequence when sorted by each criterion and using combinatorial mathematics to find the valid permutations."
+    ],
+    "origin": "rethink",
+    "generation_record_id": null,
+    "created_sequence": 6
+  },
+  {
+    "candidate_id": "cand_b5f5ebd932",
+    "problem_id": "apps_2176",
+    "code": "MOD = 998244353\n\ndef merge_sort_and_count(arr):\n    if len(arr) <= 1:\n        return arr, 0\n    \n    mid = len(arr) // 2\n    left, left_inv = merge_sort_and_count(arr[:mid])\n    right, right_inv = merge_sort_and_count(arr[mid:])\n    \n    merged, split_inv = merge_and_count(left, right)\n    \n    return merged, (left_inv + right_inv + split_inv) % MOD\n\ndef merge_and_count(left, right):\n    result = []\n    i = j = inv_count = 0\n    \n    while i < len(left) and j < len(right):\n        if left[i][0] <= right[j][0]:\n            result.append(left[i])\n            i += 1\n        else:\n            result.append(right[j])\n            j += 1\n            inv_count += len(left) - i\n    \n    result.extend(left[i:])\n    result.extend(right[j:])\n    \n    return result, inv_count\n\ndef count_good_permutations(n, s):\n    first_elements = [(a, i) for i, (a, b) in enumerate(s)]\n    second_elements = [(b, i) for i, (a, b) in enumerate(s)]\n    \n    first_sorted, first_inv = merge_sort_and_count(first_elements)\n    second_sorted, second_inv = merge_sort_and_count(second_elements)\n    \n    total_inversions = (first_inv + second_inv) % MOD\n    good_permutations = (pow(2, n, MOD) - total_inversions) % MOD\n    \n    return good_permutations\n\n# Input reading\nimport sys\ninput = sys.stdin.read\ndata = input().split()\n\nn = int(data[0])\ns = [(int(data[2*i+1]), int(data[2*i+2])) for i in range(n)]\n\n# Output the result\nprint(count_good_permutations(n, s))",
+    "code_hash": "d039bc98804ad1db",
+    "language": "python",
+    "node_id": "n_4_bf5546",
+    "revision_id": "rev_n_4_bf5546_0",
+    "thought_path_snapshot": [
+      "Count inversions in both dimensions separately using a modified merge sort algorithm, but ensure that the merge step correctly counts inversions when merging two sorted subarrays. Use inclusion-exclusion principle to calculate the number of good permutations.",
+      "Revisit the merge sort implementation to ensure it correctly handles counting inversions."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 7
+  },
+  {
+    "candidate_id": "cand_70b877c0c2",
+    "problem_id": "apps_2176",
+    "code": "MOD = 998244353\n\ndef merge_sort_and_count(arr):\n    if len(arr) <= 1:\n        return arr, 0\n    \n    mid = len(arr) // 2\n    left, left_inv = merge_sort_and_count(arr[:mid])\n    right, right_inv = merge_sort_and_count(arr[mid:])\n    \n    merged, split_inv = merge_and_count(left, right)\n    \n    return merged, (left_inv + right_inv + split_inv) % MOD\n\ndef merge_and_count(left, right):\n    i = j = inv_count = 0\n    merged = []\n    \n    while i < len(left) and j < len(right):\n        if left[i][0] <= right[j][0]:\n            merged.append(left[i])\n            i += 1\n        else:\n            merged.append(right[j])\n            j += 1\n            inv_count += len(left) - i\n    \n    merged.extend(left[i:])\n    merged.extend(right[j:])\n    \n    return merged, inv_count\n\ndef count_good_permutations(n, s):\n    first_elements = [(a, i) for i, (a, b) in enumerate(s)]\n    second_elements = [(b, i) for i, (a, b) in enumerate(s)]\n    \n    first_sorted, first_inv = merge_sort_and_count(first_elements)\n    second_sorted, second_inv = merge_sort_and_count(second_elements)\n    \n    total_inversions = (first_inv + second_inv) % MOD\n    good_permutations = (pow(2, n, MOD) - total_inversions) % MOD\n    \n    return good_permutations\n\n# Input reading\nimport sys\ninput = sys.stdin.read\ndata = input().split()\n\nn = int(data[0])\ns = [(int(data[2*i+1]), int(data[2*i+2])) for i in range(n)]\n\n# Output the result\nprint(count_good_permutations(n, s))",
+    "code_hash": "59d3a3e7f677c269",
+    "language": "python",
+    "node_id": "n_4_bf5546",
+    "revision_id": "rev_n_4_bf5546_1",
+    "thought_path_snapshot": [
+      "Count inversions in both dimensions separately using a modified merge sort algorithm, but ensure that the merge step correctly counts inversions when merging two sorted subarrays. Use inclusion-exclusion principle to calculate the number of good permutations.",
+      "Revisit the merge sort implementation to ensure it correctly handles counting inversions, especially when merging two sorted subarrays. Ensure that the merge step accurately counts inversions where an element from the right subarray should precede an element from the left subarray in the final sorted array."
+    ],
+    "origin": "rethink",
+    "generation_record_id": null,
+    "created_sequence": 8
+  },
+  {
+    "candidate_id": "cand_cac8c19bbb",
+    "problem_id": "apps_2176",
+    "code": "from collections import Counter\nfrom math import factorial\n\nMOD = 998244353\n\ndef count_good_permutations(n, s):\n    def count_sorted_by_first():\n        cnt = Counter(a for a, _ in s)\n        return sum(factorial(v) for v in cnt.values()) % MOD\n    \n    def count_sorted_by_second():\n        cnt = Counter(b for _, b in s)\n        return sum(factorial(v) for v in cnt.values()) % MOD\n    \n    def count_both_sorted():\n        cnt_a = Counter(a for a, _ in s)\n        cnt_b = Counter(b for _, b in s)\n        return sum(min(cnt_a[a], cnt_b[b]) for a, b in s) % MOD\n    \n    total_permutations = factorial(n)\n    sorted_by_first = count_sorted_by_first()\n    sorted_by_second = count_sorted_by_second()\n    both_sorted = count_both_sorted()\n    \n    result = (total_permutations - sorted_by_first - sorted_by_second + both_sorted) % MOD\n    return result\n\n# Input reading\nimport sys\ninput = sys.stdin.read\ndata = input().split()\n\nn = int(data[0])\ns = [(int(data[i*2+1]), int(data[i*2+2])) for i in range(n)]\n\n# Output the result\nprint(count_good_permutations(n, s))",
+    "code_hash": "ea707ed90b184ed1",
+    "language": "python",
+    "node_id": "n_7_5099fe",
+    "revision_id": "rev_n_7_5099fe_0",
+    "thought_path_snapshot": [
+      "Revised Thought-1: Instead of directly counting valid permutations, consider counting all permutations and subtracting those that are invalid due to being sorted by either the first or second elements. However, this approach needs careful handling to avoid double-counting permutations that are invalid in both ways. Use inclusion-exclusion principle to correctly account for these cases.",
+      "Revisit the inclusion-exclusion principle implementation."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 9
+  },
+  {
+    "candidate_id": "cand_25878f96db",
+    "problem_id": "apps_2176",
+    "code": "from collections import defaultdict\nfrom math import factorial\n\nMOD = 998244353\n\ndef count_good_permutations(n, s):\n    # Count occurrences of each value in the first and second positions\n    first_count = defaultdict(int)\n    second_count = defaultdict(int)\n    \n    for a, b in s:\n        first_count[a] += 1\n        second_count[b] += 1\n    \n    # Calculate total permutations\n    total_permutations = factorial(n)\n    \n    # Subtract permutations sorted by first elements\n    sorted_by_first = 1\n    for count in first_count.values():\n        sorted_by_first *= factorial(count)\n        sorted_by_first %= MOD\n    \n    # Subtract permutations sorted by second elements\n    sorted_by_second = 1\n    for count in second_count.values():\n        sorted_by_second *= factorial(count)\n        sorted_by_second %= MOD\n    \n    # Add back permutations sorted by both first and second elements\n    sorted_by_both = 1\n    for a, b in s:\n        if first_count[a] > 1 and second_count[b] > 1:\n            sorted_by_both *= factorial(first_count[a])\n            sorted_by_both %= MOD\n            sorted_by_both *= factorial(second_count[b])\n            sorted_by_both %= MOD\n    \n    # Apply inclusion-exclusion principle\n    result = (total_permutations - sorted_by_first - sorted_by_second + sorted_by_both) % MOD\n    \n    return result\n\n# Read input\nimport sys\ninput = sys.stdin.read\ndata = input().split()\n\nn = int(data[0])\ns = []\nfor i in range(1, 2 * n, 2):\n    a = int(data[i])\n    b = int(data[i + 1])\n    s.append((a, b))\n\n# Output the result\nprint(count_good_permutations(n, s))",
+    "code_hash": "f874ed438ee99430",
+    "language": "python",
+    "node_id": "n_7_5099fe",
+    "revision_id": "rev_n_7_5099fe_1",
+    "thought_path_snapshot": [
+      "Revised Thought-1: Instead of directly counting valid permutations, consider counting all permutations and subtracting those that are invalid due to being sorted by either the first or second elements. However, this approach needs careful handling to avoid double-counting permutations that are invalid in both ways. Use inclusion-exclusion principle to correctly account for these cases.",
+      "Revised Thought-2: Implement the inclusion-exclusion principle correctly by ensuring that permutations sorted by both the first and second elements are not counted twice when subtracted. Use a set to track elements already considered in both sorted conditions to avoid double-counting."
+    ],
+    "origin": "rethink",
+    "generation_record_id": null,
+    "created_sequence": 10
+  },
+  {
+    "candidate_id": "cand_8a75b833b6",
+    "problem_id": "apps_2176",
+    "code": "from collections import defaultdict\nimport sys\n\nMOD = 998244353\n\ndef count_good_permutations(n, s):\n    # Count occurrences of each value in the first and second positions\n    first_count = defaultdict(int)\n    second_count = defaultdict(int)\n    \n    for a, b in s:\n        first_count[a] += 1\n        second_count[b] += 1\n    \n    # Calculate total permutations\n    total_permutations = pow(n, n, MOD)\n    \n    # Calculate permutations where the sequence is sorted by first elements\n    sorted_by_first = 1\n    for a in range(1, n + 1):\n        if first_count[a] > 0:\n            sorted_by_first *= pow(first_count[a], first_count[a], MOD)\n            sorted_by_first %= MOD\n    \n    # Calculate permutations where the sequence is sorted by second elements\n    sorted_by_second = 1\n    for b in range(1, n + 1):\n        if second_count[b] > 0:\n            sorted_by_second *= pow(second_count[b], second_count[b], MOD)\n            sorted_by_second %= MOD\n    \n    # Apply inclusion-exclusion principle\n    good_permutations = (total_permutations - sorted_by_first - sorted_by_second) % MOD\n    return good_permutations\n\n# Read input\ninput = sys.stdin.read\ndata = input().split()\nn = int(data[0])\ns = [(int(data[i * 2 + 1]), int(data[i * 2 + 2])) for i in range(n)]\n\n# Output result\nprint(count_good_permutations(n, s))",
+    "code_hash": "124d609b7988174b",
+    "language": "python",
+    "node_id": "n_8_2e25f0",
+    "revision_id": "rev_n_8_2e25f0_0",
+    "thought_path_snapshot": [
+      "Revised Thought-1: Instead of directly counting valid permutations, consider counting all permutations and subtracting those that are invalid due to being sorted by either the first or second elements. However, this approach needs careful handling to avoid double-counting permutations that are invalid in both ways. Use inclusion-exclusion principle to correctly account for these cases.",
+      "Consider using dynamic programming to count valid permutations efficiently."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 11
+  },
+  {
+    "candidate_id": "cand_b75eb94fed",
+    "problem_id": "apps_2176",
+    "code": "from math import factorial\n\nMOD = 998244353\n\ndef count_good_permutations(n, s):\n    def inversions(arr):\n        return sum(arr[i] > arr[j] for i in range(len(arr)) for j in range(i + 1, len(arr)))\n\n    def mod_inv(x):\n        return pow(x, MOD - 2, MOD)\n\n    def nCr(n, r):\n        return factorial(n) * mod_inv(factorial(r)) % MOD * mod_inv(factorial(n - r)) % MOD\n\n    def count_sorted_by_first():\n        freq = [0] * (n + 1)\n        for _, b in s:\n            freq[b] += 1\n        return sum(inversions(freq))\n\n    def count_sorted_by_second():\n        freq = [0] * (n + 1)\n        for a, _ in s:\n            freq[a] += 1\n        return sum(inversions(freq))\n\n    def count_both_sorted():\n        freq = [0] * (n + 1)\n        for a, b in s:\n            freq[min(a, b)] += 1\n        return sum(inversions(freq))\n\n    total_permutations = factorial(n)\n    sorted_by_first = count_sorted_by_first()\n    sorted_by_second = count_sorted_by_second()\n    both_sorted = count_both_sorted()\n\n    result = (total_permutations - sorted_by_first - sorted_by_second + both_sorted) % MOD\n    return result\n\n# Input reading\nimport sys\ninput = sys.stdin.read\ndata = input().split()\n\nn = int(data[0])\ns = [(int(data[2*i+1]), int(data[2*i+2])) for i in range(n)]\n\n# Output the result\nprint(count_good_permutations(n, s))",
+    "code_hash": "7ac745f7bd6edb9f",
+    "language": "python",
+    "node_id": "n_8_2e25f0",
+    "revision_id": "rev_n_8_2e25f0_1",
+    "thought_path_snapshot": [
+      "Revised Thought-1: Instead of directly counting valid permutations, consider counting all permutations and subtracting those that are invalid due to being sorted by either the first or second elements. However, this approach needs careful handling to avoid double-counting permutations that are invalid in both ways. Use inclusion-exclusion principle to correctly account for these cases.",
+      "Consider using combinatorial mathematics to count the number of valid permutations more efficiently. Specifically, use the principle of inclusion-exclusion to count permutations that are not sorted by either the first or second elements. This approach ensures accurate counting without double-counting invalid permutations."
+    ],
+    "origin": "rethink",
+    "generation_record_id": null,
+    "created_sequence": 12
+  },
+  {
+    "candidate_id": "cand_e219a799ca",
+    "problem_id": "apps_2176",
+    "code": "MOD = 998244353\n\ndef merge_sort_and_count(arr):\n    if len(arr) <= 1:\n        return arr, 0\n    \n    mid = len(arr) // 2\n    left, left_inv = merge_sort_and_count(arr[:mid])\n    right, right_inv = merge_sort_and_count(arr[mid:])\n    \n    merged, split_inv = merge_and_count(left, right)\n    \n    return merged, (left_inv + right_inv + split_inv) % MOD\n\ndef merge_and_count(left, right):\n    result = []\n    i = j = inv_count = 0\n    \n    while i < len(left) and j < len(right):\n        if left[i][0] <= right[j][0]:\n            result.append(left[i])\n            i += 1\n        else:\n            result.append(right[j])\n            j += 1\n            inv_count += len(left) - i\n    \n    result.extend(left[i:])\n    result.extend(right[j:])\n    \n    return result, inv_count\n\ndef count_good_permutations(n, s):\n    first_elements = [(a, i) for i, (a, b) in enumerate(s)]\n    second_elements = [(b, i) for i, (a, b) in enumerate(s)]\n    \n    first_inv, _ = merge_sort_and_count(first_elements)\n    second_inv, _ = merge_sort_and_count(second_elements)\n    \n    total_inv = (first_inv + second_inv) % MOD\n    good_permutations = pow(2, n, MOD) - (total_inv + n) % MOD\n    \n    return (good_permutations + MOD) % MOD\n\n# Input reading\nimport sys\ninput = sys.stdin.read\ndata = input().split()\n\nn = int(data[0])\ns = [(int(data[2*i+1]), int(data[2*i+2])) for i in range(n)]\n\n# Output the result\nprint(count_good_permutations(n, s))",
+    "code_hash": "0bfd2471d881d468",
+    "language": "python",
+    "node_id": "n_5_011c7a",
+    "revision_id": "rev_n_5_011c7a_0",
+    "thought_path_snapshot": [
+      "Count inversions in both dimensions separately using a modified merge sort algorithm, but ensure that the merge step correctly counts inversions when merging two sorted subarrays. Use inclusion-exclusion principle to calculate the number of good permutations.",
+      "Explore alternative sorting algorithms that can efficiently count inversions while maintaining readability and performance."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 13
+  },
+  {
+    "candidate_id": "cand_dd3966fcf7",
+    "problem_id": "apps_2176",
+    "code": "from itertools import permutations\n\nMOD = 998244353\n\ndef count_inversions(arr):\n    def merge_sort_and_count(arr):\n        if len(arr) <= 1:\n            return arr, 0\n        mid = len(arr) // 2\n        left, left_inv = merge_sort_and_count(arr[:mid])\n        right, right_inv = merge_sort_and_count(arr[mid:])\n        merged, split_inv = merge_and_count(left, right)\n        return merged, (left_inv + right_inv + split_inv) % MOD\n    \n    def merge_and_count(left, right):\n        result = []\n        i = j = inv_count = 0\n        while i < len(left) and j < len(right):\n            if left[i][0] <= right[j][0]:\n                result.append(left[i])\n                i += 1\n            else:\n                result.append(right[j])\n                j += 1\n                inv_count += len(left) - i\n        result.extend(left[i:])\n        result.extend(right[j:])\n        return result, inv_count\n    \n    _, inversions = merge_sort_and_count(arr)\n    return inversions\n\ndef is_good_sequence(seq):\n    return count_inversions(seq) == 0\n\ndef count_good_permutations(n, seq):\n    total_permutations = list(permutations(range(1, n+1)))\n    good_permutations = [perm for perm in total_permutations if is_good_sequence([(seq[p-1][0], seq[p-1][1]) for p in perm])]\n    return len(good_permutations)\n\n# Input reading\nimport sys\ninput = sys.stdin.read\ndata = input().split()\n\nn = int(data[0])\nseq = [(int(data[2*i+1]), int(data[2*i+2])) for i in range(n)]\n\n# Output the result\nprint(count_good_permutations(n, seq) % MOD)",
+    "code_hash": "e1a5452cae735bab",
+    "language": "python",
+    "node_id": "n_5_011c7a",
+    "revision_id": "rev_n_5_011c7a_1",
+    "thought_path_snapshot": [
+      "Count inversions in both dimensions separately using a modified merge sort algorithm, but ensure that the merge step correctly counts inversions when merging two sorted subarrays. Use inclusion-exclusion principle to calculate the number of good permutations.",
+      "Thought-2: Instead of directly counting inversions in both dimensions and applying the inclusion-exclusion principle, consider generating all possible permutations of the sequence and checking each permutation to see if it results in a good sequence. This approach ensures that we accurately identify all valid permutations without encountering errors related to data types or operations."
+    ],
+    "origin": "rethink",
+    "generation_record_id": null,
+    "created_sequence": 14
+  },
+  {
+    "candidate_id": "cand_901650630f",
+    "problem_id": "apps_2176",
+    "code": "from collections import Counter\nimport sys\n\nMOD = 998244353\n\ndef count_good_permutations(n, s):\n    # Count occurrences of each value in the first and second positions\n    first_count = Counter(a for a, b in s)\n    second_count = Counter(b for a, b in s)\n\n    # Calculate total permutations\n    total_permutations = pow(n, n, MOD)\n\n    # Calculate permutations where the sequence is sorted by first elements\n    sorted_by_first = 1\n    for count in first_count.values():\n        sorted_by_first = (sorted_by_first * pow(count, count, MOD)) % MOD\n\n    # Calculate permutations where the sequence is sorted by second elements\n    sorted_by_second = 1\n    for count in second_count.values():\n        sorted_by_second = (sorted_by_second * pow(count, count, MOD)) % MOD\n\n    # Calculate permutations where the sequence is sorted by both first and second elements\n    sorted_by_both = 1\n    for count in first_count.values():\n        sorted_by_both = (sorted_by_both * pow(count, count, MOD)) % MOD\n    for count in second_count.values():\n        sorted_by_both = (sorted_by_both * pow(count, count, MOD)) % MOD\n\n    # Apply inclusion-exclusion principle\n    good_permutations = (total_permutations - sorted_by_first - sorted_by_second + sorted_by_both) % MOD\n\n    return good_permutations\n\n# Read input\ninput = sys.stdin.read\ndata = input().split()\n\nn = int(data[0])\ns = [(int(data[i*2+1]), int(data[i*2+2])) for i in range(n)]\n\n# Output result\nprint(count_good_permutations(n, s))",
+    "code_hash": "fa32a90547f85688",
+    "language": "python",
+    "node_id": "n_9_f86cd0",
+    "revision_id": "rev_n_9_f86cd0_0",
+    "thought_path_snapshot": [
+      "Revised Thought-1: Instead of directly counting valid permutations, consider counting all permutations and subtracting those that are invalid due to being sorted by either the first or second elements. However, this approach needs careful handling to avoid double-counting permutations that are invalid in both ways. Use inclusion-exclusion principle to correctly account for these cases.",
+      "Explore combinatorial methods to directly calculate the number of good permutations."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 15
+  },
+  {
+    "candidate_id": "cand_6eb1ce1b31",
+    "problem_id": "apps_2176",
+    "code": "MOD = 998244353\n\ndef count_good_permutations(n, s):\n    def count_sorted_sequences(seq):\n        dp = [[0] * (n + 1) for _ in range(2)]\n        dp[0][0] = 1\n        for i in range(n):\n            dp[0][seq[i]] += dp[0][seq[i] - 1]\n            dp[1][seq[i]] += dp[1][seq[i] - 1]\n            dp[0][seq[i]] %= MOD\n            dp[1][seq[i]] %= MOD\n        return sum(dp[0]) % MOD + sum(dp[1]) % MOD - 2\n    \n    def count_valid_permutations():\n        first_elements = [x[0] for x in s]\n        second_elements = [x[1] for x in s]\n        return pow(n, n, MOD) - (count_sorted_sequences(first_elements) + count_sorted_sequences(second_elements)) % MOD + 2\n    \n    return count_valid_permutations() % MOD\n\n# Input reading\nimport sys\ninput = sys.stdin.read\ndata = input().split()\n\nn = int(data[0])\ns = [(int(data[2*i+1]), int(data[2*i+2])) for i in range(n)]\n\n# Output result\nprint(count_good_permutations(n, s))",
+    "code_hash": "3650905690c525d3",
+    "language": "python",
+    "node_id": "n_9_f86cd0",
+    "revision_id": "rev_n_9_f86cd0_1",
+    "thought_path_snapshot": [
+      "Revised Thought-1: Instead of directly counting valid permutations, consider counting all permutations and subtracting those that are invalid due to being sorted by either the first or second elements. However, this approach needs careful handling to avoid double-counting permutations that are invalid in both ways. Use inclusion-exclusion principle to correctly account for these cases.",
+      "Revised Thought-2: To directly calculate the number of good permutations, we need to ensure that neither the sequence of first elements nor the sequence of second elements is sorted. We can use dynamic programming to count the number of valid permutations by considering the constraints on the sequences formed by the first and second elements separately. Specifically, we can use a state machine approach to keep track of the possible states of the sequences as we process each element in the permutation. By combining the results from the first and second sequences, we can determine the total number of good permutations."
+    ],
+    "origin": "rethink",
+    "generation_record_id": null,
+    "created_sequence": 16
+  },
+  {
+    "candidate_id": "cand_8c34d512f8",
+    "problem_id": "apps_2176",
+    "code": "from collections import defaultdict\nfrom math import factorial\n\nMOD = 998244353\n\ndef count_good_permutations(n, s):\n    def count_sorted_by_first():\n        dp = [[0] * (n + 1) for _ in range(n + 1)]\n        dp[0][0] = 1\n        for i in range(1, n + 1):\n            for j in range(i + 1):\n                dp[i][j] = (dp[i - 1][j] + dp[i - 1][j - 1] * i) % MOD\n        return sum(dp[n]) % MOD\n\n    def count_sorted_by_second():\n        dp = [[0] * (n + 1) for _ in range(n + 1)]\n        dp[0][0] = 1\n        for i in range(1, n + 1):\n            for j in range(i + 1):\n                dp[i][j] = (dp[i - 1][j] + dp[i - 1][j - 1] * i) % MOD\n        return sum(dp[n]) % MOD\n\n    def count_both_sorted():\n        dp = [[[0] * (n + 1) for _ in range(n + 1)] for _ in range(n + 1)]\n        dp[0][0][0] = 1\n        for i in range(1, n + 1):\n            for j in range(i + 1):\n                for k in range(j + 1):\n                    dp[i][j][k] = (dp[i - 1][j][k] + dp[i - 1][j - 1][k] * i + dp[i - 1][j][k - 1] * i) % MOD\n        return sum(dp[n][j][j] for j in range(n + 1)) % MOD\n\n    total_permutations = factorial(n)\n    sorted_by_first = count_sorted_by_first()\n    sorted_by_second = count_sorted_by_second()\n    both_sorted = count_both_sorted()\n\n    result = (total_permutations - sorted_by_first - sorted_by_second + both_sorted) % MOD\n    return result\n\n# Input reading\nimport sys\ninput = sys.stdin.read\ndata = input().split()\n\nn = int(data[0])\ns = [(int(data[2*i+1]), int(data[2*i+2])) for i in range(n)]\n\n# Output the result\nprint(count_good_permutations(n, s))",
+    "code_hash": "f2c0d3dc0fd4adb6",
+    "language": "python",
+    "node_id": "n_10_a57504",
+    "revision_id": "rev_n_10_a57504_0",
+    "thought_path_snapshot": [
+      "Revised Thought-1: Instead of directly counting valid permutations, consider counting all permutations and subtracting those that are invalid due to being sorted by either the first or second elements. However, this approach needs careful handling to avoid double-counting permutations that are invalid in both ways. Use inclusion-exclusion principle to correctly account for these cases.",
+      "Revised Thought-2: Implement the inclusion-exclusion principle correctly by ensuring that permutations sorted by both the first and second elements are not counted twice when subtracted. Use a set to track elements already considered in both sorted conditions to avoid double-counting.",
+      "Revisit the inclusion-exclusion principle implementation."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 17
+  },
+  {
+    "candidate_id": "cand_1c1d6d9115",
+    "problem_id": "apps_2176",
+    "code": "from collections import Counter\nfrom math import factorial\n\nMOD = 998244353\n\ndef count_good_permutations(n, s):\n    # Count occurrences of each element in the first and second positions\n    first_count = Counter(a for a, _ in s)\n    second_count = Counter(b for _, b in s)\n\n    # Calculate total number of permutations\n    total_permutations = factorial(n)\n\n    # Calculate permutations sorted by first elements\n    sorted_by_first = 1\n    for count in first_count.values():\n        sorted_by_first *= factorial(count)\n        sorted_by_first %= MOD\n\n    # Calculate permutations sorted by second elements\n    sorted_by_second = 1\n    for count in second_count.values():\n        sorted_by_second *= factorial(count)\n        sorted_by_second %= MOD\n\n    # Apply inclusion-exclusion principle\n    good_permutations = (total_permutations - sorted_by_first - sorted_by_second + sorted_by_first * sorted_by_second // factorial(n)) % MOD\n\n    return good_permutations\n\n# Read input\nimport sys\ninput = sys.stdin.read\ndata = input().split()\n\nn = int(data[0])\ns = [(int(data[i*2+1]), int(data[i*2+2])) for i in range(n)]\n\n# Output result\nprint(count_good_permutations(n, s))",
+    "code_hash": "d025f1787a535531",
+    "language": "python",
+    "node_id": "n_10_a57504",
+    "revision_id": "rev_n_10_a57504_1",
+    "thought_path_snapshot": [
+      "Revised Thought-1: Instead of directly counting valid permutations, consider counting all permutations and subtracting those that are invalid due to being sorted by either the first or second elements. However, this approach needs careful handling to avoid double-counting permutations that are invalid in both ways. Use inclusion-exclusion principle to correctly account for these cases.",
+      "Revised Thought-2: Implement the inclusion-exclusion principle correctly by ensuring that permutations sorted by both the first and second elements are not counted twice when subtracted. Use a set to track elements already considered in both sorted conditions to avoid double-counting.",
+      "Revised Thought-3: The current approach using dynamic programming to count sorted sequences by first and second elements separately and then applying the inclusion-exclusion principle might be incorrect. Instead, focus on generating all permutations and checking each one for goodness. Since \\( n \\) can be up to \\( 3 \\times 10^5 \\), this brute-force method is not feasible. Instead, use combinatorial insights to directly calculate the number of good permutations without explicitly generating them. Specifically, identify patterns or properties of good permutations that allow for efficient counting."
+    ],
+    "origin": "rethink",
+    "generation_record_id": null,
+    "created_sequence": 18
+  },
+  {
+    "candidate_id": "cand_ad1224c875",
+    "problem_id": "apps_2176",
+    "code": "from collections import Counter\nfrom math import factorial\n\nMOD = 998244353\n\ndef count_good_permutations(n, s):\n    def is_sorted_by_first():\n        return all(s[i][0] <= s[i + 1][0] for i in range(n - 1))\n\n    def is_sorted_by_second():\n        return all(s[i][1] <= s[i + 1][1] for i in range(n - 1))\n\n    total_permutations = factorial(n)\n    sorted_by_first = factorial(sum(1 for _, _ in s if is_sorted_by_first()))\n    sorted_by_second = factorial(sum(1 for _, _ in s if is_sorted_by_second()))\n    sorted_by_both = factorial(sum(1 for _, _ in s if is_sorted_by_first() and is_sorted_by_second()))\n\n    return (total_permutations - sorted_by_first - sorted_by_second + sorted_by_both) % MOD\n\n# Input reading\nimport sys\ninput = sys.stdin.read\ndata = input().split()\n\nn = int(data[0])\ns = [(int(data[2 * i + 1]), int(data[2 * i + 2])) for i in range(n)]\n\n# Output the result\nprint(count_good_permutations(n, s))",
+    "code_hash": "4a50e4bed8cd066c",
+    "language": "python",
+    "node_id": "n_11_ecd5fa",
+    "revision_id": "rev_n_11_ecd5fa_0",
+    "thought_path_snapshot": [
+      "Revised Thought-1: Instead of directly counting valid permutations, consider counting all permutations and subtracting those that are invalid due to being sorted by either the first or second elements. However, this approach needs careful handling to avoid double-counting permutations that are invalid in both ways. Use inclusion-exclusion principle to correctly account for these cases.",
+      "Revised Thought-2: Implement the inclusion-exclusion principle correctly by ensuring that permutations sorted by both the first and second elements are not counted twice when subtracted. Use a set to track elements already considered in both sorted conditions to avoid double-counting.",
+      "Check for edge cases where the sequence might be empty or have repeated elements."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 19
+  },
+  {
+    "candidate_id": "cand_5b3666ca5c",
+    "problem_id": "apps_2176",
+    "code": "from collections import defaultdict\nfrom math import factorial\n\nMOD = 998244353\n\ndef count_good_permutations(n, s):\n    def is_sorted_by_first(seq):\n        return seq == sorted(seq, key=lambda x: x[0])\n\n    def is_sorted_by_second(seq):\n        return seq == sorted(seq, key=lambda x: x[1])\n\n    def count_inversions(seq):\n        inversions = 0\n        for i in range(len(seq)):\n            for j in range(i + 1, len(seq)):\n                if seq[i][0] > seq[j][0]:\n                    inversions += 1\n                elif seq[i][1] > seq[j][1]:\n                    inversions += 1\n        return inversions\n\n    total_permutations = factorial(n)\n    inversions_by_first = sum(count_inversions(s[:i+1]) for i in range(n))\n    inversions_by_second = sum(count_inversions([(x[1], x[0]) for x in s[:i+1]]) for i in range(n))\n\n    # Using inclusion-exclusion principle\n    inversions_both = sum(count_inversions([(x[0], x[1]) for x in s[:i+1]]) for i in range(n))\n\n    result = (total_permutations - inversions_by_first - inversions_by_second + inversions_both) % MOD\n    return result\n\n# Input reading\nimport sys\ninput = sys.stdin.read\ndata = input().split()\n\nn = int(data[0])\ns = [(int(data[2*i+1]), int(data[2*i+2])) for i in range(n)]\n\n# Output the result\nprint(count_good_permutations(n, s))",
+    "code_hash": "d6f06ff35ee83910",
+    "language": "python",
+    "node_id": "n_11_ecd5fa",
+    "revision_id": "rev_n_11_ecd5fa_1",
+    "thought_path_snapshot": [
+      "Revised Thought-1: Instead of directly counting valid permutations, consider counting all permutations and subtracting those that are invalid due to being sorted by either the first or second elements. However, this approach needs careful handling to avoid double-counting permutations that are invalid in both ways. Use inclusion-exclusion principle to correctly account for these cases.",
+      "Revised Thought-2: Implement the inclusion-exclusion principle correctly by ensuring that permutations sorted by both the first and second elements are not counted twice when subtracted. Use a set to track elements already considered in both sorted conditions to avoid double-counting.",
+      "Revised Thought-3: Ensure that the logic for checking if the sequence is sorted by both the first and second elements is correct and does not double-count permutations. Specifically, use a more efficient method to determine if a subsequence is sorted without iterating through each element individually."
+    ],
+    "origin": "rethink",
+    "generation_record_id": null,
+    "created_sequence": 20
+  },
+  {
+    "candidate_id": "cand_484f6a04cc",
+    "problem_id": "apps_2176",
+    "code": "from math import factorial\n\nMOD = 998244353\n\ndef mod_inv(x):\n    return pow(x, MOD - 2, MOD)\n\ndef count_good_permutations(n, s):\n    def count_sorted_by_first():\n        dp = [[0] * (n + 1) for _ in range(n + 1)]\n        dp[0][0] = 1\n        for i in range(1, n + 1):\n            for j in range(i + 1):\n                dp[i][j] = (dp[i - 1][j] + dp[i - 1][j - 1] * j % MOD) % MOD\n        return sum(dp[n]) % MOD\n\n    def count_sorted_by_second():\n        dp = [[0] * (n + 1) for _ in range(n + 1)]\n        dp[0][0] = 1\n        for i in range(1, n + 1):\n            for j in range(i + 1):\n                dp[i][j] = (dp[i - 1][j] + dp[i - 1][j - 1] * j % MOD) % MOD\n        return sum(dp[n]) % MOD\n\n    def count_both_sorted():\n        dp = [[[0] * (n + 1) for _ in range(n + 1)] for _ in range(n + 1)]\n        dp[0][0][0] = 1\n        for i in range(1, n + 1):\n            for j in range(i + 1):\n                for k in range(j + 1):\n                    dp[i][j][k] = (dp[i - 1][j][k] + dp[i - 1][j - 1][k] * j % MOD) % MOD\n                    dp[i][j][k] = (dp[i][j][k] + dp[i - 1][j][k - 1] * k % MOD) % MOD\n        return dp[n][n][n]\n\n    total_permutations = factorial(n)\n    sorted_by_first = count_sorted_by_first()\n    sorted_by_second = count_sorted_by_second()\n    both_sorted = count_both_sorted()\n\n    result = (total_permutations - sorted_by_first - sorted_by_second + both_sorted) % MOD\n    return result\n\n# Input reading\nimport sys\ninput = sys.stdin.read\ndata = input().split()\n\nn = int(data[0])\ns = []\nfor i in range(n):\n    a = int(data[2 * i + 1])\n    b = int(data[2 * i + 2])\n    s.append((a, b))\n\n# Output the result\nprint(count_good_permutations(n, s))",
+    "code_hash": "c1f4485e87d64dda",
+    "language": "python",
+    "node_id": "n_12_1c3a74",
+    "revision_id": "rev_n_12_1c3a74_0",
+    "thought_path_snapshot": [
+      "Revised Thought-1: Instead of directly counting valid permutations, consider counting all permutations and subtracting those that are invalid due to being sorted by either the first or second elements. However, this approach needs careful handling to avoid double-counting permutations that are invalid in both ways. Use inclusion-exclusion principle to correctly account for these cases.",
+      "Revised Thought-2: Implement the inclusion-exclusion principle correctly by ensuring that permutations sorted by both the first and second elements are not counted twice when subtracted. Use a set to track elements already considered in both sorted conditions to avoid double-counting.",
+      "Optimize the calculation of factorials and modular arithmetic operations."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 21
+  },
+  {
+    "candidate_id": "cand_0415a0f196",
+    "problem_id": "apps_2176",
+    "code": "from math import factorial\n\nMOD = 998244353\n\ndef mod_inv(x):\n    return pow(x, MOD - 2, MOD)\n\ndef binom(n, k):\n    if k > n:\n        return 0\n    return factorial(n) * mod_inv(factorial(k)) % MOD * mod_inv(factorial(n - k)) % MOD\n\ndef count_good_permutations(n, s):\n    def count_sorted_by_first():\n        dp = [[0] * (n + 1) for _ in range(n + 1)]\n        dp[0][0] = 1\n        for i in range(1, n + 1):\n            for j in range(i + 1):\n                dp[i][j] = (dp[i - 1][j] + dp[i - 1][j - 1] * i) % MOD\n        return sum(dp[n]) % MOD\n\n    def count_sorted_by_second():\n        dp = [[0] * (n + 1) for _ in range(n + 1)]\n        dp[0][0] = 1\n        for i in range(1, n + 1):\n            for j in range(i + 1):\n                dp[i][j] = (dp[i - 1][j] + dp[i - 1][j - 1] * i) % MOD\n        return sum(dp[n]) % MOD\n\n    def count_both_sorted():\n        dp = [[[0] * (n + 1) for _ in range(n + 1)] for _ in range(n + 1)]\n        dp[0][0][0] = 1\n        for i in range(1, n + 1):\n            for j in range(i + 1):\n                for k in range(j + 1):\n                    dp[i][j][k] = (dp[i - 1][j][k] + dp[i - 1][j - 1][k] * i + dp[i - 1][j][k - 1] * i) % MOD\n        return dp[n][n][n]\n\n    total_permutations = pow(n, n, MOD)\n    sorted_by_first = count_sorted_by_first()\n    sorted_by_second = count_sorted_by_second()\n    both_sorted = count_both_sorted()\n\n    return (total_permutations - sorted_by_first - sorted_by_second + both_sorted) % MOD\n\n# Input reading\nimport sys\ninput = sys.stdin.read\ndata = input().split()\n\nn = int(data[0])\ns = [(int(data[2*i+1]), int(data[2*i+2])) for i in range(n)]\n\n# Output the result\nprint(count_good_permutations(n, s))",
+    "code_hash": "e1c7c741499ca6b3",
+    "language": "python",
+    "node_id": "n_12_1c3a74",
+    "revision_id": "rev_n_12_1c3a74_1",
+    "thought_path_snapshot": [
+      "Revised Thought-1: Instead of directly counting valid permutations, consider counting all permutations and subtracting those that are invalid due to being sorted by either the first or second elements. However, this approach needs careful handling to avoid double-counting permutations that are invalid in both ways. Use inclusion-exclusion principle to correctly account for these cases.",
+      "Revised Thought-2: Implement the inclusion-exclusion principle correctly by ensuring that permutations sorted by both the first and second elements are not counted twice when subtracted. Use a set to track elements already considered in both sorted conditions to avoid double-counting.",
+      "Revised Thought-3: To accurately count the number of good permutations, we need to use a more efficient approach than dynamic programming for large values of \\( n \\). Specifically, we can use combinatorial mathematics to calculate the number of permutations that sort the sequence by either the first or second elements, and then apply the inclusion-exclusion principle to avoid overcounting. This involves calculating binomial coefficients and their modular inverses efficiently."
+    ],
+    "origin": "rethink",
+    "generation_record_id": null,
+    "created_sequence": 22
+  },
+  {
+    "candidate_id": "cand_8ef005d3aa",
+    "problem_id": "apps_2176",
+    "code": "MOD = 998244353\n\ndef count_inversions(arr):\n    def merge_sort_and_count(arr):\n        if len(arr) <= 1:\n            return arr, 0\n        \n        mid = len(arr) // 2\n        left, left_inv = merge_sort_and_count(arr[:mid])\n        right, right_inv = merge_sort_and_count(arr[mid:])\n        \n        merged, split_inv = merge_and_count(left, right)\n        \n        return merged, (left_inv + right_inv + split_inv) % MOD\n    \n    def merge_and_count(left, right):\n        result = []\n        i = j = inv_count = 0\n        \n        while i < len(left) and j < len(right):\n            if left[i][0] <= right[j][0]:\n                result.append(left[i])\n                i += 1\n            else:\n                result.append(right[j])\n                j += 1\n                inv_count += len(left) - i\n        \n        result.extend(left[i:])\n        result.extend(right[j:])\n        \n        return result, inv_count\n    \n    _, inversions = merge_sort_and_count(arr)\n    return inversions\n\ndef count_good_permutations(n, s):\n    first_elements = [(a, i) for i, (a, b) in enumerate(s)]\n    second_elements = [(b, i) for i, (a, b) in enumerate(s)]\n    \n    inv_first = count_inversions(first_elements)\n    inv_second = count_inversions(second_elements)\n    \n    total_inversions = (inv_first + inv_second) % MOD\n    good_permutations = pow(2, n, MOD) - (pow(2, inv_first, MOD) + pow(2, inv_second, MOD) - 1) % MOD\n    \n    return good_permutations\n\n# Input reading\nimport sys\ninput = sys.stdin.read\ndata = input().split()\n\nn = int(data[0])\ns = [(int(data[2*i+1]), int(data[2*i+2])) for i in range(n)]\n\n# Output the result\nprint(count_good_permutations(n, s))",
+    "code_hash": "5368017cca6975f2",
+    "language": "python",
+    "node_id": "n_6_0bcd0b",
+    "revision_id": "rev_n_6_0bcd0b_0",
+    "thought_path_snapshot": [
+      "Count inversions in both dimensions separately using a modified merge sort algorithm, but ensure that the merge step correctly counts inversions when merging two sorted subarrays. Use inclusion-exclusion principle to calculate the number of good permutations.",
+      "Implement a different approach to solve the problem without relying on sorting and inversion counting, focusing on combinatorial logic."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 23
+  },
+  {
+    "candidate_id": "cand_9298d3efe4",
+    "problem_id": "apps_2176",
+    "code": "MOD = 998244353\n\ndef count_inversions(arr):\n    def merge_sort_and_count(arr):\n        if len(arr) <= 1:\n            return arr, 0\n        \n        mid = len(arr) // 2\n        left, left_inv = merge_sort_and_count(arr[:mid])\n        right, right_inv = merge_sort_and_count(arr[mid:])\n        \n        merged, split_inv = merge_and_count(left, right)\n        \n        return merged, (left_inv + right_inv + split_inv) % MOD\n    \n    def merge_and_count(left, right):\n        result = []\n        i = j = inv_count = 0\n        \n        while i < len(left) and j < len(right):\n            if left[i][0] <= right[j][0]:\n                result.append(left[i])\n                i += 1\n            else:\n                result.append(right[j])\n                j += 1\n                inv_count += len(left) - i\n        \n        result.extend(left[i:])\n        result.extend(right[j:])\n        \n        return result, inv_count\n    \n    _, inversions = merge_sort_and_count(arr)\n    return inversions\n\ndef count_good_permutations(n, s):\n    first_elements = [(a, i) for i, (a, _) in enumerate(s)]\n    second_elements = [(b, i) for i, (_, b) in enumerate(s)]\n    \n    inv_first = count_inversions(first_elements)\n    inv_second = count_inversions(second_elements)\n    \n    total_permutations = pow(n, n, MOD)\n    bad_permutations = (pow(2, n, MOD) - 1) * pow(n, n, MOD) // 2\n    \n    good_permutations = (total_permutations - bad_permutations + MOD) % MOD\n    good_permutations = (good_permutations - inv_first * inv_second + MOD) % MOD\n    \n    return good_permutations\n\n# Input reading\nimport sys\ninput = sys.stdin.read\ndata = input().split()\n\nn = int(data[0])\ns = [(int(data[2*i+1]), int(data[2*i+2])) for i in range(n)]\n\n# Output the result\nprint(count_good_permutations(n, s))",
+    "code_hash": "47792f22f727ef1b",
+    "language": "python",
+    "node_id": "n_6_0bcd0b",
+    "revision_id": "rev_n_6_0bcd0b_1",
+    "thought_path_snapshot": [
+      "Count inversions in both dimensions separately using a modified merge sort algorithm, but ensure that the merge step correctly counts inversions when merging two sorted subarrays. Use inclusion-exclusion principle to calculate the number of good permutations.",
+      "Revised Thought-2: Instead of directly counting inversions, use a combinatorial approach to determine the number of valid permutations. Specifically, calculate the number of permutations where the sequence remains unsorted in both dimensions after applying any permutation. Subtract this from the total number of permutations to find the number of good permutations. Utilize dynamic programming to efficiently compute the required values."
+    ],
+    "origin": "rethink",
+    "generation_record_id": null,
+    "created_sequence": 24
+  },
+  {
+    "candidate_id": "cand_e57c902c11",
+    "problem_id": "apps_2176",
+    "code": "from math import factorial\n\nMOD = 998244353\n\ndef count_good_permutations(n, s):\n    def inversions(arr):\n        return sum(arr[i] > arr[j] for i in range(len(arr)) for j in range(i + 1, len(arr)))\n\n    def mod_inv(x):\n        return pow(x, MOD - 2, MOD)\n\n    def nCr(n, r):\n        return factorial(n) * mod_inv(factorial(r)) % MOD * mod_inv(factorial(n - r)) % MOD\n\n    def count_sorted_by_first():\n        freq = [0] * (n + 1)\n        for _, b in s:\n            freq[b] += 1\n        return sum(inversions(freq))\n\n    def count_sorted_by_second():\n        freq = [0] * (n + 1)\n        for a, _ in s:\n            freq[a] += 1\n        return sum(inversions(freq))\n\n    def count_both_sorted():\n        freq = [0] * (n + 1)\n        for a, b in s:\n            freq[min(a, b)] += 1\n        return sum(inversions(freq))\n\n    total_permutations = factorial(n)\n    sorted_by_first = count_sorted_by_first()\n    sorted_by_second = count_sorted_by_second()\n    both_sorted = count_both_sorted()\n\n    result = (total_permutations - sorted_by_first - sorted_by_second + both_sorted) % MOD\n    return result\n\n# Input reading\nimport sys\ninput = sys.stdin.read\ndata = input().split()\n\nn = int(data[0])\ns = [(int(data[2*i+1]), int(data[2*i+2])) for i in range(n)]\n\n# Output the result\nprint(count_good_permutations(n, s))",
+    "code_hash": "7ac745f7bd6edb9f",
+    "language": "python",
+    "node_id": "n_13_839550",
+    "revision_id": "rev_n_13_839550_0",
+    "thought_path_snapshot": [
+      "Revised Thought-1: Instead of directly counting valid permutations, consider counting all permutations and subtracting those that are invalid due to being sorted by either the first or second elements. However, this approach needs careful handling to avoid double-counting permutations that are invalid in both ways. Use inclusion-exclusion principle to correctly account for these cases.",
+      "Consider using combinatorial mathematics to count the number of valid permutations more efficiently. Specifically, use the principle of inclusion-exclusion to count permutations that are not sorted by either the first or second elements. This approach ensures accurate counting without double-counting invalid permutations.",
+      "Revisit the inclusion-exclusion principle implementation."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 25
+  },
+  {
+    "candidate_id": "cand_eb745fe6cd",
+    "problem_id": "apps_2176",
+    "code": "MOD = 998244353\n\ndef inversions(arr):\n    freq = [0] * (len(arr) + 1)\n    result = 0\n    for x in arr:\n        result += sum(freq[:x])\n        freq[x] += 1\n    return result\n\ndef count_sorted_by_first(s):\n    freq = [0] * (len(s) + 1)\n    result = 0\n    for _, b in s:\n        result += sum(freq[:b])\n        freq[b] += 1\n    return result\n\ndef count_sorted_by_second(s):\n    freq = [0] * (len(s) + 1)\n    result = 0\n    for a, _ in s:\n        result += sum(freq[:a])\n        freq[a] += 1\n    return result\n\ndef count_both_sorted(s):\n    freq = [0] * (len(s) + 1)\n    result = 0\n    for a, b in s:\n        result += sum(freq[:min(a, b)])\n        freq[min(a, b)] += 1\n    return result\n\ndef factorial(n):\n    result = 1\n    for i in range(2, n + 1):\n        result = (result * i) % MOD\n    return result\n\ndef mod_inverse(x):\n    return pow(x, MOD - 2, MOD)\n\ndef solve():\n    import sys\n    input = sys.stdin.read\n    data = input().split()\n    \n    n = int(data[0])\n    s = []\n    index = 1\n    for _ in range(n):\n        a = int(data[index])\n        b = int(data[index + 1])\n        s.append((a, b))\n        index += 2\n    \n    total_permutations = factorial(n)\n    sorted_by_first = count_sorted_by_first(s)\n    sorted_by_second = count_sorted_by_second(s)\n    both_sorted = count_both_sorted(s)\n    \n    result = (total_permutations - sorted_by_first - sorted_by_second + both_sorted) % MOD\n    result = (result * mod_inverse(factorial(2))) % MOD\n    \n    print(result)\n\nif __name__ == \"__main__\":\n    solve()",
+    "code_hash": "4b1882047e7469c3",
+    "language": "python",
+    "node_id": "n_13_839550",
+    "revision_id": "rev_n_13_839550_1",
+    "thought_path_snapshot": [
+      "Revised Thought-1: Instead of directly counting valid permutations, consider counting all permutations and subtracting those that are invalid due to being sorted by either the first or second elements. However, this approach needs careful handling to avoid double-counting permutations that are invalid in both ways. Use inclusion-exclusion principle to correctly account for these cases.",
+      "Consider using combinatorial mathematics to count the number of valid permutations more efficiently. Specifically, use the principle of inclusion-exclusion to count permutations that are not sorted by either the first or second elements. This approach ensures accurate counting without double-counting invalid permutations.",
+      "Revised Thought-3: To fix the error, ensure that the `inversions` function correctly handles the calculation of inversions in the frequency arrays. Specifically, the `inversions` function should iterate through the frequency array and count the number of inversions between elements, taking care to handle the fact that the frequency array represents counts rather than indices. This will require modifying the `inversions` function to work with counts instead of direct comparisons. Additionally, verify that the `count_sorted_by_first`, `count_sorted_by_second`, and `count_both_sorted` functions correctly update the frequency arrays based on the sequence elements."
+    ],
+    "origin": "rethink",
+    "generation_record_id": null,
+    "created_sequence": 26
+  },
+  {
+    "candidate_id": "cand_281dd82338",
+    "problem_id": "apps_2176",
+    "code": "MOD = 998244353\n\ndef count_good_permutations(n, s):\n    def count_sorted(arr):\n        return arr == sorted(arr)\n\n    def count_valid_sequences(n, s):\n        dp = [[0] * (n + 1) for _ in range(2)]\n        dp[0][0] = 1\n        for i in range(n):\n            new_dp = [[0] * (n + 1) for _ in range(2)]\n            for j in range(n + 1):\n                if j > 0:\n                    new_dp[0][j] += dp[0][j - 1]\n                    new_dp[0][j] %= MOD\n                if j < n:\n                    new_dp[1][j] += dp[1][j + 1]\n                    new_dp[1][j] %= MOD\n                if j > 0 and j < n:\n                    if s[i][0] >= s[i - 1][0]:\n                        new_dp[0][j] += dp[0][j - 1]\n                        new_dp[0][j] %= MOD\n                    if s[i][1] >= s[i - 1][1]:\n                        new_dp[1][j] += dp[1][j + 1]\n                        new_dp[1][j] %= MOD\n            dp = new_dp\n        return sum(dp[0]) % MOD + sum(dp[1]) % MOD - 1\n\n    def count_invalid_sequences(n, s):\n        return count_valid_sequences(n, s) - count_sorted([x[0] for x in s]) - count_sorted([x[1] for x in s])\n\n    return pow(factorial(n), MOD - 2, MOD) * (count_valid_sequences(n, s) - count_invalid_sequences(n, s)) % MOD\n\nfrom math import factorial\n\n# Example usage:\nn = int(input())\ns = [tuple(map(int, input().split())) for _ in range(n)]\nprint(count_good_permutations(n, s))",
+    "code_hash": "6dba3bfe9501660a",
+    "language": "python",
+    "node_id": "n_16_1bc24a",
+    "revision_id": "rev_n_16_1bc24a_0",
+    "thought_path_snapshot": [
+      "Revised Thought-1: Instead of directly counting valid permutations, consider counting all permutations and subtracting those that are invalid due to being sorted by either the first or second elements. However, this approach needs careful handling to avoid double-counting permutations that are invalid in both ways. Use inclusion-exclusion principle to correctly account for these cases.",
+      "Revised Thought-2: To directly calculate the number of good permutations, we need to ensure that neither the sequence of first elements nor the sequence of second elements is sorted. We can use dynamic programming to count the number of valid permutations by considering the constraints on the sequences formed by the first and second elements separately. Specifically, we can use a state machine approach to keep track of the possible states of the sequences as we process each element in the permutation. By combining the results from the first and second sequences, we can determine the total number of good permutations.",
+      "Revisit the inclusion-exclusion principle implementation."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 27
+  },
+  {
+    "candidate_id": "cand_ce9136fb35",
+    "problem_id": "apps_2176",
+    "code": "MOD = 998244353\n\ndef count_good_permutations(n, s):\n    def count_sorted_by_first():\n        dp = [[0] * (n + 1) for _ in range(2)]\n        dp[0][0] = 1\n        for i in range(n):\n            for j in range(i + 1):\n                dp[0][j + 1] = (dp[0][j + 1] + dp[0][j]) % MOD\n                dp[1][j + 1] = (dp[1][j + 1] + dp[1][j] * (i - j + 1)) % MOD\n        return sum(dp[0]) % MOD\n\n    def count_sorted_by_second():\n        dp = [[0] * (n + 1) for _ in range(2)]\n        dp[0][0] = 1\n        for i in range(n):\n            for j in range(i + 1):\n                dp[0][j + 1] = (dp[0][j + 1] + dp[0][j]) % MOD\n                dp[1][j + 1] = (dp[1][j + 1] + dp[1][j] * (i - j + 1)) % MOD\n        return sum(dp[0]) % MOD\n\n    def count_both_sorted():\n        dp = [[[0] * (n + 1) for _ in range(2)] for _ in range(2)]\n        dp[0][0][0] = 1\n        for i in range(n):\n            for j in range(i + 1):\n                for k in range(j + 1):\n                    dp[0][0][k + 1] = (dp[0][0][k + 1] + dp[0][0][k]) % MOD\n                    dp[0][1][k + 1] = (dp[0][1][k + 1] + dp[0][1][k] * (i - j + 1)) % MOD\n                    dp[1][0][k + 1] = (dp[1][0][k + 1] + dp[1][0][k] * (i - j + 1)) % MOD\n                    dp[1][1][k + 1] = (dp[1][1][k + 1] + dp[1][1][k] * (i - j + 1) * (i - j + 2) // 2) % MOD\n        return dp[0][0][-1] + dp[0][1][-1] + dp[1][0][-1] + dp[1][1][-1]\n\n    total_permutations = pow(n, n, MOD)\n    sorted_by_first = count_sorted_by_first()\n    sorted_by_second = count_sorted_by_second()\n    both_sorted = count_both_sorted()\n\n    result = (total_permutations - sorted_by_first - sorted_by_second + both_sorted) % MOD\n    return result\n\n# Example usage:\nif __name__ == \"__main__\":\n    import sys\n    input = sys.stdin.read\n    data = input().split()\n    \n    n = int(data[0])\n    s = []\n    index = 1\n    for _ in range(n):\n        a = int(data[index])\n        b = int(data[index + 1])\n        s.append((a, b))\n        index += 2\n    \n    print(count_good_permutations(n, s))",
+    "code_hash": "14a8a1495c5d38f9",
+    "language": "python",
+    "node_id": "n_16_1bc24a",
+    "revision_id": "rev_n_16_1bc24a_1",
+    "thought_path_snapshot": [
+      "Revised Thought-1: Instead of directly counting valid permutations, consider counting all permutations and subtracting those that are invalid due to being sorted by either the first or second elements. However, this approach needs careful handling to avoid double-counting permutations that are invalid in both ways. Use inclusion-exclusion principle to correctly account for these cases.",
+      "Revised Thought-2: To directly calculate the number of good permutations, we need to ensure that neither the sequence of first elements nor the sequence of second elements is sorted. We can use dynamic programming to count the number of valid permutations by considering the constraints on the sequences formed by the first and second elements separately. Specifically, we can use a state machine approach to keep track of the possible states of the sequences as we process each element in the permutation. By combining the results from the first and second sequences, we can determine the total number of good permutations.",
+      "Revised Thought-3: Implement the inclusion-exclusion principle correctly by counting permutations where the sequence is sorted by either the first or second elements, and subtracting those that are sorted by both. Ensure that the dynamic programming approach accurately reflects the constraints and handles edge cases properly."
+    ],
+    "origin": "rethink",
+    "generation_record_id": null,
+    "created_sequence": 28
+  },
+  {
+    "candidate_id": "cand_4d7f2f12db",
+    "problem_id": "apps_2176",
+    "code": "from collections import Counter\nimport sys\n\nMOD = 998244353\n\ndef count_good_permutations(n, s):\n    # Count occurrences of each element in the sequence\n    count_a = Counter(a for a, _ in s)\n    count_b = Counter(b for _, b in s)\n\n    # Calculate the total number of permutations\n    total_permutations = factorial(n) % MOD\n\n    # Calculate the number of permutations sorted by first elements\n    sorted_by_first = 1\n    for a in range(1, n + 1):\n        if count_a[a] > 0:\n            sorted_by_first *= factorial(count_a[a])\n            sorted_by_first %= MOD\n\n    # Calculate the number of permutations sorted by second elements\n    sorted_by_second = 1\n    for b in range(1, n + 1):\n        if count_b[b] > 0:\n            sorted_by_second *= factorial(count_b[b])\n            sorted_by_second %= MOD\n\n    # Apply inclusion-exclusion principle\n    good_permutations = (total_permutations - sorted_by_first - sorted_by_second + MOD) % MOD\n\n    return good_permutations\n\ndef factorial(x):\n    result = 1\n    for i in range(2, x + 1):\n        result = (result * i) % MOD\n    return result\n\n# Read input\ninput = sys.stdin.read\ndata = input().split()\n\nn = int(data[0])\ns = [(int(data[i*2+1]), int(data[i*2+2])) for i in range(n)]\n\n# Output the result\nprint(count_good_permutations(n, s))",
+    "code_hash": "5fce992fa338dd6c",
+    "language": "python",
+    "node_id": "n_20_330f45",
+    "revision_id": "rev_n_20_330f45_0",
+    "thought_path_snapshot": [
+      "Revised Thought-1: Instead of directly counting valid permutations, consider counting all permutations and subtracting those that are invalid due to being sorted by either the first or second elements. However, this approach needs careful handling to avoid double-counting permutations that are invalid in both ways. Use inclusion-exclusion principle to correctly account for these cases.",
+      "Revised Thought-2: Implement the inclusion-exclusion principle correctly by ensuring that permutations sorted by both the first and second elements are not counted twice when subtracted. Use a set to track elements already considered in both sorted conditions to avoid double-counting.",
+      "Revised Thought-3: The current approach using dynamic programming to count sorted sequences by first and second elements separately and then applying the inclusion-exclusion principle might be incorrect. Instead, focus on generating all permutations and checking each one for goodness. Since \\( n \\) can be up to \\( 3 \\times 10^5 \\), this brute-force method is not feasible. Instead, use combinatorial insights to directly calculate the number of good permutations without explicitly generating them. Specifically, identify patterns or properties of good permutations that allow for efficient counting.",
+      "Implement a more efficient algorithm to check for good permutations. Consider using sorting techniques or other combinatorial methods to reduce the complexity."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 29
+  },
+  {
+    "candidate_id": "cand_3e2921686a",
+    "problem_id": "apps_2176",
+    "code": "from collections import Counter\nfrom math import factorial\n\nMOD = 998244353\n\ndef count_good_permutations(n, s):\n    def count_sorted_by_first():\n        cnt = Counter()\n        for a, _ in s:\n            cnt[a] += 1\n        return sum(factorial(v) for v in cnt.values()) % MOD\n    \n    def count_sorted_by_second():\n        cnt = Counter()\n        for _, b in s:\n            cnt[b] += 1\n        return sum(factorial(v) for v in cnt.values()) % MOD\n    \n    def count_sorted_by_both():\n        cnt = Counter((a, b) for a, b in s)\n        return sum(factorial(v) for v in cnt.values()) % MOD\n    \n    total_permutations = factorial(n)\n    sorted_by_first = count_sorted_by_first()\n    sorted_by_second = count_sorted_by_second()\n    sorted_by_both = count_sorted_by_both()\n    \n    good_permutations = (total_permutations - sorted_by_first - sorted_by_second + sorted_by_both) % MOD\n    return good_permutations\n\n# Input reading\nimport sys\ninput = sys.stdin.read\ndata = input().split()\n\nn = int(data[0])\ns = [(int(data[2*i+1]), int(data[2*i+2])) for i in range(n)]\n\n# Output the result\nprint(count_good_permutations(n, s))",
+    "code_hash": "437be6d8707ca549",
+    "language": "python",
+    "node_id": "n_20_330f45",
+    "revision_id": "rev_n_20_330f45_1",
+    "thought_path_snapshot": [
+      "Revised Thought-1: Instead of directly counting valid permutations, consider counting all permutations and subtracting those that are invalid due to being sorted by either the first or second elements. However, this approach needs careful handling to avoid double-counting permutations that are invalid in both ways. Use inclusion-exclusion principle to correctly account for these cases.",
+      "Revised Thought-2: Implement the inclusion-exclusion principle correctly by ensuring that permutations sorted by both the first and second elements are not counted twice when subtracted. Use a set to track elements already considered in both sorted conditions to avoid double-counting.",
+      "Revised Thought-3: The current approach using dynamic programming to count sorted sequences by first and second elements separately and then applying the inclusion-exclusion principle might be incorrect. Instead, focus on generating all permutations and checking each one for goodness. Since \\( n \\) can be up to \\( 3 \\times 10^5 \\), this brute-force method is not feasible. Instead, use combinatorial insights to directly calculate the number of good permutations without explicitly generating them. Specifically, identify patterns or properties of good permutations that allow for efficient counting.",
+      "Revised Thought-4: To efficiently determine the number of good permutations, we need to leverage combinatorial insights rather than generating and checking each permutation individually. Specifically, we should focus on identifying patterns or properties of good permutations that allow us to count them directly. One key observation is that a permutation is good if and only if it does not sort the sequence by either the first or the second elements. We can use this property to derive a formula or algorithm that counts the number of good permutations without explicitly generating them. This approach will significantly reduce the computational complexity and ensure that our solution works within the constraints."
+    ],
+    "origin": "rethink",
+    "generation_record_id": null,
+    "created_sequence": 30
+  },
+  {
+    "candidate_id": "cand_7946eb812a",
+    "problem_id": "apps_2176",
+    "code": "from collections import Counter\nfrom math import factorial\n\nMOD = 998244353\n\ndef count_good_permutations(n, s):\n    # Count occurrences of each element in the sequence\n    count_a = Counter(a for a, _ in s)\n    count_b = Counter(b for _, b in s)\n\n    # Calculate total number of permutations\n    total_permutations = factorial(n)\n\n    # Calculate permutations sorted by first elements\n    sorted_by_first = 1\n    for a, freq in count_a.items():\n        sorted_by_first *= factorial(freq)\n        sorted_by_first %= MOD\n\n    # Calculate permutations sorted by second elements\n    sorted_by_second = 1\n    for b, freq in count_b.items():\n        sorted_by_second *= factorial(freq)\n        sorted_by_second %= MOD\n\n    # Apply inclusion-exclusion principle\n    good_permutations = (total_permutations - sorted_by_first - sorted_by_second + 1) % MOD\n\n    return good_permutations\n\n# Read input\nimport sys\ninput = sys.stdin.read\ndata = input().split()\n\nn = int(data[0])\ns = [(int(data[i*2+1]), int(data[i*2+2])) for i in range(n)]\n\n# Output result\nprint(count_good_permutations(n, s))",
+    "code_hash": "077a9db9ebb740a0",
+    "language": "python",
+    "node_id": "n_19_96b620",
+    "revision_id": "rev_n_19_96b620_0",
+    "thought_path_snapshot": [
+      "Revised Thought-1: Instead of directly counting valid permutations, consider counting all permutations and subtracting those that are invalid due to being sorted by either the first or second elements. However, this approach needs careful handling to avoid double-counting permutations that are invalid in both ways. Use inclusion-exclusion principle to correctly account for these cases.",
+      "Revised Thought-2: Implement the inclusion-exclusion principle correctly by ensuring that permutations sorted by both the first and second elements are not counted twice when subtracted. Use a set to track elements already considered in both sorted conditions to avoid double-counting.",
+      "Revised Thought-3: The current approach using dynamic programming to count sorted sequences by first and second elements separately and then applying the inclusion-exclusion principle might be incorrect. Instead, focus on generating all permutations and checking each one for goodness. Since \\( n \\) can be up to \\( 3 \\times 10^5 \\), this brute-force method is not feasible. Instead, use combinatorial insights to directly calculate the number of good permutations without explicitly generating them. Specifically, identify patterns or properties of good permutations that allow for efficient counting.",
+      "Revisit the problem constraints and requirements carefully. Ensure that the logic for identifying good permutations aligns with the problem statement."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 31
+  },
+  {
+    "candidate_id": "cand_066beb07e8",
+    "problem_id": "apps_2176",
+    "code": "from collections import defaultdict\nfrom math import factorial\n\nMOD = 998244353\n\ndef count_good_permutations(n, s):\n    # Count occurrences of each value in the first and second positions\n    first_count = defaultdict(int)\n    second_count = defaultdict(int)\n    \n    for a, b in s:\n        first_count[a] += 1\n        second_count[b] += 1\n    \n    # Calculate the number of permutations that sort by the first element\n    first_sorted = sum(factorial(first_count[a]) for a in first_count)\n    \n    # Calculate the number of permutations that sort by the second element\n    second_sorted = sum(factorial(second_count[b]) for b in second_count)\n    \n    # Calculate the number of permutations that sort by both elements\n    both_sorted = 0\n    for a in first_count:\n        for b in second_count:\n            if a == b:\n                both_sorted += factorial(first_count[a])\n    \n    # Apply inclusion-exclusion principle\n    bad_permutations = (first_sorted + second_sorted - both_sorted) % MOD\n    \n    # Total permutations minus bad permutations\n    good_permutations = (factorial(n) - bad_permutations) % MOD\n    \n    return good_permutations\n\n# Read input\nimport sys\ninput = sys.stdin.read\ndata = input().split()\n\nn = int(data[0])\ns = []\nfor i in range(1, 2 * n, 2):\n    a = int(data[i])\n    b = int(data[i + 1])\n    s.append((a, b))\n\n# Output result\nprint(count_good_permutations(n, s))",
+    "code_hash": "2700e83d9e1438be",
+    "language": "python",
+    "node_id": "n_19_96b620",
+    "revision_id": "rev_n_19_96b620_1",
+    "thought_path_snapshot": [
+      "Revised Thought-1: Instead of directly counting valid permutations, consider counting all permutations and subtracting those that are invalid due to being sorted by either the first or second elements. However, this approach needs careful handling to avoid double-counting permutations that are invalid in both ways. Use inclusion-exclusion principle to correctly account for these cases.",
+      "Revised Thought-2: Implement the inclusion-exclusion principle correctly by ensuring that permutations sorted by both the first and second elements are not counted twice when subtracted. Use a set to track elements already considered in both sorted conditions to avoid double-counting.",
+      "Revised Thought-3: The current approach using dynamic programming to count sorted sequences by first and second elements separately and then applying the inclusion-exclusion principle might be incorrect. Instead, focus on generating all permutations and checking each one for goodness. Since \\( n \\) can be up to \\( 3 \\times 10^5 \\), this brute-force method is not feasible. Instead, use combinatorial insights to directly calculate the number of good permutations without explicitly generating them. Specifically, identify patterns or properties of good permutations that allow for efficient counting.",
+      "Revised Thought-4: Recognize that the problem requires counting permutations that do not sort the sequence by either the first or second elements. Instead of directly counting valid permutations, use combinatorial insights to determine the number of permutations that would make the sequence bad and subtract this from the total number of permutations. Specifically, calculate the number of permutations that sort the sequence by the first elements and the number that sort by the second elements, and then add back the permutations that sort by both (to correct for over-subtraction). Use the inclusion-exclusion principle to ensure accurate counting."
+    ],
+    "origin": "rethink",
+    "generation_record_id": null,
+    "created_sequence": 32
+  }
+]

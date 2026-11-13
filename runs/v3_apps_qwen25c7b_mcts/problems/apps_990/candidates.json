@@ -1,0 +1,516 @@
+[
+  {
+    "candidate_id": "cand_105804fde2",
+    "problem_id": "apps_990",
+    "code": "from sys import stdin, stdout\nimport sys\nsys.setrecursionlimit(10**6)\n\ndef dfs(node, parent, color, adj, dp):\n    if node == 1:\n        dp[node][0] = 1\n        dp[node][1] = 1\n    else:\n        dp[node][0] = 1\n        dp[node][1] = 0\n        for neighbor in adj[node]:\n            if neighbor != parent:\n                dfs(neighbor, node, color, adj, dp)\n                dp[node][0] *= dp[neighbor][0]\n                dp[node][1] += dp[neighbor][0] * dp[neighbor][1]\n\ndef check_restriction(node, parent, color, adj, dp, u, v):\n    stack = [(node, parent)]\n    while stack:\n        current, p = stack.pop()\n        if current == u or current == v:\n            return True\n        for neighbor in adj[current]:\n            if neighbor != p:\n                stack.append((neighbor, current))\n    return False\n\ndef main():\n    input = stdin.read\n    data = input().split()\n    \n    index = 0\n    N = int(data[index])\n    index += 1\n    \n    adj = [[] for _ in range(N + 1)]\n    for _ in range(N - 1):\n        a = int(data[index]) - 1\n        b = int(data[index + 1]) - 1\n        adj[a].append(b)\n        adj[b].append(a)\n        index += 2\n    \n    M = int(data[index])\n    index += 1\n    \n    restrictions = []\n    for _ in range(M):\n        u = int(data[index]) - 1\n        v = int(data[index + 1]) - 1\n        restrictions.append((u, v))\n        index += 2\n    \n    dp = [[0, 0] for _ in range(N + 1)]\n    dfs(1, -1, None, adj, dp)\n    \n    total_ways = dp[1][0] + dp[1][1]\n    valid_ways = 0\n    \n    for way in range(total_ways):\n        color = [None] * (N + 1)\n        for i in range(1, N + 1):\n            if i == 1:\n                color[i] = 0\n            elif (way >> (i - 2)) & 1:\n                color[i] = 1\n        \n        valid = True\n        for u, v in restrictions:\n            if not check_restriction(1, -1, color, adj, dp, u, v):\n                valid = False\n                break\n        \n        if valid:\n            valid_ways += 1\n    \n    stdout.write(str(valid_ways))\n\nif __name__ == \"__main__\":\n    main()",
+    "code_hash": "3c2a5538f894fd42",
+    "language": "python",
+    "node_id": "n_1_c78083",
+    "revision_id": "rev_n_1_c78083_0",
+    "thought_path_snapshot": [
+      "Dynamic Programming on Tree"
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 1
+  },
+  {
+    "candidate_id": "cand_53284eee8b",
+    "problem_id": "apps_990",
+    "code": "import sys\nfrom collections import defaultdict\n\ndef dfs(node, parent, color, adj, mask):\n    valid = True\n    for neighbor in adj[node]:\n        if neighbor == parent:\n            continue\n        if mask & (1 << (node * len(adj) + neighbor)):\n            valid = False\n        dfs(neighbor, node, color, adj, mask)\n    return valid\n\ndef count_ways(n, edges, m, restrictions):\n    adj = defaultdict(list)\n    for a, b in edges:\n        adj[a].append(b)\n        adj[b].append(a)\n\n    def check_mask(mask):\n        for u, v in restrictions:\n            stack = [u]\n            visited = set()\n            while stack:\n                node = stack.pop()\n                if node in visited:\n                    continue\n                visited.add(node)\n                if node == v:\n                    break\n                for neighbor in adj[node]:\n                    if neighbor != parent[node] and mask & (1 << (node * len(adj) + neighbor)):\n                        stack.append(neighbor)\n            else:\n                return False\n        return True\n\n    count = 0\n    for mask in range(1 << (n * n - n // 2)):\n        if check_mask(mask):\n            count += 1\n    return count\n\nif __name__ == \"__main__\":\n    input = sys.stdin.read\n    data = input().split()\n\n    index = 0\n    n = int(data[index])\n    index += 1\n    edges = []\n    for _ in range(n - 1):\n        a = int(data[index]) - 1\n        b = int(data[index + 1]) - 1\n        edges.append((a, b))\n        index += 2\n\n    m = int(data[index])\n    index += 1\n    restrictions = []\n    for _ in range(m):\n        u = int(data[index]) - 1\n        v = int(data[index + 1]) - 1\n        restrictions.append((u, v))\n        index += 2\n\n    result = count_ways(n, edges, m, restrictions)\n    print(result)",
+    "code_hash": "aeee0a8915df9c5f",
+    "language": "python",
+    "node_id": "n_1_c78083",
+    "revision_id": "rev_n_1_c78083_1",
+    "thought_path_snapshot": [
+      "Dynamic Programming on Tree with Bitmasking for Validity Check"
+    ],
+    "origin": "rethink",
+    "generation_record_id": null,
+    "created_sequence": 2
+  },
+  {
+    "candidate_id": "cand_9a66b69344",
+    "problem_id": "apps_990",
+    "code": "import sys\nfrom collections import defaultdict\n\ndef count_ways(n, edges, m, restrictions):\n    graph = defaultdict(list)\n    for a, b in edges:\n        graph[a].append(b)\n        graph[b].append(a)\n\n    def dfs(node, parent, mask):\n        if node == 1:\n            return 1\n        total = 0\n        for neighbor in graph[node]:\n            if neighbor != parent:\n                if (mask >> (neighbor - 1)) & 1:\n                    total += dfs(neighbor, node, mask)\n                else:\n                    total += dfs(neighbor, node, mask | (1 << (neighbor - 1)))\n        return total\n\n    def check_restriction(mask, restriction):\n        u, v = restriction\n        stack = [u]\n        visited = set()\n        while stack:\n            node = stack.pop()\n            if node in visited:\n                continue\n            visited.add(node)\n            if node == v:\n                return True\n            for neighbor in graph[node]:\n                if neighbor != parent and (mask >> (neighbor - 1)) & 1:\n                    stack.append(neighbor)\n        return False\n\n    valid_masks = []\n    for mask in range(1 << n):\n        if all(check_restriction(mask, restriction) for restriction in restrictions):\n            valid_masks.append(mask)\n\n    result = 0\n    for mask in valid_masks:\n        result += dfs(1, None, mask)\n\n    return result\n\nif __name__ == \"__main__\":\n    input = sys.stdin.read\n    data = input().split()\n\n    n = int(data[0])\n    edges = [(int(data[i * 2 + 1]), int(data[i * 2 + 2])) for i in range(n - 1)]\n    m = int(data[n * 2 + 1])\n    restrictions = [(int(data[(n + i) * 2 + 1]), int(data[(n + i) * 2 + 2])) for i in range(m)]\n\n    print(count_ways(n, edges, m, restrictions))",
+    "code_hash": "e16a477b5d633de8",
+    "language": "python",
+    "node_id": "n_2_4921ce",
+    "revision_id": "rev_n_2_4921ce_0",
+    "thought_path_snapshot": [
+      "Bitmask Dynamic Programming"
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 3
+  },
+  {
+    "candidate_id": "cand_10e985dc6f",
+    "problem_id": "apps_990",
+    "code": "import sys\nfrom collections import defaultdict\n\ndef count_valid_paintings(n, edges, m, restrictions):\n    def dfs(node, parent, color):\n        nonlocal valid\n        if node == n:\n            valid = True\n            return\n        for neighbor in adj[node]:\n            if neighbor != parent:\n                dfs(neighbor, node, 'B' if color == 'W' else 'W')\n                if not valid:\n                    break\n    \n    adj = defaultdict(list)\n    for a, b in edges:\n        adj[a].append(b)\n        adj[b].append(a)\n    \n    total_ways = 2 ** (n - 1)\n    valid_ways = 0\n    \n    for way in range(total_ways):\n        colors = ['W'] * (n + 1)\n        for i in range(n - 1):\n            if (way >> i) & 1:\n                colors[edges[i][0]] = 'B'\n                colors[edges[i][1]] = 'B'\n        \n        valid = False\n        dfs(1, -1, 'W')\n        if valid:\n            valid_ways += 1\n    \n    return valid_ways\n\nif __name__ == \"__main__\":\n    input = sys.stdin.read\n    data = input().split()\n    \n    n = int(data[0])\n    edges = []\n    index = 1\n    for _ in range(n - 1):\n        a = int(data[index])\n        b = int(data[index + 1])\n        edges.append((a, b))\n        index += 2\n    \n    m = int(data[index])\n    restrictions = []\n    for _ in range(m):\n        u = int(data[index + 1])\n        v = int(data[index + 2])\n        restrictions.append((u, v))\n        index += 3\n    \n    result = count_valid_paintings(n, edges, m, restrictions)\n    print(result)",
+    "code_hash": "cd599845bf6311e6",
+    "language": "python",
+    "node_id": "n_2_4921ce",
+    "revision_id": "rev_n_2_4921ce_1",
+    "thought_path_snapshot": [
+      "Revised Thought-1: Instead of attempting to read and parse the input incrementally, read the entire input at once and then split it into a list of strings. This ensures that the indices are handled correctly and prevents the IndexError."
+    ],
+    "origin": "rethink",
+    "generation_record_id": null,
+    "created_sequence": 4
+  },
+  {
+    "candidate_id": "cand_1f6a279220",
+    "problem_id": "apps_990",
+    "code": "from sys import stdin, stdout\nimport functools\n\ndef dfs(node, parent, color, memo):\n    key = (node, parent, tuple(color))\n    if key in memo:\n        return memo[key]\n    \n    if node == n + 1:\n        valid = True\n        for u, v in restrictions:\n            path = set()\n            def traverse(current):\n                path.add(current)\n                for neighbor in adj[current]:\n                    if neighbor != parent and neighbor not in path:\n                        traverse(neighbor)\n            traverse(u)\n            if v not in path:\n                valid = False\n                break\n        memo[key] = int(valid)\n        return memo[key]\n    \n    count = 0\n    for i in range(n):\n        if i != node - 1 and i != parent - 1:\n            color[node - 1] = i\n            count += dfs(i + 1, node, color, memo)\n    memo[key] = count\n    return memo[key]\n\nn = int(stdin.readline().strip())\nedges = [tuple(map(int, stdin.readline().strip().split())) for _ in range(n - 1)]\nm = int(stdin.readline().strip())\nrestrictions = [tuple(map(int, stdin.readline().strip().split())) for _ in range(m)]\n\nadj = [[] for _ in range(n + 1)]\nfor a, b in edges:\n    adj[a].append(b)\n    adj[b].append(a)\n\ncolor = [0] * n\nmemo = {}\nresult = dfs(1, 0, color, memo)\nstdout.write(str(result) + '\\n')",
+    "code_hash": "215b9d94def55390",
+    "language": "python",
+    "node_id": "n_3_be3191",
+    "revision_id": "rev_n_3_be3191_0",
+    "thought_path_snapshot": [
+      "Graph Traversal with Memoization"
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 5
+  },
+  {
+    "candidate_id": "cand_f1f28f3bd3",
+    "problem_id": "apps_990",
+    "code": "from sys import stdin, stdout\nimport sys\nsys.setrecursionlimit(10**6)\n\ndef dfs(node, parent, color, adj, dp):\n    if node == 1:\n        dp[node][0] = 1\n    else:\n        dp[node][color] = sum(dp[neighbor][1-color] for neighbor in adj[node] if neighbor != parent)\n        dp[node][1-color] = sum(dp[neighbor][color] for neighbor in adj[node] if neighbor != parent)\n\ndef count_ways(n, edges, m, restrictions):\n    adj = [[] for _ in range(n+1)]\n    for a, b in edges:\n        adj[a].append(b)\n        adj[b].append(a)\n    \n    dp = [[0]*2 for _ in range(n+1)]\n    dfs(1, -1, 0, adj, dp)\n    \n    for u, v in restrictions:\n        if u > v:\n            u, v = v, u\n        if dp[u][1] + dp[v][1] == 0:\n            return 0\n    \n    total_ways = dp[1][0] + dp[1][1]\n    for u, v in restrictions:\n        if u > v:\n            u, v = v, u\n        total_ways //= (dp[u][1] + dp[v][1])\n    \n    return total_ways\n\nif __name__ == \"__main__\":\n    input = stdin.read\n    data = input().split()\n    \n    n = int(data[0])\n    edges = []\n    index = 1\n    for _ in range(n-1):\n        a = int(data[index])\n        b = int(data[index+1])\n        edges.append((a, b))\n        index += 2\n    \n    m = int(data[index])\n    restrictions = []\n    for _ in range(m):\n        u = int(data[index])\n        v = int(data[index+1])\n        restrictions.append((u, v))\n        index += 2\n    \n    result = count_ways(n, edges, m, restrictions)\n    stdout.write(str(result) + '\\n')",
+    "code_hash": "b58d5a6a19be1f5e",
+    "language": "python",
+    "node_id": "n_3_be3191",
+    "revision_id": "rev_n_3_be3191_1",
+    "thought_path_snapshot": [
+      "Graph Traversal with Dynamic Programming"
+    ],
+    "origin": "rethink",
+    "generation_record_id": null,
+    "created_sequence": 6
+  },
+  {
+    "candidate_id": "cand_a47d3346fb",
+    "problem_id": "apps_990",
+    "code": "from sys import stdin, stdout\nimport sys\nsys.setrecursionlimit(10**6)\n\ndef dfs(node, parent, color, dp, adj):\n    mask = 1 << node\n    dp[node][mask] = 1\n    for neighbor in adj[node]:\n        if neighbor != parent:\n            dfs(neighbor, node, color, dp, adj)\n            for prev_mask in range(1 << len(adj)):\n                new_mask = prev_mask | (1 << neighbor)\n                if dp[neighbor][new_mask] > 0:\n                    dp[node][prev_mask] += dp[neighbor][new_mask]\n                    if color[node] == 'B':\n                        dp[node][prev_mask] -= dp[neighbor][new_mask]\n\ndef check_restriction(dp, u, v, adj):\n    stack = [u]\n    visited = set()\n    while stack:\n        node = stack.pop()\n        if node in visited:\n            continue\n        visited.add(node)\n        for neighbor in adj[node]:\n            if neighbor == v:\n                return True\n            stack.append(neighbor)\n    return False\n\ndef main():\n    input = stdin.read\n    data = input().split()\n    \n    index = 0\n    N = int(data[index])\n    index += 1\n    \n    adj = [[] for _ in range(N + 1)]\n    for _ in range(N - 1):\n        u = int(data[index]) - 1\n        v = int(data[index + 1]) - 1\n        adj[u].append(v)\n        adj[v].append(u)\n        index += 2\n    \n    M = int(data[index])\n    index += 1\n    \n    restrictions = []\n    for _ in range(M):\n        u = int(data[index]) - 1\n        v = int(data[index + 1]) - 1\n        restrictions.append((u, v))\n        index += 2\n    \n    dp = [[0] * (1 << N) for _ in range(N + 1)]\n    color = ['W'] * (N + 1)\n    \n    dfs(0, -1, color, dp, adj)\n    \n    result = 0\n    for mask in range(1 << N):\n        valid = True\n        for u, v in restrictions:\n            if not check_restriction(dp, u, v, adj):\n                valid = False\n                break\n        if valid:\n            result += dp[0][mask]\n    \n    stdout.write(str(result))\n\nif __name__ == \"__main__\":\n    main()",
+    "code_hash": "f0579059f57dc5d3",
+    "language": "python",
+    "node_id": "n_5_2dc9f1",
+    "revision_id": "rev_n_5_2dc9f1_0",
+    "thought_path_snapshot": [
+      "Dynamic Programming on Tree with Bitmasking for Validity Check",
+      "Use dynamic programming to keep track of valid states based on the current node and its children's colors."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 7
+  },
+  {
+    "candidate_id": "cand_1a994cc641",
+    "problem_id": "apps_990",
+    "code": "from sys import stdin, stdout\ninput = stdin.read\nprint = stdout.write\n\ndef dfs(node, parent, mask):\n    dp[node][mask] = 1\n    for child in adj[node]:\n        if child == parent:\n            continue\n        dfs(child, node, mask)\n        for m in range(1 << n):\n            if dp[child][m] and ((mask & m) != m):\n                dp[node][(mask | m)] += dp[child][m]\n\ndef count_ways():\n    dfs(0, -1, 0)\n    total = sum(dp[0])\n    for i in range(m):\n        u, v = edges[i]\n        u -= 1\n        v -= 1\n        total //= 2\n    return total\n\nn, m = map(int, input().split())\nedges = [tuple(map(int, input().split())) for _ in range(n - 1)]\nadj = [[] for _ in range(n)]\nfor u, v in edges:\n    u -= 1\n    v -= 1\n    adj[u].append(v)\n    adj[v].append(u)\n\ndp = [[0] * (1 << n) for _ in range(n)]\n\nprint(count_ways())",
+    "code_hash": "159bda99615d8d60",
+    "language": "python",
+    "node_id": "n_5_2dc9f1",
+    "revision_id": "rev_n_5_2dc9f1_1",
+    "thought_path_snapshot": [
+      "Dynamic Programming on Tree with Bitmasking for Validity Check",
+      "Thought-2 (revised): Use dynamic programming to keep track of valid states based on the current node and its children's colors, ensuring proper initialization and handling of the bitmasking process."
+    ],
+    "origin": "rethink",
+    "generation_record_id": null,
+    "created_sequence": 8
+  },
+  {
+    "candidate_id": "cand_d8a095daa7",
+    "problem_id": "apps_990",
+    "code": "import sys\nfrom collections import defaultdict\n\ndef dfs(node, parent, color, restrictions):\n    count = 0\n    for neighbor in graph[node]:\n        if neighbor != parent:\n            if (node, neighbor) in restrictions or (neighbor, node) in restrictions:\n                count += dfs(neighbor, node, 'B', restrictions)\n            else:\n                count += dfs(neighbor, node, 'W', restrictions)\n                count += dfs(neighbor, node, 'B', restrictions)\n    return count\n\ndef main():\n    input = sys.stdin.read\n    data = input().split()\n    \n    index = 0\n    N = int(data[index])\n    index += 1\n    \n    graph = defaultdict(list)\n    for _ in range(N - 1):\n        a = int(data[index]) - 1\n        b = int(data[index + 1]) - 1\n        graph[a].append(b)\n        graph[b].append(a)\n        index += 2\n    \n    M = int(data[index])\n    index += 1\n    \n    restrictions = set()\n    for _ in range(M):\n        u = int(data[index]) - 1\n        v = int(data[index + 1]) - 1\n        if u > v:\n            u, v = v, u\n        restrictions.add((u, v))\n        index += 2\n    \n    result = dfs(0, -1, 'W', restrictions)\n    print(result)\n\nif __name__ == \"__main__\":\n    main()",
+    "code_hash": "8db6f329a9d815d5",
+    "language": "python",
+    "node_id": "n_9_16048d",
+    "revision_id": "rev_n_9_16048d_0",
+    "thought_path_snapshot": [
+      "Revised Thought-1: Instead of attempting to read and parse the input incrementally, read the entire input at once and then split it into a list of strings. This ensures that the indices are handled correctly and prevents the IndexError.",
+      "Implement memoization for DFS"
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 9
+  },
+  {
+    "candidate_id": "cand_1d70e56a32",
+    "problem_id": "apps_990",
+    "code": "import sys\nfrom collections import defaultdict\n\ndef dfs(node, parent, color, graph, restrictions):\n    count = 0\n    for neighbor in graph[node]:\n        if neighbor != parent:\n            if (node, neighbor) in restrictions or (neighbor, node) in restrictions:\n                count += dfs(neighbor, node, 'B', graph, restrictions)\n            else:\n                count += dfs(neighbor, node, 'W', graph, restrictions)\n    return count + (color == 'B')\n\ndef main():\n    input = sys.stdin.read\n    data = input().split()\n    \n    index = 0\n    N = int(data[index])\n    index += 1\n    \n    graph = defaultdict(list)\n    for _ in range(N - 1):\n        a = int(data[index]) - 1\n        b = int(data[index + 1]) - 1\n        graph[a].append(b)\n        graph[b].append(a)\n        index += 2\n    \n    M = int(data[index])\n    index += 1\n    \n    restrictions = set()\n    for _ in range(M):\n        u = int(data[index]) - 1\n        v = int(data[index + 1]) - 1\n        restrictions.add((u, v))\n        index += 2\n    \n    result = dfs(0, -1, 'W', graph, restrictions)\n    print(result)\n\nif __name__ == \"__main__\":\n    main()",
+    "code_hash": "4e93855c386af449",
+    "language": "python",
+    "node_id": "n_9_16048d",
+    "revision_id": "rev_n_9_16048d_1",
+    "thought_path_snapshot": [
+      "Revised Thought-1: Instead of attempting to read and parse the input incrementally, read the entire input at once and then split it into a list of strings. This ensures that the indices are handled correctly and prevents the IndexError.",
+      "Thought-2: Ensure that the `dfs` function uses the `graph` parameter passed to it instead of trying to access a global variable. This will resolve the NameError encountered during execution."
+    ],
+    "origin": "rethink",
+    "generation_record_id": null,
+    "created_sequence": 10
+  },
+  {
+    "candidate_id": "cand_9f2d79a5f7",
+    "problem_id": "apps_990",
+    "code": "from sys import stdin, stdout\nimport sys\nsys.setrecursionlimit(10**6)\n\ndef dfs(node, parent, color, adj, restrictions):\n    count = 0\n    for neighbor in adj[node]:\n        if neighbor != parent:\n            if (node, neighbor) in restrictions or (neighbor, node) in restrictions:\n                color[neighbor] = 1 - color[node]\n                count += dfs(neighbor, node, color, adj, restrictions)\n            else:\n                count += dfs(neighbor, node, color, adj, restrictions)\n    return count + 1\n\ndef main():\n    input = stdin.read\n    data = input().split()\n    \n    index = 0\n    N = int(data[index])\n    index += 1\n    \n    adj = [[] for _ in range(N+1)]\n    for _ in range(N-1):\n        a = int(data[index]) - 1\n        b = int(data[index+1]) - 1\n        adj[a].append(b)\n        adj[b].append(a)\n        index += 2\n    \n    M = int(data[index])\n    index += 1\n    \n    restrictions = set()\n    for _ in range(M):\n        u = int(data[index]) - 1\n        v = int(data[index+1]) - 1\n        if u > v:\n            u, v = v, u\n        restrictions.add((u, v))\n        index += 2\n    \n    total_ways = 0\n    for start in range(N):\n        color = [0] * (N+1)\n        color[start] = 0\n        if dfs(start, -1, color, adj, restrictions) == N:\n            total_ways += 1\n    \n    stdout.write(str(total_ways))\n\nif __name__ == \"__main__\":\n    main()",
+    "code_hash": "6b6a2161f4471dff",
+    "language": "python",
+    "node_id": "n_10_bb037a",
+    "revision_id": "rev_n_10_bb037a_0",
+    "thought_path_snapshot": [
+      "Graph Traversal with Dynamic Programming",
+      "Revisit the DFS approach to correctly identify paths that violate the restrictions."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 11
+  },
+  {
+    "candidate_id": "cand_8ff07ae896",
+    "problem_id": "apps_990",
+    "code": "from sys import stdin, stdout\nimport sys\nsys.setrecursionlimit(10**6)\n\ndef dfs(node, parent, black_edge_encountered):\n    global count\n    if black_edge_encountered:\n        count += 1\n    for neighbor in adj_list[node]:\n        if neighbor != parent:\n            dfs(neighbor, node, black_edge_encountered or (node, neighbor) in black_edges or (neighbor, node) in black_edges)\n\ndef main():\n    input = stdin.read\n    data = input().split()\n    \n    index = 0\n    N = int(data[index])\n    index += 1\n    \n    adj_list = [[] for _ in range(N + 1)]\n    for _ in range(N - 1):\n        a = int(data[index]) - 1\n        b = int(data[index + 1]) - 1\n        adj_list[a].append(b)\n        adj_list[b].append(a)\n        index += 2\n    \n    M = int(data[index])\n    index += 1\n    \n    black_edges = set()\n    for _ in range(M):\n        u = int(data[index]) - 1\n        v = int(data[index + 1]) - 1\n        black_edges.add((u, v))\n        index += 2\n    \n    count = 0\n    dfs(0, -1, False)\n    \n    stdout.write(str(count))\n\nif __name__ == \"__main__\":\n    main()",
+    "code_hash": "581cc3f853de35e5",
+    "language": "python",
+    "node_id": "n_10_bb037a",
+    "revision_id": "rev_n_10_bb037a_1",
+    "thought_path_snapshot": [
+      "Graph Traversal with Dynamic Programming",
+      "Revisit the DFS approach to correctly identify paths that violate the restrictions by ensuring that each path checked actually contains at least one black edge. This can be done by modifying the DFS function to keep track of whether a black edge has been encountered on the path from the root to the current node. If a path does not contain any black edges, it should not be counted as satisfying the restrictions."
+    ],
+    "origin": "rethink",
+    "generation_record_id": null,
+    "created_sequence": 12
+  },
+  {
+    "candidate_id": "cand_8371977b04",
+    "problem_id": "apps_990",
+    "code": "import sys\nfrom collections import defaultdict\n\ndef dfs(node, parent, mask, restrictions):\n    valid = True\n    for u, v in restrictions:\n        if node == u and parent == v or node == v and parent == u:\n            if mask & (1 << (node - 1)) == 0:\n                valid = False\n                break\n    if not valid:\n        return 0\n    \n    count = 1 if valid else 0\n    for neighbor in tree[node]:\n        if neighbor != parent:\n            count += dfs(neighbor, node, mask | (1 << (node - 1)), restrictions)\n            count += dfs(neighbor, node, mask, restrictions)\n    \n    return count\n\ninput = sys.stdin.read\ndata = input().split()\n\nN = int(data[0])\nedges = data[1:2 * N - 1]\nM = int(data[2 * N - 1])\nrestrictions = [(int(data[2 * N + 2 * i - 2]), int(data[2 * N + 2 * i - 1])) for i in range(M)]\n\ntree = defaultdict(list)\nfor i in range(N - 1):\n    a = int(edges[i * 2]) - 1\n    b = int(edges[i * 2 + 1]) - 1\n    tree[a].append(b)\n    tree[b].append(a)\n\nresult = 0\nfor i in range(1 << N):\n    result += dfs(0, -1, i, restrictions)\n\nprint(result)",
+    "code_hash": "a2d0a1fe4008411e",
+    "language": "python",
+    "node_id": "n_4_f98677",
+    "revision_id": "rev_n_4_f98677_0",
+    "thought_path_snapshot": [
+      "Dynamic Programming on Tree with Bitmasking for Validity Check",
+      "Implement DFS to traverse the tree and check each edge's color against the restrictions."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 13
+  },
+  {
+    "candidate_id": "cand_233de8784b",
+    "problem_id": "apps_990",
+    "code": "from sys import stdin, stdout\nimport sys\nsys.setrecursionlimit(10**6)\n\ndef dfs(node, parent, color, mask, dp):\n    if dp[node][mask] != -1:\n        return dp[node][mask]\n    \n    valid = True\n    for neighbor in adj[node]:\n        if neighbor == parent:\n            continue\n        new_mask = mask | (1 << (node * (N - 1) + neighbor))\n        if dfs(neighbor, node, color ^ 1, new_mask, dp):\n            valid = False\n    \n    if valid:\n        dp[node][mask] = 1\n    else:\n        dp[node][mask] = 0\n    \n    return dp[node][mask]\n\ndef check_restriction(u, v, mask):\n    stack = [u]\n    visited = set()\n    while stack:\n        node = stack.pop()\n        if node in visited:\n            continue\n        visited.add(node)\n        for neighbor in adj[node]:\n            if neighbor == v:\n                return True\n            if mask & (1 << (node * (N - 1) + neighbor)):\n                stack.append(neighbor)\n    return False\n\nN = int(stdin.readline())\nadj = [[] for _ in range(N)]\nfor _ in range(N - 1):\n    a, b = map(int, stdin.readline().split())\n    a -= 1\n    b -= 1\n    adj[a].append(b)\n    adj[b].append(a)\n\nM = int(stdin.readline())\nrestrictions = []\nfor _ in range(M):\n    u, v = map(int, stdin.readline().split())\n    u -= 1\n    v -= 1\n    restrictions.append((u, v))\n\ndp = [[-1] * (1 << (N * (N - 1))) for _ in range(N)]\n\nresult = 0\nfor mask in range(1 << (N * (N - 1))):\n    valid = True\n    for u, v in restrictions:\n        if not check_restriction(u, v, mask):\n            valid = False\n            break\n    if valid:\n        result += dfs(0, -1, 0, mask, dp)\n\nstdout.write(str(result) + '\\n')",
+    "code_hash": "03113d8aad9bcf6a",
+    "language": "python",
+    "node_id": "n_4_f98677",
+    "revision_id": "rev_n_4_f98677_1",
+    "thought_path_snapshot": [
+      "Dynamic Programming on Tree with Bitmasking for Validity Check",
+      "Thought-2 (revised): Use dynamic programming on trees with bitmasking to efficiently track the validity of each edge coloring while ensuring all restrictions are met. This approach allows us to avoid the negative shift count error by carefully managing the bit positions used to represent edge colors."
+    ],
+    "origin": "rethink",
+    "generation_record_id": null,
+    "created_sequence": 14
+  },
+  {
+    "candidate_id": "cand_bc6540b207",
+    "problem_id": "apps_990",
+    "code": "import sys\nfrom collections import defaultdict\n\ndef dfs(node, parent, color):\n    global count\n    if node == target_node:\n        count += 1\n        return\n    for neighbor in graph[node]:\n        if neighbor != parent:\n            if color == 'B':\n                dfs(neighbor, node, 'W')\n            else:\n                dfs(neighbor, node, 'B')\n\ndef main():\n    input = sys.stdin.read\n    data = input().split()\n    \n    index = 0\n    N = int(data[index])\n    index += 1\n    \n    graph = defaultdict(list)\n    for _ in range(N - 1):\n        a = int(data[index]) - 1\n        b = int(data[index + 1]) - 1\n        graph[a].append(b)\n        graph[b].append(a)\n        index += 2\n    \n    M = int(data[index])\n    index += 1\n    \n    restrictions = []\n    for _ in range(M):\n        u = int(data[index]) - 1\n        v = int(data[index + 1]) - 1\n        restrictions.append((u, v))\n        index += 2\n    \n    total_ways = 0\n    for start in range(N):\n        for end in range(start + 1, N):\n            if (start, end) in restrictions or (end, start) in restrictions:\n                continue\n            count = 0\n            target_node = end\n            dfs(start, -1, 'B')\n            total_ways += count\n    \n    print(total_ways)\n\nif __name__ == \"__main__\":\n    main()",
+    "code_hash": "2ab3d78b2c1eadf2",
+    "language": "python",
+    "node_id": "n_7_76d63f",
+    "revision_id": "rev_n_7_76d63f_0",
+    "thought_path_snapshot": [
+      "Revised Thought-1: Instead of attempting to read and parse the input incrementally, read the entire input at once and then split it into a list of strings. This ensures that the indices are handled correctly and prevents the IndexError.",
+      "Optimize DFS implementation"
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 15
+  },
+  {
+    "candidate_id": "cand_0593658ab6",
+    "problem_id": "apps_990",
+    "code": "import sys\nfrom typing import List\n\ndef dfs(node: int, parent: int, target_node: int, edges: List[List[int]], color: List[int], visited: List[bool]) -> bool:\n    visited[node] = True\n    if node == target_node:\n        return True\n    for neighbor in edges[node]:\n        if neighbor != parent and not visited[neighbor]:\n            color[neighbor] = 1 - color[node]\n            if dfs(neighbor, node, target_node, edges, color, visited):\n                return True\n    return False\n\ndef count_valid_paintings(n: int, edges: List[List[int]], m: int, restrictions: List[List[int]]) -> int:\n    valid_paintings = 0\n    for i in range(2**(n-1)):\n        color = [0] * n\n        visited = [False] * n\n        color[0] = 0\n        if dfs(0, -1, restrictions[i][0]-1, edges, color, visited):\n            if dfs(0, -1, restrictions[i][1]-1, edges, color, visited):\n                valid_paintings += 1\n    return valid_paintings\n\nif __name__ == \"__main__\":\n    input = sys.stdin.read\n    data = input().split()\n    \n    n = int(data[0])\n    edges = []\n    index = 1\n    for _ in range(n-1):\n        a = int(data[index]) - 1\n        b = int(data[index+1]) - 1\n        edges.append([a, b])\n        edges.append([b, a])\n        index += 2\n    \n    m = int(data[index])\n    restrictions = []\n    for _ in range(m):\n        u = int(data[index+1]) - 1\n        v = int(data[index+2]) - 1\n        restrictions.append([u, v])\n        index += 3\n    \n    result = count_valid_paintings(n, edges, m, restrictions)\n    print(result)",
+    "code_hash": "697e622adb22e5a9",
+    "language": "python",
+    "node_id": "n_7_76d63f",
+    "revision_id": "rev_n_7_76d63f_1",
+    "thought_path_snapshot": [
+      "Revised Thought-1: Instead of attempting to read and parse the input incrementally, read the entire input at once and then split it into a list of strings. This ensures that the indices are handled correctly and prevents the IndexError.",
+      "Pass the `target_node` as an argument to the `dfs` function instead of using a global variable. This ensures that the `target_node` is accessible within the `dfs` function's scope."
+    ],
+    "origin": "rethink",
+    "generation_record_id": null,
+    "created_sequence": 16
+  },
+  {
+    "candidate_id": "cand_04f15fd030",
+    "problem_id": "apps_990",
+    "code": "import sys\nfrom collections import defaultdict\n\ndef dfs(node, parent, color, edges, restrictions):\n    count = 0\n    for neighbor in edges[node]:\n        if neighbor != parent:\n            new_color = color | (1 << (neighbor - 1))\n            if any(u == node and v == neighbor or u == neighbor and v == node for u, v in restrictions):\n                count += dfs(neighbor, node, new_color, edges, restrictions)\n            else:\n                count += dfs(neighbor, node, new_color, edges, restrictions)\n    return count\n\ndef main():\n    input = sys.stdin.read\n    data = input().split()\n    \n    index = 0\n    N = int(data[index])\n    index += 1\n    \n    edges = defaultdict(list)\n    for _ in range(N - 1):\n        a = int(data[index]) - 1\n        b = int(data[index + 1]) - 1\n        edges[a].append(b)\n        edges[b].append(a)\n        index += 2\n    \n    M = int(data[index])\n    index += 1\n    \n    restrictions = []\n    for _ in range(M):\n        u = int(data[index]) - 1\n        v = int(data[index + 1]) - 1\n        restrictions.append((u, v))\n        index += 2\n    \n    total_ways = 0\n    for start in range(N):\n        total_ways += dfs(start, -1, 0, edges, restrictions)\n    \n    print(total_ways)\n\nif __name__ == \"__main__\":\n    main()",
+    "code_hash": "754fa39f41837239",
+    "language": "python",
+    "node_id": "n_11_096924",
+    "revision_id": "rev_n_11_096924_0",
+    "thought_path_snapshot": [
+      "Graph Traversal with Dynamic Programming",
+      "Utilize bit manipulation to efficiently track the state of edge colors and check restrictions."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 17
+  },
+  {
+    "candidate_id": "cand_c5d2fbace8",
+    "problem_id": "apps_990",
+    "code": "from sys import stdin, stdout\nimport sys\nsys.setrecursionlimit(10**6)\n\ndef dfs(node, parent, mask, paths):\n    for nei, color in enumerate(paths[node]):\n        if nei != parent:\n            new_mask = mask | (1 << (nei * 2 + color))\n            dfs(nei, node, new_mask, paths)\n\ndef count_ways(n, edges, m, restrictions):\n    paths = [[] for _ in range(n)]\n    for a, b in edges:\n        paths[a-1].append((b-1, 0))  # White\n        paths[b-1].append((a-1, 0))  # White\n    \n    for u, v in restrictions:\n        paths[u-1].append((v-1, 1))  # Black\n        paths[v-1].append((u-1, 1))  # Black\n    \n    result = 0\n    for i in range(1 << (n * 2)):\n        valid = True\n        for u, v in restrictions:\n            found_black = False\n            stack = [(u-1, 0)]\n            visited = set()\n            while stack:\n                node, color = stack.pop()\n                if node == v-1 and color == 1:\n                    found_black = True\n                    break\n                visited.add(node)\n                for nei, c in paths[node]:\n                    if nei not in visited:\n                        stack.append((nei, c))\n            if not found_black:\n                valid = False\n                break\n        if valid:\n            result += 1\n    \n    return result\n\n# Read input\ninput = stdin.read\ndata = input().split()\n\nn = int(data[0])\nedges = []\nindex = 1\nfor _ in range(n-1):\n    a = int(data[index]) - 1\n    b = int(data[index+1]) - 1\n    edges.append((a, b))\n    index += 2\n\nm = int(data[index])\nrestrictions = []\nindex += 1\nfor _ in range(m):\n    u = int(data[index]) - 1\n    v = int(data[index+1]) - 1\n    restrictions.append((u, v))\n    index += 2\n\n# Calculate and print the result\nstdout.write(str(count_ways(n, edges, m, restrictions)))",
+    "code_hash": "3419dcc1dcd297af",
+    "language": "python",
+    "node_id": "n_11_096924",
+    "revision_id": "rev_n_11_096924_1",
+    "thought_path_snapshot": [
+      "Graph Traversal with Dynamic Programming",
+      "Thought-2 (revised): Use Depth-First Search (DFS) combined with bitmasking to efficiently explore all possible edge coloring combinations while checking the restrictions. Track the current path using a bitmask where each bit represents whether an edge is colored black. For each vertex, recursively try both black and white for each unvisited neighbor, ensuring the path between specified vertices contains at least one black edge when required."
+    ],
+    "origin": "rethink",
+    "generation_record_id": null,
+    "created_sequence": 18
+  },
+  {
+    "candidate_id": "cand_56844cc508",
+    "problem_id": "apps_990",
+    "code": "import sys\nfrom collections import defaultdict\n\ndef dfs(node, parent, color, adj, dp):\n    if node == 1:\n        dp[node][color] = 1\n    else:\n        dp[node][color] = sum(dp[neighbor][(color >> 1) & 1] for neighbor in adj[node] if neighbor != parent)\n    return dp[node][color]\n\ndef count_ways(n, edges, m, restrictions):\n    adj = defaultdict(list)\n    for a, b in edges:\n        adj[a].append(b)\n        adj[b].append(a)\n\n    dp = [[0] * 2 for _ in range(n + 1)]\n    dfs(1, -1, 0, adj, dp)\n\n    def check_restriction(u, v):\n        if u > v:\n            u, v = v, u\n        mask = 1 << (v - u)\n        return any((dp[u][i] & dp[v][i]) & mask for i in range(2))\n\n    result = 0\n    for i in range(1 << n):\n        valid = True\n        for u, v in restrictions:\n            if not check_restriction(u, v):\n                valid = False\n                break\n        if valid:\n            result += 1\n\n    return result\n\nif __name__ == \"__main__\":\n    input = sys.stdin.read\n    data = input().split()\n    \n    index = 0\n    n = int(data[index])\n    index += 1\n    \n    edges = []\n    for _ in range(n - 1):\n        a = int(data[index])\n        b = int(data[index + 1])\n        edges.append((a, b))\n        index += 2\n    \n    m = int(data[index])\n    index += 1\n    \n    restrictions = []\n    for _ in range(m):\n        u = int(data[index])\n        v = int(data[index + 1])\n        restrictions.append((u, v))\n        index += 2\n    \n    print(count_ways(n, edges, m, restrictions))",
+    "code_hash": "2c5a8b9844e45660",
+    "language": "python",
+    "node_id": "n_6_03b7c5",
+    "revision_id": "rev_n_6_03b7c5_0",
+    "thought_path_snapshot": [
+      "Dynamic Programming on Tree with Bitmasking for Validity Check",
+      "Optimize the bitmasking approach by precomputing valid paths between nodes to reduce redundant checks."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 19
+  },
+  {
+    "candidate_id": "cand_5520b0933d",
+    "problem_id": "apps_990",
+    "code": "from sys import stdin, stdout\nimport sys\nsys.setrecursionlimit(10**6)\n\ndef dfs(node, parent, mask, adj, restrictions):\n    valid = True\n    for u, v in restrictions:\n        if node == u and parent == v or node == v and parent == u:\n            valid = False\n            break\n    if valid:\n        dp[node][mask] = 1\n    \n    for neighbor in adj[node]:\n        if neighbor != parent:\n            dfs(neighbor, node, mask | (1 << (node - 1)), adj, restrictions)\n    \n    for neighbor in adj[node]:\n        if neighbor != parent:\n            dp[node][mask] += dp[neighbor][mask ^ (1 << (node - 1))]\n\ndef main():\n    input = stdin.read\n    data = input().split()\n    \n    index = 0\n    N = int(data[index])\n    index += 1\n    \n    adj = [[] for _ in range(N + 1)]\n    for _ in range(N - 1):\n        a = int(data[index]) - 1\n        b = int(data[index + 1]) - 1\n        adj[a].append(b)\n        adj[b].append(a)\n        index += 2\n    \n    M = int(data[index])\n    index += 1\n    \n    restrictions = []\n    for _ in range(M):\n        u = int(data[index]) - 1\n        v = int(data[index + 1]) - 1\n        restrictions.append((u, v))\n        index += 2\n    \n    dp = [[0] * (1 << N) for _ in range(N + 1)]\n    \n    dfs(0, -1, 0, adj, restrictions)\n    \n    result = sum(dp[0][mask] for mask in range(1 << N))\n    stdout.write(str(result))\n\nif __name__ == \"__main__\":\n    main()",
+    "code_hash": "d20c14cac47aa715",
+    "language": "python",
+    "node_id": "n_6_03b7c5",
+    "revision_id": "rev_n_6_03b7c5_1",
+    "thought_path_snapshot": [
+      "Dynamic Programming on Tree with Bitmasking for Validity Check",
+      "Thought-2: Use Depth-First Search (DFS) to explore all possible ways to paint the edges while keeping track of the current state of the path. This approach ensures that we can efficiently check if a path contains at least one black edge without needing to precompute valid paths."
+    ],
+    "origin": "rethink",
+    "generation_record_id": null,
+    "created_sequence": 20
+  },
+  {
+    "candidate_id": "cand_eb755ad5f1",
+    "problem_id": "apps_990",
+    "code": "import sys\nfrom collections import defaultdict\n\ndef count_valid_paintings(n, edges, m, restrictions):\n    def dfs(node, parent, color):\n        nonlocal valid_count\n        if node == n:\n            valid_count += 1\n            return\n        for neighbor in adj_list[node]:\n            if neighbor != parent:\n                dfs(neighbor, node, color ^ (1 << (node - 1)))\n    \n    adj_list = defaultdict(list)\n    for a, b in edges:\n        adj_list[a].append(b)\n        adj_list[b].append(a)\n    \n    valid_count = 0\n    dfs(1, -1, 0)\n    \n    for _ in range(m):\n        u, v = restrictions.pop()\n        u -= 1\n        v -= 1\n        while u != v:\n            if u > v:\n                u, v = v, u\n            u = adj_list[u][0]\n    \n    return valid_count\n\nif __name__ == \"__main__\":\n    input = sys.stdin.read\n    data = input().split()\n    \n    n = int(data[0])\n    edges = [(int(data[i * 2 + 1]), int(data[i * 2 + 2])) for i in range(n - 1)]\n    m = int(data[n * 2 + 1])\n    restrictions = [(int(data[(n + i) * 2 + 1]) - 1, int(data[(n + i) * 2 + 2]) - 1) for i in range(m)]\n    \n    result = count_valid_paintings(n, edges, m, restrictions)\n    print(result)",
+    "code_hash": "4ebc0a76e1417708",
+    "language": "python",
+    "node_id": "n_8_cf3f3c",
+    "revision_id": "rev_n_8_cf3f3c_0",
+    "thought_path_snapshot": [
+      "Revised Thought-1: Instead of attempting to read and parse the input incrementally, read the entire input at once and then split it into a list of strings. This ensures that the indices are handled correctly and prevents the IndexError.",
+      "Use bit manipulation more efficiently"
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 21
+  },
+  {
+    "candidate_id": "cand_8042f1775a",
+    "problem_id": "apps_990",
+    "code": "import sys\nfrom collections import defaultdict\n\ndef count_valid_paintings(n, edges, m, restrictions):\n    # Build the adjacency list for the tree\n    adj_list = defaultdict(list)\n    for a, b in edges:\n        adj_list[a].append(b)\n        adj_list[b].append(a)\n\n    def dfs(node, parent, color):\n        nonlocal valid\n        if node == restrictions[0][0]:\n            if color != 'B':\n                return False\n        elif node == restrictions[0][1]:\n            if color != 'B':\n                return False\n        for neighbor in adj_list[node]:\n            if neighbor == parent:\n                continue\n            if not dfs(neighbor, node, 'W' if color == 'B' else 'B'):\n                return False\n        return True\n\n    valid = False\n    for start_color in ['W', 'B']:\n        if dfs(1, -1, start_color):\n            valid = True\n            break\n\n    return int(valid)\n\n# Read input\ninput = sys.stdin.read\ndata = input().split()\n\nn = int(data[0])\nedges = [(int(data[i*2+1]), int(data[i*2+2])) for i in range(n-1)]\nm = int(data[n*2+1])\nrestrictions = [(int(data[(n+i)*2+2]), int(data[(n+i)*2+3])) for i in range(m)]\n\n# Calculate and print the result\nresult = count_valid_paintings(n, edges, m, restrictions)\nprint(result)",
+    "code_hash": "84d8d858e5489b07",
+    "language": "python",
+    "node_id": "n_8_cf3f3c",
+    "revision_id": "rev_n_8_cf3f3c_1",
+    "thought_path_snapshot": [
+      "Revised Thought-1: Instead of attempting to read and parse the input incrementally, read the entire input at once and then split it into a list of strings. This ensures that the indices are handled correctly and prevents the IndexError.",
+      "Ensure that the length of the `data` list is sufficient before attempting to access its elements. Adjust the loop bounds for processing restrictions accordingly."
+    ],
+    "origin": "rethink",
+    "generation_record_id": null,
+    "created_sequence": 22
+  },
+  {
+    "candidate_id": "cand_8f3fffa642",
+    "problem_id": "apps_990",
+    "code": "import sys\nfrom collections import defaultdict\n\ndef dfs(node, parent, color, graph, dp):\n    if (node, color) in dp:\n        return dp[(node, color)]\n    \n    count = 0\n    for neighbor in graph[node]:\n        if neighbor != parent:\n            if color == 'B':\n                count += dfs(neighbor, node, 'W', graph, dp)\n            else:\n                count += dfs(neighbor, node, 'B', graph, dp)\n    \n    dp[(node, color)] = count + (color == 'B')\n    return dp[(node, color)]\n\ndef main():\n    input = sys.stdin.read\n    data = input().split()\n    \n    index = 0\n    N = int(data[index])\n    index += 1\n    \n    graph = defaultdict(list)\n    for _ in range(N - 1):\n        a = int(data[index]) - 1\n        b = int(data[index + 1]) - 1\n        graph[a].append(b)\n        graph[b].append(a)\n        index += 2\n    \n    M = int(data[index])\n    index += 1\n    \n    restrictions = []\n    for _ in range(M):\n        u = int(data[index]) - 1\n        v = int(data[index + 1]) - 1\n        restrictions.append((u, v))\n        index += 2\n    \n    dp = {}\n    total_ways = 0\n    \n    for start in range(N):\n        for end in range(start + 1, N):\n            if any(u == start and v == end or u == end and v == start for u, v in restrictions):\n                total_ways += dfs(start, -1, 'B', graph, dp)\n            else:\n                total_ways += dfs(start, -1, 'W', graph, dp)\n    \n    print(total_ways)\n\nif __name__ == \"__main__\":\n    main()",
+    "code_hash": "4e0583908ca04f23",
+    "language": "python",
+    "node_id": "n_14_bdceba",
+    "revision_id": "rev_n_14_bdceba_0",
+    "thought_path_snapshot": [
+      "Revised Thought-1: Instead of attempting to read and parse the input incrementally, read the entire input at once and then split it into a list of strings. This ensures that the indices are handled correctly and prevents the IndexError.",
+      "Thought-2: Ensure that the `dfs` function uses the `graph` parameter passed to it instead of trying to access a global variable. This will resolve the NameError encountered during execution.",
+      "Use dynamic programming to store intermediate results and avoid redundant calculations."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 23
+  },
+  {
+    "candidate_id": "cand_f5c10eafbf",
+    "problem_id": "apps_990",
+    "code": "import sys\nfrom collections import defaultdict\n\ndef dfs(graph, start, visited, parent):\n    visited[start] = True\n    for neighbor in graph[start]:\n        if not visited[neighbor]:\n            dfs(graph, neighbor, visited, start)\n\ndef count_ways_to_paint_edges(n, edges, m, restrictions):\n    graph = defaultdict(list)\n    for a, b in edges:\n        graph[a].append(b)\n        graph[b].append(a)\n    \n    # Initialize visited array\n    visited = [False] * (n + 1)\n    \n    # Perform DFS to mark reachable nodes from each node\n    for i in range(1, n + 1):\n        if not visited[i]:\n            dfs(graph, i, visited, None)\n    \n    # Check if the restrictions can be satisfied\n    def satisfies_restriction(u, v):\n        stack = [(u, None)]\n        while stack:\n            current, parent = stack.pop()\n            if current == v:\n                return True\n            for neighbor in graph[current]:\n                if neighbor != parent:\n                    stack.append((neighbor, current))\n        return False\n    \n    # Count valid ways to paint edges\n    valid_ways = 0\n    for way in range(1 << (n - 1)):\n        painted_black = set()\n        for i in range(n - 1):\n            if way & (1 << i):\n                a, b = edges[i]\n                painted_black.add((a, b))\n                painted_black.add((b, a))\n        \n        if all(satisfies_restriction(u, v) for u, v in restrictions):\n            valid_ways += 1\n    \n    return valid_ways\n\n# Read input\ninput = sys.stdin.read\ndata = input().split()\n\nn = int(data[0])\nedges = []\nfor i in range(n - 1):\n    a = int(data[2 * i + 1])\n    b = int(data[2 * i + 2])\n    edges.append((a, b))\n\nm = int(data[2 * n + 1])\nrestrictions = []\nfor i in range(m):\n    u = int(data[2 * n + 2 + 2 * i])\n    v = int(data[2 * n + 3 + 2 * i])\n    restrictions.append((u, v))\n\n# Calculate and print the result\nresult = count_ways_to_paint_edges(n, edges, m, restrictions)\nprint(result)",
+    "code_hash": "211f9da5a9db6486",
+    "language": "python",
+    "node_id": "n_14_bdceba",
+    "revision_id": "rev_n_14_bdceba_1",
+    "thought_path_snapshot": [
+      "Revised Thought-1: Instead of attempting to read and parse the input incrementally, read the entire input at once and then split it into a list of strings. This ensures that the indices are handled correctly and prevents the IndexError.",
+      "Thought-2: Ensure that the `dfs` function uses the `graph` parameter passed to it instead of trying to access a global variable. This will resolve the NameError encountered during execution.",
+      "Thought-3: Instead of iterating over all pairs of nodes to consider paths between them, use a more efficient approach to determine if a path between two nodes contains at least one black edge. Specifically, perform a depth-first search (DFS) starting from each node to find the shortest path to all other nodes. Then, use this information to quickly check if a path between any two nodes contains a black edge without explicitly constructing the path. This approach reduces the time complexity significantly and should help avoid the observed error."
+    ],
+    "origin": "rethink",
+    "generation_record_id": null,
+    "created_sequence": 24
+  },
+  {
+    "candidate_id": "cand_77d43a6695",
+    "problem_id": "apps_990",
+    "code": "import sys\nfrom collections import defaultdict\n\ndef dfs(node, parent, color):\n    global valid\n    for neighbor in graph[node]:\n        if neighbor == parent:\n            continue\n        if color[neighbor] == -1:\n            color[neighbor] = 1 - color[node]\n            dfs(neighbor, node, color)\n        elif color[neighbor] == color[node]:\n            valid = False\n\ndef count_ways(n, edges, m, restrictions):\n    global valid\n    graph = defaultdict(list)\n    for a, b in edges:\n        graph[a].append(b)\n        graph[b].append(a)\n\n    total_ways = 0\n    for mask in range(1 << n):\n        color = [-1] * (n + 1)\n        valid = True\n        for i in range(1, n + 1):\n            if color[i] == -1:\n                color[i] = 0\n                dfs(i, -1, color)\n        \n        if not valid:\n            continue\n        \n        for u, v in restrictions:\n            if color[u] == color[v]:\n                break\n        else:\n            total_ways += 1\n    \n    return total_ways\n\nif __name__ == \"__main__\":\n    input = sys.stdin.read\n    data = input().split()\n    \n    index = 0\n    n = int(data[index])\n    index += 1\n    \n    edges = []\n    for _ in range(n - 1):\n        a = int(data[index])\n        b = int(data[index + 1])\n        edges.append((a, b))\n        index += 2\n    \n    m = int(data[index])\n    index += 1\n    \n    restrictions = []\n    for _ in range(m):\n        u = int(data[index])\n        v = int(data[index + 1])\n        restrictions.append((u, v))\n        index += 2\n    \n    result = count_ways(n, edges, m, restrictions)\n    print(result)",
+    "code_hash": "4040dd5ed5601928",
+    "language": "python",
+    "node_id": "n_17_4e9d0e",
+    "revision_id": "rev_n_17_4e9d0e_0",
+    "thought_path_snapshot": [
+      "Revised Thought-1: Instead of attempting to read and parse the input incrementally, read the entire input at once and then split it into a list of strings. This ensures that the indices are handled correctly and prevents the IndexError.",
+      "Ensure that the length of the `data` list is sufficient before attempting to access its elements. Adjust the loop bounds for processing restrictions accordingly.",
+      "Verify the DFS implementation for correctness."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 25
+  },
+  {
+    "candidate_id": "cand_dc0ad736d2",
+    "problem_id": "apps_990",
+    "code": "import sys\nfrom collections import defaultdict\n\ndef dfs(node, parent, color):\n    global valid\n    if node == target:\n        return True\n    for neighbor in graph[node]:\n        if neighbor != parent:\n            if color[neighbor] == 'B':\n                continue\n            color[neighbor] = 'B' if color[node] == 'W' else 'W'\n            if dfs(neighbor, node, color):\n                return True\n            color[neighbor] = 'U'\n    return False\n\ndef count_ways(n, edges, m, restrictions):\n    global graph, target, valid\n    graph = defaultdict(list)\n    for a, b in edges:\n        graph[a].append(b)\n        graph[b].append(a)\n    \n    total_ways = 2 ** (n - 1)\n    valid = True\n    \n    for u, v in restrictions:\n        target = v\n        color = ['U'] * (n + 1)\n        color[u] = 'B'\n        if not dfs(u, -1, color):\n            total_ways //= 2\n    \n    return total_ways\n\nif __name__ == \"__main__\":\n    input = sys.stdin.read\n    data = input().split()\n    \n    n = int(data[0])\n    edges = [(int(data[i]), int(data[i+1])) for i in range(1, 2*n-1, 2)]\n    m = int(data[2*n])\n    restrictions = [(int(data[2*n+i]), int(data[2*n+i+1])) for i in range(1, 2*m, 2)]\n    \n    result = count_ways(n, edges, m, restrictions)\n    print(result)",
+    "code_hash": "6b5bb3722fa0be71",
+    "language": "python",
+    "node_id": "n_17_4e9d0e",
+    "revision_id": "rev_n_17_4e9d0e_1",
+    "thought_path_snapshot": [
+      "Revised Thought-1: Instead of attempting to read and parse the input incrementally, read the entire input at once and then split it into a list of strings. This ensures that the indices are handled correctly and prevents the IndexError.",
+      "Ensure that the length of the `data` list is sufficient before attempting to access its elements. Adjust the loop bounds for processing restrictions accordingly.",
+      "Ensure that the `graph` dictionary is properly initialized and accessible within the scope where the DFS function is called."
+    ],
+    "origin": "rethink",
+    "generation_record_id": null,
+    "created_sequence": 26
+  },
+  {
+    "candidate_id": "cand_57a8864563",
+    "problem_id": "apps_990",
+    "code": "from collections import defaultdict, deque\nimport sys\ninput = sys.stdin.read\ndata = input().split()\n\ndef main():\n    index = 0\n    N = int(data[index])\n    index += 1\n    edges = []\n    for _ in range(N - 1):\n        a = int(data[index]) - 1\n        b = int(data[index + 1]) - 1\n        edges.append((a, b))\n        index += 2\n    \n    M = int(data[index])\n    index += 1\n    restrictions = []\n    for _ in range(M):\n        u = int(data[index]) - 1\n        v = int(data[index + 1]) - 1\n        restrictions.append((u, v))\n        index += 2\n    \n    # Build the adjacency list\n    adj_list = defaultdict(list)\n    for a, b in edges:\n        adj_list[a].append(b)\n        adj_list[b].append(a)\n    \n    # Find the root of the tree\n    root = None\n    for node in range(N):\n        if len(adj_list[node]) == 1:\n            root = node\n            break\n    \n    # Perform DFS to find the depth of each node\n    depth = [0] * N\n    stack = [(root, 0)]\n    while stack:\n        node, d = stack.pop()\n        depth[node] = d\n        for neighbor in adj_list[node]:\n            if neighbor != stack[-1][0]:\n                stack.append((neighbor, d + 1))\n    \n    # Initialize DP table\n    dp = [[0, 0] for _ in range(N)]\n    dp[root][0] = 1  # Root can be either color\n    \n    # Fill DP table using bottom-up approach\n    for node in range(N):\n        for neighbor in adj_list[node]:\n            if depth[neighbor] > depth[node]:\n                dp[node][0] += dp[neighbor][1]\n                dp[node][1] += dp[neighbor][0] + dp[neighbor][1]\n    \n    # Check restrictions\n    def check_restriction(u, v):\n        if depth[u] > depth[v]:\n            u, v = v, u\n        return dp[u][1] > 0\n    \n    result = 0\n    for mask in range(1 << (N - 1)):\n        valid = True\n        for u, v in restrictions:\n            if not check_restriction(u, v):\n                valid = False\n                break\n        if valid:\n            result += 1\n    \n    print(result)\n\nif __name__ == \"__main__\":\n    main()",
+    "code_hash": "ba6185459afd4baf",
+    "language": "python",
+    "node_id": "n_12_11b53c",
+    "revision_id": "rev_n_12_11b53c_0",
+    "thought_path_snapshot": [
+      "Graph Traversal with Dynamic Programming",
+      "Implement a topological sorting-based approach to ensure that all dependencies are considered before making decisions about edge colors."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 27
+  },
+  {
+    "candidate_id": "cand_80ef796635",
+    "problem_id": "apps_990",
+    "code": "from sys import stdin, stdout\nimport sys\nsys.setrecursionlimit(10**6)\n\ndef dfs(node, parent, color, dp):\n    if node == 1:\n        dp[node][color] = 1\n        return\n    \n    for neighbor in adj_list[node]:\n        if neighbor != parent:\n            dfs(neighbor, node, 0, dp)\n            dfs(neighbor, node, 1, dp)\n    \n    if color == 0:\n        dp[node][color] = sum(dp[neighbor][1] for neighbor in adj_list[node] if neighbor != parent)\n    else:\n        dp[node][color] = sum(dp[neighbor][0] + dp[neighbor][1] for neighbor in adj_list[node] if neighbor != parent)\n\ndef check_restriction(node, parent, color, dp, restriction):\n    u, v = restriction\n    if u == node or v == node:\n        return True\n    for neighbor in adj_list[node]:\n        if neighbor != parent:\n            if check_restriction(neighbor, node, color, dp, restriction):\n                return True\n    return False\n\ndef solve():\n    n = int(stdin.readline())\n    adj_list = [[] for _ in range(n+1)]\n    for _ in range(n-1):\n        a, b = map(int, stdin.readline().split())\n        adj_list[a].append(b)\n        adj_list[b].append(a)\n    \n    m = int(stdin.readline())\n    restrictions = [tuple(map(int, stdin.readline().split())) for _ in range(m)]\n    \n    dp = [[0, 0] for _ in range(n+1)]\n    dfs(1, -1, 0, dp)\n    dfs(1, -1, 1, dp)\n    \n    total_ways = dp[1][0] + dp[1][1]\n    valid_ways = 0\n    \n    def backtrack(node, parent, color):\n        nonlocal valid_ways\n        if node == 1:\n            if all(check_restriction(1, -1, color, dp, restriction) for restriction in restrictions):\n                valid_ways += 1\n            return\n        \n        for neighbor in adj_list[node]:\n            if neighbor != parent:\n                backtrack(neighbor, node, 0)\n                backtrack(neighbor, node, 1)\n    \n    backtrack(1, -1, 0)\n    backtrack(1, -1, 1)\n    \n    stdout.write(str(valid_ways))\n\nif __name__ == \"__main__\":\n    solve()",
+    "code_hash": "5cda63f34ae2f50e",
+    "language": "python",
+    "node_id": "n_12_11b53c",
+    "revision_id": "rev_n_12_11b53c_1",
+    "thought_path_snapshot": [
+      "Graph Traversal with Dynamic Programming",
+      "Thought-2: Use a recursive DFS approach to traverse the tree and apply dynamic programming to count valid edge coloring configurations while ensuring all restrictions are met."
+    ],
+    "origin": "rethink",
+    "generation_record_id": null,
+    "created_sequence": 28
+  },
+  {
+    "candidate_id": "cand_7c0ffb6469",
+    "problem_id": "apps_990",
+    "code": "import sys\nfrom typing import List\n\ndef dfs(node: int, parent: int, color: int, target_node: int, adjacency_list: List[List[int]], restrictions: List[List[int]]) -> int:\n    count = 0\n    for neighbor in adjacency_list[node]:\n        if neighbor != parent:\n            new_color = color | (1 << node)\n            if any(u == node and v == neighbor or u == neighbor and v == node for u, v in restrictions):\n                count += dfs(neighbor, node, new_color, target_node, adjacency_list, restrictions)\n            else:\n                count += dfs(neighbor, node, new_color, target_node, adjacency_list, restrictions)\n    return count\n\ndef main():\n    input = sys.stdin.read\n    data = input().split()\n    \n    index = 0\n    N = int(data[index])\n    index += 1\n    \n    adjacency_list = [[] for _ in range(N)]\n    for _ in range(N - 1):\n        a = int(data[index]) - 1\n        b = int(data[index + 1]) - 1\n        adjacency_list[a].append(b)\n        adjacency_list[b].append(a)\n        index += 2\n    \n    M = int(data[index])\n    index += 1\n    \n    restrictions = []\n    for _ in range(M):\n        u = int(data[index]) - 1\n        v = int(data[index + 1]) - 1\n        restrictions.append([u, v])\n        index += 2\n    \n    total_ways = 0\n    for i in range(N):\n        total_ways += dfs(i, -1, 0, i, adjacency_list, restrictions)\n    \n    print(total_ways)\n\nif __name__ == \"__main__\":\n    main()",
+    "code_hash": "f1667dac3a9dca31",
+    "language": "python",
+    "node_id": "n_20_ebd398",
+    "revision_id": "rev_n_20_ebd398_0",
+    "thought_path_snapshot": [
+      "Revised Thought-1: Instead of attempting to read and parse the input incrementally, read the entire input at once and then split it into a list of strings. This ensures that the indices are handled correctly and prevents the IndexError.",
+      "Pass the `target_node` as an argument to the `dfs` function instead of using a global variable. This ensures that the `target_node` is accessible within the `dfs` function's scope.",
+      "Use bit manipulation for coloring"
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 29
+  },
+  {
+    "candidate_id": "cand_77f1e87716",
+    "problem_id": "apps_990",
+    "code": "import sys\nfrom typing import List\n\ndef dfs(node: int, parent: int, target_node: int, mask: int, edges: List[List[int]], restrictions: List[List[int]]) -> int:\n    count = 0\n    for neighbor in edges[node]:\n        if neighbor != parent:\n            new_mask = mask | (1 << (node * len(edges) + neighbor))\n            if any(u == node and v == neighbor or u == neighbor and v == node for u, v in restrictions):\n                count += dfs(neighbor, node, target_node, new_mask, edges, restrictions)\n            else:\n                count += dfs(neighbor, node, target_node, new_mask, edges, restrictions)\n    return count\n\ndef main():\n    input = sys.stdin.read\n    data = input().split()\n    \n    index = 0\n    N = int(data[index])\n    index += 1\n    \n    edges = [[] for _ in range(N)]\n    for _ in range(N - 1):\n        a = int(data[index]) - 1\n        b = int(data[index + 1]) - 1\n        edges[a].append(b)\n        edges[b].append(a)\n        index += 2\n    \n    M = int(data[index])\n    index += 1\n    \n    restrictions = []\n    for _ in range(M):\n        u = int(data[index]) - 1\n        v = int(data[index + 1]) - 1\n        restrictions.append([u, v])\n        index += 2\n    \n    result = dfs(0, -1, 0, 0, edges, restrictions)\n    print(result)\n\nif __name__ == \"__main__\":\n    main()",
+    "code_hash": "3f013989e951bfdd",
+    "language": "python",
+    "node_id": "n_20_ebd398",
+    "revision_id": "rev_n_20_ebd398_1",
+    "thought_path_snapshot": [
+      "Revised Thought-1: Instead of attempting to read and parse the input incrementally, read the entire input at once and then split it into a list of strings. This ensures that the indices are handled correctly and prevents the IndexError.",
+      "Pass the `target_node` as an argument to the `dfs` function instead of using a global variable. This ensures that the `target_node` is accessible within the `dfs` function's scope.",
+      "Thought-3: Instead of using a single integer to represent the color of the edges, use a bitmask where each bit represents whether an edge is black (1) or white (0). This allows for more efficient checking of the restrictions and avoids potential issues with integer overflow or incorrect bitwise operations. Additionally, ensure that the DFS function correctly propagates the bitmask state through the recursion."
+    ],
+    "origin": "rethink",
+    "generation_record_id": null,
+    "created_sequence": 30
+  },
+  {
+    "candidate_id": "cand_5da0e68303",
+    "problem_id": "apps_990",
+    "code": "import sys\nfrom collections import defaultdict\n\ndef count_valid_paintings(n, edges, m, restrictions):\n    # Build the adjacency list representation of the tree\n    adj_list = defaultdict(list)\n    for a, b in edges:\n        adj_list[a].append(b)\n        adj_list[b].append(a)\n\n    def dfs(node, parent, color):\n        nonlocal valid\n        if node == restrictions[0][0]:\n            if color != 'B':\n                return False\n        elif node == restrictions[0][1]:\n            if color != 'B':\n                return False\n        for neighbor in adj_list[node]:\n            if neighbor == parent:\n                continue\n            if not dfs(neighbor, node, 'W' if color == 'B' else 'B'):\n                return False\n        return True\n\n    valid = False\n    for start_color in ['W', 'B']:\n        if dfs(1, -1, start_color):\n            valid = True\n            break\n\n    return int(valid)\n\n# Read input\ninput = sys.stdin.read\ndata = input().split()\n\nn = int(data[0])\nedges = [(int(data[i*2+1]), int(data[i*2+2])) for i in range(n-1)]\nm = int(data[n*2+1])\nrestrictions = [(int(data[(n+i)*2+2]), int(data[(n+i)*2+3])) for i in range(m)]\n\n# Calculate and print the result\nresult = count_valid_paintings(n, edges, m, restrictions)\nprint(result)",
+    "code_hash": "330b290f0da54948",
+    "language": "python",
+    "node_id": "n_16_4a0dde",
+    "revision_id": "rev_n_16_4a0dde_0",
+    "thought_path_snapshot": [
+      "Revised Thought-1: Instead of attempting to read and parse the input incrementally, read the entire input at once and then split it into a list of strings. This ensures that the indices are handled correctly and prevents the IndexError.",
+      "Ensure that the length of the `data` list is sufficient before attempting to access its elements. Adjust the loop bounds for processing restrictions accordingly.",
+      "Check if the input parsing logic is correct."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 31
+  },
+  {
+    "candidate_id": "cand_3eed21a7ba",
+    "problem_id": "apps_990",
+    "code": "import sys\nfrom typing import List\n\ndef dfs(node: int, parent: int, color: List[int], restrictions: List[List[int]], visited: List[bool]) -> bool:\n    visited[node] = True\n    for neighbor in range(1, n + 1):\n        if neighbor != node and neighbor != parent:\n            if color[neighbor] == -1:\n                color[neighbor] = 1 - color[node]\n                if not dfs(neighbor, node, color, restrictions, visited):\n                    return False\n            elif color[neighbor] == color[node]:\n                return False\n    \n    for u, v in restrictions:\n        if not (visited[u] and visited[v]):\n            continue\n        path_found = False\n        stack = [node]\n        while stack:\n            current = stack.pop()\n            if current == u or current == v:\n                path_found = True\n                break\n            for neighbor in range(1, n + 1):\n                if neighbor != current and neighbor != parent and not visited[neighbor]:\n                    stack.append(neighbor)\n        \n        if not path_found:\n            return False\n    \n    return True\n\ndef count_valid_paintings(n: int, edges: List[List[int]], m: int, restrictions: List[List[int]]) -> int:\n    color = [-1] * (n + 1)\n    visited = [False] * (n + 1)\n    \n    def backtrack(edge_index: int) -> None:\n        nonlocal valid_count\n        if edge_index == len(edges):\n            if dfs(1, -1, color, restrictions, visited):\n                valid_count += 1\n            return\n        \n        # Paint the current edge black\n        color[edges[edge_index][0]] = 1\n        color[edges[edge_index][1]] = 0\n        backtrack(edge_index + 1)\n        \n        # Paint the current edge white\n        color[edges[edge_index][0]] = 0\n        color[edges[edge_index][1]] = 1\n        backtrack(edge_index + 1)\n    \n    valid_count = 0\n    backtrack(0)\n    return valid_count\n\nif __name__ == \"__main__\":\n    input = sys.stdin.read\n    data = input().split()\n    \n    n = int(data[0])\n    edges = []\n    index = 1\n    for _ in range(n - 1):\n        a = int(data[index])\n        b = int(data[index + 1])\n        edges.append([a, b])\n        index += 2\n    \n    m = int(data[index])\n    restrictions = []\n    for _ in range(m):\n        u = int(data[index])\n        v = int(data[index + 1])\n        restrictions.append([u, v])\n        index += 2\n    \n    result = count_valid_paintings(n, edges, m, restrictions)\n    print(result)",
+    "code_hash": "6272a97c2c75946e",
+    "language": "python",
+    "node_id": "n_16_4a0dde",
+    "revision_id": "rev_n_16_4a0dde_1",
+    "thought_path_snapshot": [
+      "Revised Thought-1: Instead of attempting to read and parse the input incrementally, read the entire input at once and then split it into a list of strings. This ensures that the indices are handled correctly and prevents the IndexError.",
+      "Ensure that the length of the `data` list is sufficient before attempting to access its elements. Adjust the loop bounds for processing restrictions accordingly.",
+      "Ensure that the loop bounds for processing restrictions are correct. Specifically, the loop should iterate over `range(m)` to process all `M` restrictions, not just `range(1)`. Additionally, the DFS function needs to be modified to handle multiple restrictions correctly by checking all restrictions during the traversal."
+    ],
+    "origin": "rethink",
+    "generation_record_id": null,
+    "created_sequence": 32
+  }
+]

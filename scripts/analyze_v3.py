@@ -1,0 +1,240 @@
+#!/usr/bin/env python3
+"""Paired analysis of protocol v3.1 runs (reads runs/ and prepared/ only; no model calls).
+
+For every model x dataset with all three methods complete (Direct, Best-of-16, RethinkMCTS):
+  1. Pass@1 (all hidden tests pass) with Wilson 95% CI, and per APPS difficulty.
+  2. Paired exact McNemar for MCTS-Direct, MCTS-BoN16, BoN16-Direct, Holm-corrected over the family.
+  3. Paired bootstrap 95% CI of the accuracy difference (10 000 resamples, seed 0).
+  4. Cost per problem: model calls, code generations, input/output tokens; tokens per solved problem.
+  5. Offline counterfactuals (hidden verdicts re-judged locally with the same trusted executor):
+     - MCTS: first code of the tree (root), selection without the critic, actual selection.
+       Without the critic the search is identical up to the first all-public-pass candidate (the critic
+       is only called on those), and every later passing candidate ties at reward 1.0, so the earliest
+       one is selected: the counterfactual is exact up to vLLM nondeterminism.
+     - Best-of-k for k = 1..16 from the 16 stored samples (same selection rule as the run:
+       max public pass rate, ties to the earliest sample).
+Local re-judging is cached in --cache; agreement with the VM verdict of the selected code is reported.
+
+usage: python3 scripts/analyze_v3.py --models qwen25c7b seedcoder8b [--json out.json] [--no-offline]
+"""
+import argparse, json, random, sys
+from collections import defaultdict
+from concurrent.futures import ThreadPoolExecutor
+from math import comb, sqrt
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / 'src'))
+
+DATASETS = {'apps': ROOT / 'prepared/apps_half', 'humaneval': ROOT / 'prepared/humaneval'}
+METHODS = ['direct', 'bon16', 'mcts']
+COMPARISONS = [('mcts', 'direct'), ('mcts', 'bon16'), ('bon16', 'direct')]
+
+
+def wilson(k, n, z=1.96):
+    if n == 0:
+        return (0.0, 0.0)
+    p = k / n
+    d = 1 + z * z / n
+    c = (p + z * z / (2 * n)) / d
+    h = z * sqrt(p * (1 - p) / n + z * z / (4 * n * n)) / d
+    return (c - h, c + h)
+
+
+def mcnemar_exact(a, b):
+    """a, b: paired booleans (baseline, method). Returns (wins of b, losses of b, two-sided p)."""
+    w = sum((not x) and y for x, y in zip(a, b))
+    l = sum(x and (not y) for x, y in zip(a, b))
+    n = w + l
+    p = min(1.0, 2 * sum(comb(n, k) for k in range(min(w, l) + 1)) / 2 ** n) if n else 1.0
+    return w, l, p
+
+
+def holm(pvals):
+    order = sorted(range(len(pvals)), key=lambda i: pvals[i])
+    adj, running = [0.0] * len(pvals), 0.0
+    for rank, i in enumerate(order):
+        running = max(running, min(1.0, (len(pvals) - rank) * pvals[i]))
+        adj[i] = running
+    return adj
+
+
+def bootstrap_diff(a, b, reps=10000, seed=0):
+    rng = random.Random(seed)
+    n = len(a)
+    diffs = []
+    for _ in range(reps):
+        idx = [rng.randrange(n) for _ in range(n)]
+        diffs.append(sum(b[i] - a[i] for i in idx) / n)
+    diffs.sort()
+    return diffs[int(0.025 * reps)], diffs[int(0.975 * reps) - 1]
+
+
+def load_meta(ds):
+    meta = {}
+    for line in (DATASETS[ds] / 'public/problems.jsonl').open():
+        d = json.loads(line)
+        meta[d['problem_id']] = d
+    return meta
+
+
+def load_run(name):
+    run = ROOT / 'runs' / name
+    recs = {}
+    for f in (run / 'problems').glob('*/completed.json'):
+        r = json.loads(f.read_text())
+        recs[r['problem_id']] = r
+    summary = json.loads((run / 'summary.json').read_text()) if (run / 'summary.json').exists() else {}
+    return run, recs, summary
+
+
+class LocalJudge:
+    """Re-judges candidate code on the hidden suite, cached by (problem, code_hash)."""
+
+    def __init__(self, ds, cache_path):
+        from rethink_mcts.adapters.execution.trusted_fixture_executor import TrustedFixtureExecutor
+        from rethink_mcts.application.judge import HiddenJudge
+        self.ds, self.meta = ds, load_meta(ds)
+        self.judge = HiddenJudge(TrustedFixtureExecutor(test_workers=4, max_test_processes=8))
+        self.cache_path = cache_path
+        self.cache = json.loads(cache_path.read_text()) if cache_path.exists() else {}
+
+    def verdict(self, pid, code, code_hash):
+        from rethink_mcts.adapters.datasets.jsonl import parse_case_dict
+        from rethink_mcts.domain.candidate import ProgramCandidate
+        from rethink_mcts.domain.problem import HiddenProblem, HiddenSuite, JudgeSpec, ExecutionSpec
+        key = f'{self.ds}/{pid}/{code_hash}'
+        if key not in self.cache:
+            raw = json.loads((DATASETS[self.ds] / 'judge/suites' / f'{pid}.json').read_text())
+            s = raw['hidden_suite']
+            hp = HiddenProblem(pid, HiddenSuite(tuple(parse_case_dict(c) for c in s['cases']), s.get('suite_id', 'hidden'), ()),
+                               JudgeSpec(**raw.get('judge_spec', {})))
+            sd = self.meta[pid]['execution_spec']
+            spec = ExecutionSpec(**{k: v for k, v in sd.items() if k in ExecutionSpec.__dataclass_fields__})
+            self.cache[key] = self.judge.judge(ProgramCandidate('offline', pid, code, code_hash), hp, execution_spec=spec).all_hidden_passed
+        return self.cache[key]
+
+    def save(self):
+        self.cache_path.write_text(json.dumps(self.cache))
+
+
+def problem_files(run, pid):
+    pdir = run / 'problems' / pid
+    cands = {c['candidate_id']: c for c in json.loads((pdir / 'candidates.json').read_text())}
+    evals = [e for e in json.loads((pdir / 'evaluations.json').read_text()) if e['suite_visibility'] == 'public']
+    sel = json.loads((pdir / 'selected.json').read_text())['candidate_id'] if (pdir / 'selected.json').exists() else None
+    return pdir, cands, evals, sel
+
+
+def offline_mcts(run, pids, judge):
+    out = {}
+
+    def one(pid):
+        pdir, cands, evals, sel = problem_files(run, pid)
+        tree = json.loads((pdir / 'search.json').read_text())['tree']
+        ev_by_id = {e['evaluation_id']: e for e in evals}
+        root = ev_by_id[tree['nodes'][tree['root_id']]['latest_evaluation_id']]['candidate_id']
+        passing = sorted({e['candidate_id'] for e in evals if e['execution_summary']['all_passed']},
+                         key=lambda c: cands[c]['created_sequence'])
+        nocrit = passing[0] if passing else sel
+        v = lambda c: judge.verdict(pid, cands[c]['code'], cands[c]['code_hash']) if c else False
+        return pid, dict(root=v(root), no_critic=v(nocrit), selected=v(sel), any_public_pass=bool(passing),
+                         n_public_pass_codes=len({cands[c]['code_hash'] for c in passing}))
+
+    with ThreadPoolExecutor(4) as ex:
+        for pid, row in ex.map(one, pids):
+            out[pid] = row
+    return out
+
+
+def offline_bok(run, pids, judge, kmax=16):
+    out = {}
+
+    def one(pid):
+        _, cands, evals, sel = problem_files(run, pid)
+        ev = sorted(evals, key=lambda e: cands[e['candidate_id']]['created_sequence'])
+        row = {}
+        for k in range(1, kmax + 1):
+            pool = [e for e in ev[:k] if e.get('reward') is not None]
+            best = max(pool, key=lambda e: (e['reward'], -cands[e['candidate_id']]['created_sequence'])) if pool else None
+            c = cands[best['candidate_id']] if best else None
+            row[k] = judge.verdict(pid, c['code'], c['code_hash']) if c else False
+        row['selected_is_k16'] = (best['candidate_id'] == sel) if best else None
+        return pid, row
+
+    with ThreadPoolExecutor(4) as ex:
+        for pid, row in ex.map(one, pids):
+            out[pid] = row
+    return out
+
+
+def cost(recs):
+    n = len(recs)
+    g = lambda key: sum((r.get('usage') or {}).get(key) or 0 for r in recs.values()) / n
+    solved = sum(r.get('all_hidden_passed', False) for r in recs.values())
+    tot = sum(((r.get('usage') or {}).get('total_tokens') or 0) for r in recs.values())
+    return dict(calls=g('total_model_calls'), code_generations=g('code_generation_attempts'),
+                input_tokens=g('input_tokens'), output_tokens=g('output_tokens'),
+                tokens_per_solved=(tot / solved if solved else None))
+
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument('--models', nargs='+', required=True)
+    ap.add_argument('--datasets', nargs='+', default=['apps', 'humaneval'])
+    ap.add_argument('--json', default=None)
+    ap.add_argument('--cache', default=str(ROOT / 'docs/results/v3_offline_judge_cache.json'))
+    ap.add_argument('--no-offline', action='store_true')
+    args = ap.parse_args()
+
+    result, family = {}, []
+    for model in args.models:
+        for ds in args.datasets:
+            runs = {m: load_run(f'v3_{ds}_{model}_{m}') for m in METHODS}
+            ids = sorted(set.intersection(*(set(r[1]) for r in runs.values())))
+            meta = load_meta(ds)
+            cell = dict(n=len(ids), methods={}, comparisons={}, by_difficulty={})
+            for m, (run, recs, summ) in runs.items():
+                k = sum(recs[i].get('all_hidden_passed', False) for i in ids)
+                lo, hi = wilson(k, len(ids))
+                cell['methods'][m] = dict(passed=k, rate=k / len(ids), wilson95=[lo, hi],
+                                          errors=summ.get('error_problems'), cost=cost({i: recs[i] for i in ids}))
+            if ds == 'apps':
+                for d in ['introductory', 'interview', 'competition']:
+                    sub = [i for i in ids if meta[i]['metadata']['difficulty'] == d]
+                    cell['by_difficulty'][d] = {m: sum(runs[m][1][i].get('all_hidden_passed', False) for i in sub) for m in METHODS}
+                    cell['by_difficulty'][d]['n'] = len(sub)
+            for b, a in COMPARISONS:
+                A = [runs[a][1][i].get('all_hidden_passed', False) for i in ids]
+                B = [runs[b][1][i].get('all_hidden_passed', False) for i in ids]
+                w, l, p = mcnemar_exact(A, B)
+                lo, hi = bootstrap_diff([int(x) for x in A], [int(x) for x in B])
+                cell['comparisons'][f'{b}_vs_{a}'] = dict(wins=w, losses=l, p=p, diff=(sum(B) - sum(A)) / len(ids), boot95=[lo, hi])
+                family.append((model, ds, f'{b}_vs_{a}', p))
+            if not args.no_offline:
+                judge = LocalJudge(ds, Path(args.cache).with_name(Path(args.cache).stem + f'_{ds}.json'))
+                om = offline_mcts(runs['mcts'][0], ids, judge)
+                ob = offline_bok(runs['bon16'][0], ids, judge)
+                judge.save()
+                vm = {i: runs['mcts'][1][i].get('all_hidden_passed', False) for i in ids}
+                cell['offline_mcts'] = dict(
+                    root=sum(om[i]['root'] for i in ids), no_critic=sum(om[i]['no_critic'] for i in ids),
+                    selected_local=sum(om[i]['selected'] for i in ids), selected_vm=sum(vm.values()),
+                    local_vm_agreement=sum(om[i]['selected'] == vm[i] for i in ids),
+                    critic_vs_no_critic=dict(zip(['wins', 'losses', 'p'], mcnemar_exact([om[i]['no_critic'] for i in ids], [om[i]['selected'] for i in ids]))),
+                    search_vs_root=dict(zip(['wins', 'losses', 'p'], mcnemar_exact([om[i]['root'] for i in ids], [om[i]['no_critic'] for i in ids]))),
+                    problems_with_public_pass=sum(om[i]['any_public_pass'] for i in ids))
+                vb = {i: runs['bon16'][1][i].get('all_hidden_passed', False) for i in ids}
+                cell['best_of_k'] = {k: sum(ob[i][k] for i in ids) for k in range(1, 17)}
+                cell['best_of_k_local_vm_agreement_k16'] = sum(ob[i][16] == vb[i] for i in ids)
+            result[f'{model}/{ds}'] = cell
+    adj = holm([p for *_, p in family])
+    for (model, ds, comp, p), pa in zip(family, adj):
+        result[f'{model}/{ds}']['comparisons'][comp]['p_holm'] = pa
+    if args.json:
+        Path(args.json).write_text(json.dumps(result, indent=1))
+    print(json.dumps(result, indent=1))
+
+
+if __name__ == '__main__':
+    main()

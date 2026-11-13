@@ -1,0 +1,323 @@
+[
+  {
+    "candidate_id": "cand_92b9542a28",
+    "problem_id": "apps_3214",
+    "code": "import sys\nfrom collections import defaultdict\n\ndef get_word_cores(text):\n    words = text.split()\n    cores = []\n    for word in words:\n        core = ''.join(filter(str.isalpha, word)).lower()\n        if core:\n            cores.append(core)\n    return cores\n\ndef generate_variants(word):\n    variants = set()\n    length = len(word)\n    \n    # Deletion\n    for i in range(length):\n        variants.add(word[:i] + word[i+1:])\n    \n    # Insertion\n    for i in range(length + 1):\n        for c in 'abcdefghijklmnopqrstuvwxyz':\n            variants.add(word[:i] + c + word[i:])\n    \n    # Replacement\n    for i in range(length):\n        for c in 'abcdefghijklmnopqrstuvwxyz':\n            if word[i] != c:\n                variants.add(word[:i] + c + word[i+1:])\n    \n    # Transposition\n    for i in range(length - 1):\n        variants.add(word[:i] + word[i+1] + word[i] + word[i+2:])\n    \n    return variants\n\ndef find_similar_words(cores):\n    similar_words = defaultdict(set)\n    for core in cores:\n        variants = generate_variants(core)\n        for variant in variants:\n            if variant in cores and variant != core:\n                similar_words[core].add(variant)\n                similar_words[variant].add(core)\n    \n    result = []\n    for core in sorted(similar_words.keys()):\n        similar = sorted(similar_words[core])\n        if similar:\n            result.append(f\"{core}: {' '.join(similar)}\")\n    \n    return result\n\ndef main():\n    input_lines = sys.stdin.read().strip().split('\\n')\n    if input_lines[-1] != \"***\":\n        return\n    \n    input_lines = input_lines[:-1]\n    text = ' '.join(input_lines)\n    cores = get_word_cores(text)\n    similar_word_list = find_similar_words(cores)\n    \n    if similar_word_list:\n        for line in similar_word_list:\n            print(line)\n    else:\n        print(\"***\")\n\nif __name__ == \"__main__\":\n    main()",
+    "code_hash": "c6a74da4ba953160",
+    "language": "python",
+    "node_id": "n_1_4f0050",
+    "revision_id": "rev_n_1_4f0050_0",
+    "thought_path_snapshot": [
+      "Use a trie data structure to efficiently store and search for word cores"
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 1
+  },
+  {
+    "candidate_id": "cand_f074c0bff8",
+    "problem_id": "apps_3214",
+    "code": "import sys\nfrom collections import defaultdict\n\ndef get_core(word):\n    return ''.join(filter(str.isalpha, word)).lower()\n\ndef are_similar(core1, core2):\n    if core1 == core2:\n        return False\n    len1, len2 = len(core1), len(core2)\n    if abs(len1 - len2) > 1:\n        return False\n\n    if len1 == len2:\n        # Check for single replacement\n        diff_count = sum(1 for a, b in zip(core1, core2) if a != b)\n        return diff_count == 1\n    elif len1 < len2:\n        # Check for single insertion\n        for i in range(len2):\n            if core1 == core2[:i] + core2[i+1:]:\n                return True\n    else:\n        # Check for single deletion\n        for i in range(len1):\n            if core1[:i] + core1[i+1:] == core2:\n                return True\n\n    # Check for single transposition\n    if len1 == len2:\n        for i in range(len1 - 1):\n            if core1[:i] + core1[i+1] + core1[i] + core1[i+2:] == core2:\n                return True\n\n    return False\n\ndef find_similar_words(text):\n    words = text.split()\n    cores = [get_core(word) for word in words]\n    similar_dict = defaultdict(set)\n\n    for i, core in enumerate(cores):\n        for j, other_core in enumerate(cores):\n            if i != j and are_similar(core, other_core):\n                similar_dict[core].add(other_core)\n\n    result = []\n    for core in sorted(similar_dict.keys()):\n        if similar_dict[core]:\n            result.append(f\"{core}: {' '.join(sorted(similar_dict[core]))}\")\n\n    return result\n\ndef main():\n    input_lines = sys.stdin.read().strip().split('\\n')\n    text = '\\n'.join(input_lines[:-1])  # Exclude the end-of-input marker\n    similar_words = find_similar_words(text)\n    if similar_words:\n        for line in similar_words:\n            print(line)\n    else:\n        print(\"***\")\n\nif __name__ == \"__main__\":\n    main()",
+    "code_hash": "de52ae995c8fd7ca",
+    "language": "python",
+    "node_id": "n_2_200e1d",
+    "revision_id": "rev_n_2_200e1d_0",
+    "thought_path_snapshot": [
+      "Implement a custom edit distance algorithm optimized for the four allowed transformations"
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 2
+  },
+  {
+    "candidate_id": "cand_b59e5533a9",
+    "problem_id": "apps_3214",
+    "code": "import sys\nfrom collections import defaultdict\n\ndef get_core(word):\n    return ''.join(filter(str.isalpha, word)).lower()\n\ndef are_similar(core1, core2):\n    if core1 == core2:\n        return False\n    len1, len2 = len(core1), len(core2)\n    if abs(len1 - len2) > 1:\n        return False\n    \n    if len1 == len2:\n        # Check for single replacement\n        diff_count = sum(1 for a, b in zip(core1, core2) if a != b)\n        return diff_count == 1\n    elif len1 < len2:\n        # Check for single insertion\n        for i in range(len2):\n            if core1 == core2[:i] + core2[i+1:]:\n                return True\n    else:\n        # Check for single deletion\n        for i in range(len1):\n            if core1[:i] + core1[i+1:] == core2:\n                return True\n    \n    # Check for single transposition\n    if len1 == len2:\n        for i in range(len1 - 1):\n            if core1[:i] + core1[i+1] + core1[i] + core1[i+2:] == core2:\n                return True\n    \n    return False\n\ndef typo_checker():\n    word_cores = defaultdict(set)\n    for line in sys.stdin:\n        line = line.strip()\n        if line == \"***\":\n            break\n        words = line.split()\n        for word in words:\n            core = get_core(word)\n            if core:\n                word_cores[core].add(word)\n    \n    similar_words = defaultdict(set)\n    cores = sorted(word_cores.keys())\n    \n    for i in range(len(cores)):\n        for j in range(i + 1, len(cores)):\n            if are_similar(cores[i], cores[j]):\n                similar_words[cores[i]].add(cores[j])\n                similar_words[cores[j]].add(cores[i])\n    \n    if not similar_words:\n        print(\"***\")\n    else:\n        for core in sorted(similar_words.keys()):\n            similar_list = sorted(similar_words[core])\n            print(f\"{core}: {' '.join(similar_list)}\")",
+    "code_hash": "c04ae4c32e6fe99e",
+    "language": "python",
+    "node_id": "n_3_bcdf84",
+    "revision_id": "rev_n_3_bcdf84_0",
+    "thought_path_snapshot": [
+      "Use a hash table to group words by their core, then compare groups for similar words"
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 3
+  },
+  {
+    "candidate_id": "cand_77eb413086",
+    "problem_id": "apps_3214",
+    "code": "import sys\nfrom collections import defaultdict\n\ndef get_core(word):\n    return ''.join(c.lower() for c in word if c.isalpha())\n\ndef are_similar(word1, word2):\n    if abs(len(word1) - len(word2)) > 1:\n        return False\n    \n    if len(word1) == len(word2):\n        # Check for replacement\n        diff_count = sum(1 for a, b in zip(word1, word2) if a != b)\n        return diff_count == 1\n    \n    if len(word1) < len(word2):\n        # Check for insertion\n        for i in range(len(word2)):\n            if word1 == word2[:i] + word2[i+1:]:\n                return True\n        return False\n    \n    if len(word1) > len(word2):\n        # Check for deletion\n        for i in range(len(word1)):\n            if word1[:i] + word1[i+1:] == word2:\n                return True\n        return False\n\ndef find_similar_words(text):\n    words = text.split()\n    cores = [get_core(word) for word in words]\n    similar_words = defaultdict(set)\n    \n    for i, core in enumerate(cores):\n        for j, other_core in enumerate(cores):\n            if i != j and core != other_core and are_similar(core, other_core):\n                similar_words[core].add(other_core)\n    \n    return similar_words\n\ndef main():\n    input_lines = sys.stdin.read().strip().split('\\n')\n    text = '\\n'.join(input_lines[:-1])  # Exclude the end-of-input marker\n    \n    similar_words = find_similar_words(text)\n    \n    if not similar_words:\n        print(\"***\")\n        return\n    \n    for core in sorted(similar_words.keys()):\n        similar_list = sorted(similar_words[core])\n        if similar_list:\n            print(f\"{core}: {' '.join(similar_list)}\")\n\nif __name__ == \"__main__\":\n    main()",
+    "code_hash": "b80ccb4306ae1824",
+    "language": "python",
+    "node_id": "n_3_bcdf84",
+    "revision_id": "rev_n_3_bcdf84_1",
+    "thought_path_snapshot": [
+      "The current implementation of the `are_similar` function has a few issues. The transposition check is commented out and not implemented correctly. Additionally, the code doesn't handle the case where a word core has no similar words, which should be skipped in the output. To improve the solution, we should implement the transposition check correctly and ensure that we only print word cores that have similar words. This will help in producing the expected output for the given input."
+    ],
+    "origin": "rethink",
+    "generation_record_id": null,
+    "created_sequence": 4
+  },
+  {
+    "candidate_id": "cand_e921f7cc1e",
+    "problem_id": "apps_3214",
+    "code": "import sys\nfrom collections import defaultdict\n\ndef get_word_cores(text):\n    words = text.split()\n    cores = []\n    for word in words:\n        core = ''.join(filter(str.isalpha, word)).lower()\n        if core:\n            cores.append(core)\n    return cores\n\ndef generate_variants(word):\n    variants = set()\n    length = len(word)\n    \n    # Deletion\n    for i in range(length):\n        variants.add(word[:i] + word[i+1:])\n    \n    # Insertion\n    for i in range(length + 1):\n        for c in 'abcdefghijklmnopqrstuvwxyz':\n            variants.add(word[:i] + c + word[i:])\n    \n    # Replacement\n    for i in range(length):\n        for c in 'abcdefghijklmnopqrstuvwxyz':\n            if word[i] != c:\n                variants.add(word[:i] + c + word[i+1:])\n    \n    # Transposition\n    for i in range(length - 1):\n        variants.add(word[:i] + word[i+1] + word[i] + word[i+2:])\n    \n    return variants\n\ndef find_similar_words(cores):\n    similar_words = defaultdict(set)\n    core_to_index = {core: i for i, core in enumerate(cores)}\n    \n    for i, core in enumerate(cores):\n        variants = generate_variants(core)\n        for variant in variants:\n            if variant in core_to_index and core_to_index[variant] != i:\n                similar_words[core].add(variant)\n                similar_words[variant].add(core)\n    \n    return similar_words\n\ndef main():\n    input_lines = sys.stdin.read().strip().split('\\n')\n    if input_lines[-1] != '***':\n        return\n    \n    input_lines = input_lines[:-1]\n    text = ' '.join(input_lines)\n    cores = get_word_cores(text)\n    similar_words = find_similar_words(cores)\n    \n    result = []\n    for core in sorted(similar_words.keys()):\n        similar = sorted(similar_words[core] - {core})\n        if similar:\n            result.append(f\"{core}: {' '.join(similar)}\")\n    \n    if not result:\n        print(\"***\")\n    else:\n        for line in result:\n            print(line)\n\nif __name__ == \"__main__\":\n    main()",
+    "code_hash": "85ffa4a40bf00356",
+    "language": "python",
+    "node_id": "n_6_66141f",
+    "revision_id": "rev_n_6_66141f_0",
+    "thought_path_snapshot": [
+      "Use a trie data structure to efficiently store and search for word cores",
+      "Use a hash table to store word cores and their similar counterparts for quick lookup"
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 5
+  },
+  {
+    "candidate_id": "cand_a83aed3730",
+    "problem_id": "apps_3214",
+    "code": "import sys\nfrom collections import defaultdict\n\ndef get_word_cores(text):\n    words = text.split()\n    cores = []\n    for word in words:\n        core = ''.join(filter(str.isalpha, word)).lower()\n        if core:\n            cores.append(core)\n    return cores\n\ndef generate_variants(word):\n    variants = set()\n    length = len(word)\n    \n    # Deletion\n    for i in range(length):\n        variants.add(word[:i] + word[i+1:])\n    \n    # Insertion\n    for i in range(length + 1):\n        for c in 'abcdefghijklmnopqrstuvwxyz':\n            variants.add(word[:i] + c + word[i:])\n    \n    # Replacement\n    for i in range(length):\n        for c in 'abcdefghijklmnopqrstuvwxyz':\n            if word[i] != c:\n                variants.add(word[:i] + c + word[i+1:])\n    \n    # Transposition\n    for i in range(length - 1):\n        variants.add(word[:i] + word[i+1] + word[i] + word[i+2:])\n    \n    return variants\n\ndef find_similar_words(cores):\n    similar_words = defaultdict(set)\n    core_to_index = {core: i for i, core in enumerate(cores)}\n    \n    for i, core in enumerate(cores):\n        variants = generate_variants(core)\n        for variant in variants:\n            if variant in core_to_index and core_to_index[variant] != i:\n                similar_words[core].add(variant)\n                similar_words[variant].add(core)\n    \n    return similar_words\n\ndef main():\n    input_lines = sys.stdin.read().strip().split('\\n')\n    if input_lines[-1] != '***':\n        return\n    \n    input_lines = input_lines[:-1]\n    text = ' '.join(input_lines)\n    cores = get_word_cores(text)\n    similar_words = find_similar_words(cores)\n    \n    result = []\n    for core in sorted(similar_words.keys()):\n        similar = sorted(similar_words[core] - {core})\n        if similar:\n            result.append(f\"{core}: {' '.join(similar)}\")\n    \n    if not result:\n        print(\"***\")\n    else:\n        for line in result:\n            print(line)\n\nif __name__ == \"__main__\":\n    main()",
+    "code_hash": "85ffa4a40bf00356",
+    "language": "python",
+    "node_id": "n_7_42e221",
+    "revision_id": "rev_n_7_42e221_0",
+    "thought_path_snapshot": [
+      "Implement a custom edit distance algorithm optimized for the four allowed transformations",
+      "Use a trie data structure to efficiently store and search for word cores"
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 6
+  },
+  {
+    "candidate_id": "cand_fce5e13e5b",
+    "problem_id": "apps_3214",
+    "code": "import sys\nfrom collections import defaultdict\n\ndef get_word_cores(text):\n    words = text.split()\n    cores = []\n    for word in words:\n        core = ''.join(filter(str.isalpha, word)).lower()\n        if core:\n            cores.append(core)\n    return cores\n\ndef generate_variants(word):\n    variants = set()\n    length = len(word)\n    \n    # Deletion\n    for i in range(length):\n        variants.add(word[:i] + word[i+1:])\n    \n    # Insertion\n    for i in range(length + 1):\n        for c in 'abcdefghijklmnopqrstuvwxyz':\n            variants.add(word[:i] + c + word[i:])\n    \n    # Replacement\n    for i in range(length):\n        for c in 'abcdefghijklmnopqrstuvwxyz':\n            if word[i] != c:\n                variants.add(word[:i] + c + word[i+1:])\n    \n    # Transposition\n    for i in range(length - 1):\n        variants.add(word[:i] + word[i+1] + word[i] + word[i+2:])\n    \n    return variants\n\ndef find_similar_words(cores):\n    similar_words = defaultdict(set)\n    core_to_index = {core: i for i, core in enumerate(cores)}\n    \n    for i, core in enumerate(cores):\n        variants = generate_variants(core)\n        for variant in variants:\n            if variant in core_to_index and core_to_index[variant] != i:\n                similar_words[core].add(variant)\n                similar_words[variant].add(core)\n    \n    return similar_words\n\ndef main():\n    input_lines = sys.stdin.read().strip().split('\\n')\n    if input_lines[-1] != \"***\":\n        return\n    \n    input_lines = input_lines[:-1]\n    text = ' '.join(input_lines)\n    cores = get_word_cores(text)\n    similar_words = find_similar_words(cores)\n    \n    result = []\n    for core in sorted(similar_words.keys()):\n        similar = sorted(similar_words[core] - {core})\n        if similar:\n            result.append(f\"{core}: {' '.join(similar)}\")\n    \n    if not result:\n        print(\"***\")\n    else:\n        for line in result:\n            print(line)\n\nif __name__ == \"__main__\":\n    main()",
+    "code_hash": "7de8ac93e654482d",
+    "language": "python",
+    "node_id": "n_4_00ee54",
+    "revision_id": "rev_n_4_00ee54_0",
+    "thought_path_snapshot": [
+      "Use a trie data structure to efficiently store and search for word cores",
+      "Use a trie data structure to efficiently store and search for word cores"
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 7
+  },
+  {
+    "candidate_id": "cand_7b35825f6f",
+    "problem_id": "apps_3214",
+    "code": "import sys\nfrom collections import defaultdict\n\ndef get_core(word):\n    return ''.join(filter(str.isalpha, word)).lower()\n\ndef are_similar(word1, word2):\n    if abs(len(word1) - len(word2)) > 1:\n        return False\n    \n    if len(word1) == len(word2):\n        # Check for replacement\n        differences = sum(1 for a, b in zip(word1, word2) if a != b)\n        return differences == 1\n    \n    if len(word1) < len(word2):\n        # Check for insertion\n        for i in range(len(word2)):\n            if word1 == word2[:i] + word2[i+1:]:\n                return True\n        return False\n    \n    if len(word1) > len(word2):\n        # Check for deletion\n        for i in range(len(word1)):\n            if word1[:i] + word1[i+1:] == word2:\n                return True\n        return False\n\ndef find_similar_words(text):\n    words = text.split()\n    cores = [get_core(word) for word in words]\n    core_to_word = defaultdict(list)\n    \n    for word, core in zip(words, cores):\n        core_to_word[core].append(word)\n    \n    similar_words = defaultdict(set)\n    \n    for core in core_to_word:\n        for other_core in core_to_word:\n            if core != other_core and are_similar(core, other_core):\n                similar_words[core].add(other_core)\n    \n    return similar_words\n\ndef main():\n    input_lines = sys.stdin.read().strip().split('\\n')\n    text = '\\n'.join(input_lines[:-1])  # Exclude the end marker \"***\"\n    \n    similar_words = find_similar_words(text)\n    \n    if not similar_words:\n        print(\"***\")\n        return\n    \n    for core in sorted(similar_words):\n        similar_list = sorted(similar_words[core])\n        if similar_list:\n            print(f\"{core}: {' '.join(similar_list)}\")\n\nif __name__ == \"__main__\":\n    main()",
+    "code_hash": "b386e30741c7c1ef",
+    "language": "python",
+    "node_id": "n_10_ae513e",
+    "revision_id": "rev_n_10_ae513e_0",
+    "thought_path_snapshot": [
+      "The current implementation of the `are_similar` function has a few issues. The transposition check is commented out and not implemented correctly. Additionally, the code doesn't handle the case where a word core has no similar words, which should be skipped in the output. To improve the solution, we should implement the transposition check correctly and ensure that we only print word cores that have similar words. This will help in producing the expected output for the given input.",
+      "Implement a more efficient similarity check algorithm"
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 8
+  },
+  {
+    "candidate_id": "cand_471ee9eefe",
+    "problem_id": "apps_3214",
+    "code": "import sys\nfrom collections import defaultdict\n\ndef get_core(word):\n    return ''.join(filter(str.isalpha, word)).lower()\n\ndef are_similar(core1, core2):\n    if core1 == core2:\n        return False\n    len1, len2 = len(core1), len(core2)\n    if abs(len1 - len2) > 1:\n        return False\n\n    if len1 == len2:\n        # Check for single replacement\n        diff_count = sum(1 for a, b in zip(core1, core2) if a != b)\n        return diff_count == 1\n    elif len1 < len2:\n        # Check for single insertion\n        for i in range(len2):\n            if core1 == core2[:i] + core2[i+1:]:\n                return True\n    else:\n        # Check for single deletion\n        for i in range(len1):\n            if core1[:i] + core1[i+1:] == core2:\n                return True\n\n    # Check for single transposition\n    if len1 == len2:\n        for i in range(len1 - 1):\n            if core1[:i] + core1[i+1] + core1[i] + core1[i+2:] == core2:\n                return True\n\n    return False\n\ndef typo_checker():\n    words = []\n    for line in sys.stdin:\n        line = line.strip()\n        if line == \"***\":\n            break\n        words.extend(line.split())\n\n    cores = [get_core(word) for word in words]\n    similar_words = defaultdict(set)\n\n    for i, core1 in enumerate(cores):\n        for j, core2 in enumerate(cores):\n            if i != j and are_similar(core1, core2):\n                similar_words[core1].add(core2)\n\n    if not similar_words:\n        print(\"***\")\n        return\n\n    for core in sorted(similar_words.keys()):\n        similar_list = sorted(similar_words[core])\n        if similar_list:\n            print(f\"{core}: {' '.join(similar_list)}\")\n\ntypo_checker()",
+    "code_hash": "f76dea583a33f12e",
+    "language": "python",
+    "node_id": "n_8_9a98ef",
+    "revision_id": "rev_n_8_9a98ef_0",
+    "thought_path_snapshot": [
+      "Implement a custom edit distance algorithm optimized for the four allowed transformations",
+      "Implement a custom edit distance function optimized for the four allowed transformations"
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 9
+  },
+  {
+    "candidate_id": "cand_560573502a",
+    "problem_id": "apps_3214",
+    "code": "import sys\nfrom collections import defaultdict\n\ndef get_similar_words(word):\n    alphabet = 'abcdefghijklmnopqrstuvwxyz'\n    word = word.lower()\n    length = len(word)\n    similar_words = set()\n\n    # Deletion\n    for i in range(length):\n        similar_words.add(word[:i] + word[i+1:])\n\n    # Insertion\n    for i in range(length + 1):\n        for char in alphabet:\n            similar_words.add(word[:i] + char + word[i:])\n\n    # Replacement\n    for i in range(length):\n        for char in alphabet:\n            if word[i] != char:\n                similar_words.add(word[:i] + char + word[i+1:])\n\n    # Transposition\n    for i in range(length - 1):\n        similar_words.add(word[:i] + word[i+1] + word[i] + word[i+2:])\n\n    return similar_words\n\ndef main():\n    input_lines = sys.stdin.read().strip().split('\\n')\n    word_cores = defaultdict(set)\n    word_count = defaultdict(int)\n\n    for line in input_lines:\n        if line == \"***\":\n            break\n        words = line.split()\n        for word in words:\n            core = ''.join(filter(str.isalpha, word)).lower()\n            if core:\n                word_count[core] += 1\n                similar_cores = get_similar_words(core)\n                for similar_core in similar_cores:\n                    if similar_core != core:\n                        word_cores[core].add(similar_core)\n                        word_cores[similar_core].add(core)\n\n    result = []\n    for core in sorted(word_cores.keys()):\n        similar_cores = sorted(word_cores[core])\n        if similar_cores:\n            result.append(f\"{core}: {' '.join(similar_cores)}\")\n\n    if result:\n        for line in result:\n            print(line)\n    else:\n        print(\"***\")\n\nif __name__ == \"__main__\":\n    main()",
+    "code_hash": "433faac161769b98",
+    "language": "python",
+    "node_id": "n_5_efef37",
+    "revision_id": "rev_n_5_efef37_0",
+    "thought_path_snapshot": [
+      "Use a trie data structure to efficiently store and search for word cores",
+      "Implement a function to generate all possible similar word cores for each word"
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 10
+  },
+  {
+    "candidate_id": "cand_ec26f97a1a",
+    "problem_id": "apps_3214",
+    "code": "import sys\nfrom collections import defaultdict\n\ndef get_word_cores(text):\n    words = text.split()\n    cores = []\n    for word in words:\n        core = ''.join(filter(str.isalpha, word)).lower()\n        if core:\n            cores.append(core)\n    return cores\n\ndef generate_similar_words(word):\n    letters = 'abcdefghijklmnopqrstuvwxyz'\n    splits = [(word[:i], word[i:]) for i in range(len(word) + 1)]\n    deletes = [L + R[1:] for L, R in splits if R]\n    transposes = [L + R[1] + R[0] + R[2:] for L, R in splits if len(R) > 1]\n    replaces = [L + c + R[1:] for L, R in splits if R for c in letters]\n    inserts = [L + c + R for L, R in splits for c in letters]\n    return set(deletes + transposes + replaces + inserts)\n\ndef find_similar_words(cores):\n    similar_words = defaultdict(set)\n    for core in cores:\n        for similar in generate_similar_words(core):\n            if similar in cores and similar != core:\n                similar_words[core].add(similar)\n    return similar_words\n\ndef main():\n    input_lines = sys.stdin.read().strip().split('\\n')\n    if input_lines[-1] != '***':\n        return\n\n    input_lines = input_lines[:-1]\n    text = ' '.join(input_lines)\n    cores = get_word_cores(text)\n    similar_words = find_similar_words(cores)\n\n    if not similar_words:\n        print('***')\n        return\n\n    for core in sorted(similar_words):\n        similar_list = sorted(similar_words[core])\n        if similar_list:\n            print(f\"{core}: {' '.join(similar_list)}\")\n\nif __name__ == \"__main__\":\n    main()",
+    "code_hash": "c45c3af5dd6ca480",
+    "language": "python",
+    "node_id": "n_5_efef37",
+    "revision_id": "rev_n_5_efef37_1",
+    "thought_path_snapshot": [
+      "Use a trie data structure to efficiently store and search for word cores",
+      "I understand the issue. The current implementation generates all possible similar words, including those that are not valid words in the English language. This leads to incorrect results, as seen in the sample output where words like \"aad\" and \"aadd\" are included. To fix this, we need to modify our approach to only consider valid English words as similar. This can be achieved by using a dictionary of valid English words to filter the generated similar words."
+    ],
+    "origin": "rethink",
+    "generation_record_id": null,
+    "created_sequence": 11
+  },
+  {
+    "candidate_id": "cand_ffd15419b4",
+    "problem_id": "apps_3214",
+    "code": "import sys\nfrom collections import defaultdict\n\ndef get_core(word):\n    return ''.join(filter(str.isalpha, word)).lower()\n\ndef are_similar(core1, core2):\n    if core1 == core2:\n        return False\n    len1, len2 = len(core1), len(core2)\n    if abs(len1 - len2) > 1:\n        return False\n\n    if len1 == len2:\n        # Check for single replacement\n        diff_count = sum(1 for a, b in zip(core1, core2) if a != b)\n        return diff_count == 1\n    elif len1 < len2:\n        # Check for single insertion\n        for i in range(len2):\n            if core1 == core2[:i] + core2[i+1:]:\n                return True\n    else:\n        # Check for single deletion\n        for i in range(len1):\n            if core1[:i] + core1[i+1:] == core2:\n                return True\n\n    # Check for single transposition\n    if len1 == len2:\n        for i in range(len1 - 1):\n            if core1[:i] + core1[i+1] + core1[i] + core1[i+2:] == core2:\n                return True\n\n    return False\n\ndef typo_checker():\n    words_by_core = defaultdict(set)\n    for line in sys.stdin:\n        line = line.strip()\n        if line == \"***\":\n            break\n        words = line.split()\n        for word in words:\n            core = get_core(word)\n            if core:\n                words_by_core[core].add(word)\n\n    similar_words = defaultdict(set)\n    cores = sorted(words_by_core.keys())\n    for i in range(len(cores)):\n        for j in range(i + 1, len(cores)):\n            core1, core2 = cores[i], cores[j]\n            if are_similar(core1, core2):\n                similar_words[core1].add(core2)\n                similar_words[core2].add(core1)\n\n    if not similar_words:\n        print(\"***\")\n    else:\n        for core in sorted(similar_words.keys()):\n            similar_list = sorted(similar_words[core])\n            print(f\"{core}: {' '.join(similar_list)}\")",
+    "code_hash": "a6f27e71d1cd9bdd",
+    "language": "python",
+    "node_id": "n_9_c903bb",
+    "revision_id": "rev_n_9_c903bb_0",
+    "thought_path_snapshot": [
+      "Implement a custom edit distance algorithm optimized for the four allowed transformations",
+      "Use a hash table to group words by their core, then compare groups for similar words"
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 12
+  },
+  {
+    "candidate_id": "cand_14bae31fe9",
+    "problem_id": "apps_3214",
+    "code": "import sys\nfrom collections import defaultdict\n\ndef get_core(word):\n    return ''.join(c.lower() for c in word if c.isalpha())\n\ndef are_similar(core1, core2):\n    if abs(len(core1) - len(core2)) > 1:\n        return False\n    \n    if len(core1) == len(core2):\n        # Check for replacement\n        diff_count = sum(1 for a, b in zip(core1, core2) if a != b)\n        return diff_count == 1\n    \n    if len(core1) < len(core2):\n        core1, core2 = core2, core1\n    \n    # Check for insertion or deletion\n    i, j = 0, 0\n    diff_count = 0\n    while i < len(core1) and j < len(core2):\n        if core1[i] != core2[j]:\n            diff_count += 1\n            if diff_count > 1:\n                return False\n            i += 1\n        else:\n            i += 1\n            j += 1\n    return True\n\ndef typo_checker():\n    words = defaultdict(set)\n    \n    for line in sys.stdin:\n        line = line.strip()\n        if line == \"***\":\n            break\n        for word in line.split():\n            core = get_core(word)\n            if core:\n                words[core].add(word)\n    \n    similar_words = defaultdict(set)\n    \n    for core1 in words:\n        for core2 in words:\n            if core1 != core2 and are_similar(core1, core2):\n                similar_words[core1].add(core2)\n    \n    if not similar_words:\n        print(\"***\")\n        return\n    \n    for core in sorted(similar_words):\n        similar_list = sorted(similar_words[core])\n        print(f\"{core}: {' '.join(similar_list)}\")",
+    "code_hash": "ae0a102210692208",
+    "language": "python",
+    "node_id": "n_9_c903bb",
+    "revision_id": "rev_n_9_c903bb_1",
+    "thought_path_snapshot": [
+      "Implement a custom edit distance algorithm optimized for the four allowed transformations",
+      "The current approach of using a hash table to group words by their core and then comparing groups for similar words is correct in principle, but it's not handling the output format as specified in the problem statement. The issue is that the program is not printing the word cores that have no similar words, which is why the output is empty for the given input. Let's modify the approach to address this issue and ensure the output matches the expected format."
+    ],
+    "origin": "rethink",
+    "generation_record_id": null,
+    "created_sequence": 13
+  },
+  {
+    "candidate_id": "cand_5a5aa4c823",
+    "problem_id": "apps_3214",
+    "code": "import sys\nfrom collections import defaultdict\n\ndef are_similar(word1, word2):\n    if abs(len(word1) - len(word2)) > 1:\n        return False\n\n    if len(word1) > len(word2):\n        word1, word2 = word2, word1\n\n    if len(word1) == len(word2):\n        # Check for replacement\n        differences = sum(1 for a, b in zip(word1, word2) if a != b)\n        return differences == 1\n\n    if len(word1) + 1 == len(word2):\n        # Check for insertion or deletion\n        i, j = 0, 0\n        while i < len(word1) and j < len(word2):\n            if word1[i] != word2[j]:\n                if i != j:\n                    return False\n                j += 1\n            else:\n                i += 1\n                j += 1\n        return True\n\n    return False\n\ndef get_word_core(word):\n    return ''.join(filter(str.isalpha, word)).lower()\n\ndef find_similar_words(text):\n    words = text.split()\n    word_cores = [get_word_core(word) for word in words]\n    similar_words = defaultdict(set)\n\n    for i, core in enumerate(word_cores):\n        for j, other_core in enumerate(word_cores):\n            if i != j and are_similar(core, other_core):\n                similar_words[core].add(other_core)\n\n    result = []\n    for core in sorted(similar_words.keys()):\n        if similar_words[core]:\n            result.append(f\"{core}: {' '.join(sorted(similar_words[core]))}\")\n\n    return result\n\ndef main():\n    input_lines = sys.stdin.read().strip().split('\\n')\n    text = '\\n'.join(input_lines[:-1])  # Exclude the last line \"***\"\n    similar_word_list = find_similar_words(text)\n\n    if similar_word_list:\n        for line in similar_word_list:\n            print(line)\n    else:\n        print(\"***\")\n\nif __name__ == \"__main__\":\n    main()",
+    "code_hash": "9d5c1781b557b5a1",
+    "language": "python",
+    "node_id": "n_11_e933ba",
+    "revision_id": "rev_n_11_e933ba_0",
+    "thought_path_snapshot": [
+      "The current implementation of the `are_similar` function has a few issues. The transposition check is commented out and not implemented correctly. Additionally, the code doesn't handle the case where a word core has no similar words, which should be skipped in the output. To improve the solution, we should implement the transposition check correctly and ensure that we only print word cores that have similar words. This will help in producing the expected output for the given input.",
+      "Use a trie data structure to store and compare word cores"
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 14
+  },
+  {
+    "candidate_id": "cand_92aa449da3",
+    "problem_id": "apps_3214",
+    "code": "import sys\nfrom collections import defaultdict\n\ndef get_word_cores(text):\n    words = text.split()\n    cores = []\n    for word in words:\n        core = ''.join(filter(str.isalpha, word)).lower()\n        if core:\n            cores.append(core)\n    return cores\n\ndef generate_variants(word):\n    variants = set()\n    length = len(word)\n    \n    # Deletion\n    for i in range(length):\n        variants.add(word[:i] + word[i+1:])\n    \n    # Insertion\n    for i in range(length + 1):\n        for c in 'abcdefghijklmnopqrstuvwxyz':\n            variants.add(word[:i] + c + word[i:])\n    \n    # Replacement\n    for i in range(length):\n        for c in 'abcdefghijklmnopqrstuvwxyz':\n            if word[i] != c:\n                variants.add(word[:i] + c + word[i+1:])\n    \n    # Transposition\n    for i in range(length - 1):\n        variants.add(word[:i] + word[i+1] + word[i] + word[i+2:])\n    \n    return variants\n\ndef find_similar_words(cores):\n    similar_words = defaultdict(set)\n    core_to_index = {core: i for i, core in enumerate(cores)}\n    \n    for i, core in enumerate(cores):\n        variants = generate_variants(core)\n        for variant in variants:\n            if variant in core_to_index and core_to_index[variant] != i:\n                similar_words[core].add(variant)\n                similar_words[variant].add(core)\n    \n    return similar_words\n\ndef main():\n    input_lines = sys.stdin.read().strip().split('\\n')\n    if input_lines[-1] != \"***\":\n        return\n    \n    input_lines = input_lines[:-1]\n    text = ' '.join(input_lines)\n    cores = get_word_cores(text)\n    similar_words = find_similar_words(cores)\n    \n    result = []\n    for core in sorted(similar_words.keys()):\n        similar = sorted(similar_words[core] - {core})\n        if similar:\n            result.append(f\"{core}: {' '.join(similar)}\")\n    \n    if not result:\n        print(\"***\")\n    else:\n        for line in result:\n            print(line)\n\nif __name__ == \"__main__\":\n    main()",
+    "code_hash": "7de8ac93e654482d",
+    "language": "python",
+    "node_id": "n_13_e93895",
+    "revision_id": "rev_n_13_e93895_0",
+    "thought_path_snapshot": [
+      "Use a trie data structure to efficiently store and search for word cores",
+      "Use a hash table to store word cores and their similar counterparts for quick lookup",
+      "Use a trie data structure to efficiently store and search for word cores"
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 15
+  },
+  {
+    "candidate_id": "cand_df31c135e3",
+    "problem_id": "apps_3214",
+    "code": "import sys\nfrom collections import defaultdict\n\ndef get_core(word):\n    return ''.join(filter(str.isalpha, word)).lower()\n\ndef are_similar(word1, word2):\n    if abs(len(word1) - len(word2)) > 1:\n        return False\n    \n    if len(word1) == len(word2):\n        # Check for replacement\n        differences = sum(1 for a, b in zip(word1, word2) if a != b)\n        return differences == 1\n    \n    if len(word1) < len(word2):\n        # Check for insertion\n        for i in range(len(word2)):\n            if word1 == word2[:i] + word2[i+1:]:\n                return True\n        return False\n    \n    if len(word1) > len(word2):\n        # Check for deletion\n        for i in range(len(word1)):\n            if word1[:i] + word1[i+1:] == word2:\n                return True\n        return False\n\ndef find_similar_words(text):\n    words = text.split()\n    cores = [get_core(word) for word in words]\n    similar_words = defaultdict(set)\n    \n    for i, core in enumerate(cores):\n        for j, other_core in enumerate(cores):\n            if i != j and core != other_core and are_similar(core, other_core):\n                similar_words[core].add(other_core)\n    \n    return similar_words\n\ndef main():\n    input_lines = sys.stdin.read().strip().split('\\n')\n    text = '\\n'.join(input_lines[:-1])  # Exclude the \"***\" line\n    \n    similar_words = find_similar_words(text)\n    \n    if not similar_words:\n        print(\"***\")\n        return\n    \n    for core in sorted(similar_words.keys()):\n        if similar_words[core]:\n            similar_list = ' '.join(sorted(similar_words[core]))\n            print(f\"{core}: {similar_list}\")\n\nif __name__ == \"__main__\":\n    main()",
+    "code_hash": "63e1f5f99d1f5a4b",
+    "language": "python",
+    "node_id": "n_12_e95509",
+    "revision_id": "rev_n_12_e95509_0",
+    "thought_path_snapshot": [
+      "The current implementation of the `are_similar` function has a few issues. The transposition check is commented out and not implemented correctly. Additionally, the code doesn't handle the case where a word core has no similar words, which should be skipped in the output. To improve the solution, we should implement the transposition check correctly and ensure that we only print word cores that have similar words. This will help in producing the expected output for the given input.",
+      "Optimize memory usage by processing the text in chunks"
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 16
+  },
+  {
+    "candidate_id": "cand_6ea3c07924",
+    "problem_id": "apps_3214",
+    "code": "import sys\nfrom collections import defaultdict\n\ndef get_word_cores(text):\n    words = text.split()\n    cores = []\n    for word in words:\n        core = ''.join(filter(str.isalpha, word)).lower()\n        if core:\n            cores.append(core)\n    return cores\n\ndef generate_variants(word):\n    variants = set()\n    length = len(word)\n    \n    # Deletion\n    for i in range(length):\n        variants.add(word[:i] + word[i+1:])\n    \n    # Insertion\n    for i in range(length + 1):\n        for c in 'abcdefghijklmnopqrstuvwxyz':\n            variants.add(word[:i] + c + word[i:])\n    \n    # Replacement\n    for i in range(length):\n        for c in 'abcdefghijklmnopqrstuvwxyz':\n            if word[i] != c:\n                variants.add(word[:i] + c + word[i+1:])\n    \n    # Transposition\n    for i in range(length - 1):\n        variants.add(word[:i] + word[i+1] + word[i] + word[i+2:])\n    \n    return variants\n\ndef find_similar_words(cores):\n    similar_words = defaultdict(set)\n    for core in cores:\n        variants = generate_variants(core)\n        for variant in variants:\n            if variant in cores and variant != core:\n                similar_words[core].add(variant)\n                similar_words[variant].add(core)\n    \n    result = []\n    for core in sorted(similar_words.keys()):\n        similar = sorted(similar_words[core])\n        if similar:\n            result.append(f\"{core}: {' '.join(similar)}\")\n    \n    return result\n\ndef main():\n    input_lines = sys.stdin.read().strip().split('\\n')\n    if input_lines[-1] != \"***\":\n        return\n    \n    input_lines = input_lines[:-1]\n    text = ' '.join(input_lines)\n    cores = get_word_cores(text)\n    similar_word_list = find_similar_words(cores)\n    \n    if similar_word_list:\n        for line in similar_word_list:\n            print(line)\n    else:\n        print(\"***\")\n\nif __name__ == \"__main__\":\n    main()",
+    "code_hash": "c6a74da4ba953160",
+    "language": "python",
+    "node_id": "n_16_ed5654",
+    "revision_id": "rev_n_16_ed5654_0",
+    "thought_path_snapshot": [
+      "Implement a custom edit distance algorithm optimized for the four allowed transformations",
+      "Use a trie data structure to efficiently store and search for word cores",
+      "Use a hash table to group words by their core"
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 17
+  },
+  {
+    "candidate_id": "cand_93fdb03764",
+    "problem_id": "apps_3214",
+    "code": "import sys\nfrom collections import defaultdict\n\ndef get_transformations(word):\n    transformations = set()\n    length = len(word)\n    \n    # Deletion\n    for i in range(length):\n        transformations.add(word[:i] + word[i+1:])\n    \n    # Insertion\n    for i in range(length + 1):\n        for c in 'abcdefghijklmnopqrstuvwxyz':\n            transformations.add(word[:i] + c + word[i:])\n    \n    # Replacement\n    for i in range(length):\n        for c in 'abcdefghijklmnopqrstuvwxyz':\n            if word[i] != c:\n                transformations.add(word[:i] + c + word[i+1:])\n    \n    # Transposition\n    for i in range(length - 1):\n        transformations.add(word[:i] + word[i+1] + word[i] + word[i+2:])\n    \n    return transformations\n\ndef process_text():\n    word_cores = defaultdict(set)\n    core_to_words = defaultdict(set)\n    \n    for line in sys.stdin:\n        line = line.strip()\n        if line == \"***\":\n            break\n        \n        words = line.split()\n        for word in words:\n            core = ''.join(filter(str.isalpha, word)).lower()\n            if core:\n                word_cores[core].add(word)\n                core_to_words[core].add(word)\n    \n    similar_words = defaultdict(set)\n    \n    for core in word_cores:\n        transformations = get_transformations(core)\n        for transformed in transformations:\n            if transformed in word_cores and transformed != core:\n                similar_words[core].update(word_cores[transformed])\n    \n    result = []\n    for core in sorted(similar_words):\n        similar = sorted(similar_words[core] - {core})\n        if similar:\n            result.append(f\"{core}: {' '.join(similar)}\")\n    \n    if not result:\n        print(\"***\")\n    else:\n        for line in result:\n            print(line)\n\nprocess_text()",
+    "code_hash": "024a2473547aa954",
+    "language": "python",
+    "node_id": "n_19_555145",
+    "revision_id": "rev_n_19_555145_0",
+    "thought_path_snapshot": [
+      "Use a trie data structure to efficiently store and search for word cores",
+      "Use a trie data structure to efficiently store and search for word cores",
+      "Use a hash table to store word cores and their transformations"
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 18
+  },
+  {
+    "candidate_id": "cand_7ae60790d7",
+    "problem_id": "apps_3214",
+    "code": "import sys\nfrom collections import defaultdict\n\ndef get_word_cores(text):\n    words = text.split()\n    word_cores = defaultdict(set)\n    for word in words:\n        core = ''.join(filter(str.isalpha, word)).lower()\n        if core:\n            word_cores[core].add(word)\n    return word_cores\n\ndef are_similar(core1, core2):\n    if abs(len(core1) - len(core2)) > 1:\n        return False\n    if len(core1) == len(core2):\n        diff_count = sum(1 for a, b in zip(core1, core2) if a != b)\n        return diff_count == 1\n    if len(core1) < len(core2):\n        core1, core2 = core2, core1\n    for i in range(len(core1)):\n        if core1[:i] + core1[i+1:] == core2:\n            return True\n    return False\n\ndef find_similar_words(word_cores):\n    similar_words = defaultdict(set)\n    cores = list(word_cores.keys())\n    for i in range(len(cores)):\n        for j in range(i + 1, len(cores)):\n            if are_similar(cores[i], cores[j]):\n                similar_words[cores[i]].update(word_cores[cores[j]])\n                similar_words[cores[j]].update(word_cores[cores[i]])\n    return similar_words\n\ndef main():\n    input_lines = sys.stdin.read().strip().split('\\n')\n    text = '\\n'.join(input_lines[:-1])\n    word_cores = get_word_cores(text)\n    similar_words = find_similar_words(word_cores)\n    \n    result = []\n    for core in sorted(similar_words.keys()):\n        similar = sorted(similar_words[core])\n        if similar:\n            result.append(f\"{core}: {' '.join(similar)}\")\n    \n    if not result:\n        print(\"***\")\n    else:\n        for line in result:\n            print(line)\n\nif __name__ == \"__main__\":\n    main()",
+    "code_hash": "570a37bbd02c4092",
+    "language": "python",
+    "node_id": "n_19_555145",
+    "revision_id": "rev_n_19_555145_1",
+    "thought_path_snapshot": [
+      "Use a trie data structure to efficiently store and search for word cores",
+      "Use a trie data structure to efficiently store and search for word cores",
+      "I apologize for the oversight. The issue in the previous implementation was that it was not preserving the original capitalization of words when storing them in the word_cores dictionary. This led to incorrect output in the case where words with different capitalizations but the same core were present. To fix this, we should store the original words in the word_cores dictionary instead of just the cores. This will allow us to maintain the correct capitalization when generating the output."
+    ],
+    "origin": "rethink",
+    "generation_record_id": null,
+    "created_sequence": 19
+  },
+  {
+    "candidate_id": "cand_4c7582415a",
+    "problem_id": "apps_3214",
+    "code": "import sys\nfrom collections import defaultdict\n\ndef get_word_cores(text):\n    words = text.split()\n    cores = []\n    for word in words:\n        core = ''.join(filter(str.isalpha, word)).lower()\n        if core:\n            cores.append(core)\n    return cores\n\ndef generate_variants(word):\n    variants = set()\n    length = len(word)\n    \n    # Deletion\n    for i in range(length):\n        variants.add(word[:i] + word[i+1:])\n    \n    # Insertion\n    for i in range(length + 1):\n        for c in 'abcdefghijklmnopqrstuvwxyz':\n            variants.add(word[:i] + c + word[i:])\n    \n    # Replacement\n    for i in range(length):\n        for c in 'abcdefghijklmnopqrstuvwxyz':\n            if word[i] != c:\n                variants.add(word[:i] + c + word[i+1:])\n    \n    # Transposition\n    for i in range(length - 1):\n        variants.add(word[:i] + word[i+1] + word[i] + word[i+2:])\n    \n    return variants\n\ndef find_similar_words(cores):\n    similar_words = defaultdict(set)\n    for core in cores:\n        variants = generate_variants(core)\n        for variant in variants:\n            if variant in cores and variant != core:\n                similar_words[core].add(variant)\n                similar_words[variant].add(core)\n    \n    result = []\n    for core in sorted(similar_words.keys()):\n        similar = sorted(similar_words[core])\n        if similar:\n            result.append(f\"{core}: {' '.join(similar)}\")\n    \n    return result\n\ndef main():\n    input_lines = sys.stdin.read().strip().split('\\n')\n    if input_lines[-1] != \"***\":\n        return\n    \n    input_lines = input_lines[:-1]\n    text = ' '.join(input_lines)\n    cores = get_word_cores(text)\n    similar_word_list = find_similar_words(cores)\n    \n    if similar_word_list:\n        for line in similar_word_list:\n            print(line)\n    else:\n        print(\"***\")\n\nif __name__ == \"__main__\":\n    main()",
+    "code_hash": "c6a74da4ba953160",
+    "language": "python",
+    "node_id": "n_22_13cf35",
+    "revision_id": "rev_n_22_13cf35_0",
+    "thought_path_snapshot": [
+      "Implement a custom edit distance algorithm optimized for the four allowed transformations",
+      "Implement a custom edit distance function optimized for the four allowed transformations",
+      "Use a trie data structure to efficiently store and search for word cores"
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 20
+  }
+]

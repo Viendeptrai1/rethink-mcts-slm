@@ -43,3 +43,15 @@ Còn mở: temperature của Best-of-16 (0,8 là đề xuất); có chạy ablat
 Lý do: gate của Qwen3.5-9B (chạy với v3.0) fail vì 15/255 output bị cắt (5,9%, ngưỡng 5%). Bị cắt gồm expansion 6/64 (giới hạn 512), block analysis 6/29 (1.536), rethink 2/22 (256), code 1/153 (2.048). Các output này đều là lập luận hợp lệ viết dở, không phải lặp. Expansion bị cắt làm node bị đóng, analysis bị cắt làm feedback tụt xuống mức trace, nên model bị thiệt vì cấu hình chứ không vì năng lực. Seed-Coder-8B qua gate v3.0 nhưng cũng có 11/90 block analysis bị cắt. Nguồn: `colab_results/qwen35/`, `colab_results/seed_v30/`.
 
 Quyết định (người dùng đồng ý): nâng giới hạn **cho mọi model**: expansion 1.024, code 4.096, rethink 512, block analysis 3.072 (critic giữ 256); vLLM `max-model-len` 32.768 để prompt cộng output vẫn vừa ngữ cảnh. Với temperature 0, output nào trước đây không bị cắt thì giữ nguyên. `protocol_id` đổi thành `*_v3_1`. Chưa run cohort nào chạy xong với v3.0 (run MCTS của Seed-Coder bị dừng ngay khi vừa bắt đầu), nên mọi run báo cáo đều dùng v3.1. Pilot P1/P2 (v3.0) vẫn giữ làm bằng chứng về quy trình.
+
+## D-008: Vận hành đợt chạy v3.1 trên Colab khi runtime bị thu hồi (13/11/2026)
+
+Bối cảnh: từ khoảng 01:45 đến 10:10 ngày 13/11, runtime A100 trên Colab thường biến mất sau khoảng 22–25 phút. Nguyên nhân phía Colab chưa rõ. Chi tiết và số liệu ở [BENCHMARK_LEDGER.md](../results/BENCHMARK_LEDGER.md), mục 12.
+
+Quyết định:
+1. **Resume từ bản lưu.** Bản lưu `runs/` được tải về mỗi 5 phút, và run được tiếp tục trên VM mới với cùng code đóng băng `d9666c4`. Chấp nhận vì resume chỉ diễn ra ở ranh giới hoàn thành một bài, manifest được kiểm tra khớp, và bài đang chạy dở được giải lại từ đầu (D-004).
+2. **Bài vướng lỗi CRLF khi resume thì giải lại.** 3 bài Best-of-16 của qwen25c7b được giải lại; kết quả lần đầu được lưu riêng. Không sửa code giữa đợt, vì sửa sẽ làm đổi `source_hash` và chặn resume mọi run. Sửa sau đợt: đọc `selected.py` dưới dạng bytes trong `_load_completed`, thêm test hồi quy, rồi bump protocol nếu cần.
+3. **Đổi thứ tự hàng đợi** của seedcoder8b và qwen35_9b: các run ngắn trước, MCTS APPS sau cùng. Việc này không ảnh hưởng kết quả.
+4. **Tạm dừng qwen35_9b** (người dùng đồng ý sau khi thử lại lúc 10:35–11:03): với tuổi thọ runtime khoảng 23 phút và thời gian khởi động 9 phút, MCTS không tiến được. Chưa quyết định chạy lại vào lúc khác hay chỉ báo cáo 2 model.
+5. **Lưu trữ artifact.** Các file nặng của từng bài được nén theo run trong `runs/v3_raw_archives/`, phần còn lại commit trực tiếp.
+6. **Phân tích** dùng [analyze_v3.py](../../scripts/analyze_v3.py): McNemar exact với Holm, bootstrap ghép cặp, chọn lại offline (bỏ critic, dừng sớm) và Best-of-k từ k mẫu đầu, chấm lại hidden trên máy local. Kết quả cho 2 model: [docs/results/v3/analysis_qwen25c7b_seedcoder8b.json](../results/v3/analysis_qwen25c7b_seedcoder8b.json). Đây là quan sát, chưa phải kết luận của đề tài.
