@@ -1,0 +1,346 @@
+[
+  {
+    "candidate_id": "cand_4e705930cf",
+    "problem_id": "python_32",
+    "code": "import math\n\ndef poly(xs: list, x: float):\n    \"\"\"\n    Evaluates polynomial with coefficients xs at point x.\n    return xs[0] + xs[1] * x + xs[1] * x^2 + .... xs[n] * x^n\n    \"\"\"\n    return sum([coeff * math.pow(x, i) for i, coeff in enumerate(xs)])\n\ndef poly_derivative(xs: list, x: float):\n    \"\"\"\n    Evaluates the derivative of the polynomial with coefficients xs at point x.\n    Derivative of sum(a_i * x^i) is sum(i * a_i * x^(i-1)) for i >= 1.\n    \"\"\"\n    if len(xs) <= 1:\n        return 0.0\n    derivative_coeffs = [i * coeff for i, coeff in enumerate(xs) if i > 0]\n    return poly(derivative_coeffs, x)\n\ndef find_zero(xs: list):\n    \"\"\"\n    Finds a zero of the polynomial defined by coefficients xs using the Newton-Raphson method.\n    \"\"\"\n    if len(xs) <= 1:\n        return 0.0\n    \n    # Initial guess: start with a value that is likely to be close to a root.\n    # A common heuristic is to start near the largest coefficient index or a small integer.\n    # Given the problem constraints guarantee a solution, we can pick a reasonable starting point.\n    # Let's try starting at x = 1.0 if the constant term is not zero, otherwise -1.0.\n    # Or simply start at 1.0 as a generic guess.\n    x = 1.0\n    \n    # Newton-Raphson iteration\n    # x_{n+1} = x_n - f(x_n) / f'(x_n)\n    # We iterate until the change is very small or the function value is close to zero.\n    tolerance = 1e-10\n    max_iterations = 1000\n    \n    for _ in range(max_iterations):\n        fx = poly(xs, x)\n        dfx = poly_derivative(xs, x)\n        \n        if abs(dfx) < 1e-12:\n            # Derivative is too close to zero, try a different starting point or break\n            # Since a solution is guaranteed, we might need to perturb x slightly\n            x += 0.1\n            continue\n            \n        x_new = x - fx / dfx\n        \n        if abs(x_new - x) < tolerance:\n            return round(x_new, 10)\n        \n        x = x_new\n    \n    # If loop finishes without convergence (should not happen per problem statement), return last best guess\n    return round(x, 10)",
+    "code_hash": "d427ff545552bd52",
+    "language": "python",
+    "node_id": "n_1_e2e58c",
+    "revision_id": "rev_n_1_e2e58c_0",
+    "thought_path_snapshot": [
+      "Implement the Newton-Raphson method using the provided poly function and its derivative to iteratively converge to a root, leveraging the guarantee that a solution exists."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 1
+  },
+  {
+    "candidate_id": "cand_7e5ec8789e",
+    "problem_id": "python_32",
+    "code": "import math\n\ndef poly(xs: list, x: float):\n    \"\"\"\n    Evaluates polynomial with coefficients xs at point x.\n    return xs[0] + xs[1] * x + xs[1] * x^2 + .... xs[n] * x^n\n    \"\"\"\n    return sum([coeff * math.pow(x, i) for i, coeff in enumerate(xs)])\n\ndef find_zero(xs: list):\n    \"\"\"\n    Finds a zero of the polynomial defined by coefficients xs using the bisection method.\n    Assumes the polynomial has at least one real root and that the largest coefficient\n    ensures a sign change within a reasonable interval.\n    \"\"\"\n    # Determine a safe interval [a, b] where the polynomial changes sign.\n    # We start with a small range and expand until we find a sign change.\n    a = -1.0\n    b = 1.0\n    \n    # Expand the interval until we find a sign change or the values become too large\n    while poly(xs, a) * poly(xs, b) > 0:\n        a *= 2\n        b *= 2\n        if abs(a) > 1e12 or abs(b) > 1e12:\n            # Fallback if expansion fails (though problem guarantees a solution)\n            break\n\n    # Bisection method\n    for _ in range(100):  # Sufficient iterations for high precision\n        c = (a + b) / 2\n        if poly(xs, c) == 0:\n            return c\n        if poly(xs, a) * poly(xs, c) < 0:\n            b = c\n        else:\n            a = c\n            \n    return (a + b) / 2",
+    "code_hash": "91b4bf228addd432",
+    "language": "python",
+    "node_id": "n_2_f909e4",
+    "revision_id": "rev_n_2_f909e4_0",
+    "thought_path_snapshot": [
+      "Use the bisection method by first identifying an interval [a, b] where the polynomial changes sign, then repeatedly halving the interval to find the zero."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 2
+  },
+  {
+    "candidate_id": "cand_1cef61059f",
+    "problem_id": "python_32",
+    "code": "import math\n\ndef poly(xs: list, x: float):\n    \"\"\"\n    Evaluates polynomial with coefficients xs at point x.\n    return xs[0] + xs[1] * x + xs[1] * x^2 + .... xs[n] * x^n\n    \"\"\"\n    return sum([coeff * math.pow(x, i) for i, coeff in enumerate(xs)])\n\ndef find_zero(xs: list):\n    \"\"\"\n    Finds a zero of the polynomial defined by coefficients xs using the secant method.\n    \"\"\"\n    # Initial guesses: -1 and 1\n    x0 = -1.0\n    x1 = 1.0\n    \n    # Evaluate polynomial at initial points\n    y0 = poly(xs, x0)\n    y1 = poly(xs, x1)\n    \n    # Secant method iteration\n    for _ in range(1000):  # Sufficient iterations for convergence\n        if abs(y1 - y0) < 1e-12:\n            # Slope is too small, try different initial points if stuck\n            x0 = x0 * 2\n            x1 = x1 * 2\n            y0 = poly(xs, x0)\n            y1 = poly(xs, x1)\n            continue\n        \n        # Calculate next approximation\n        x2 = x1 - y1 * (x1 - x0) / (y1 - y0)\n        y2 = poly(xs, x2)\n        \n        # Check for convergence\n        if abs(y2) < 1e-12:\n            return x2\n        \n        # Update points\n        x0, y0 = x1, y1\n        x1, y1 = x2, y2\n    \n    return x1",
+    "code_hash": "61bb02d5c124a47d",
+    "language": "python",
+    "node_id": "n_3_df47c2",
+    "revision_id": "rev_n_3_df47c2_0",
+    "thought_path_snapshot": [
+      "Apply the secant method as an alternative to Newton-Raphson that does not require explicit derivative calculation, estimating the slope between two initial points."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 3
+  },
+  {
+    "candidate_id": "cand_245354b506",
+    "problem_id": "python_32",
+    "code": "import math\n\ndef poly(xs: list, x: float):\n    \"\"\"\n    Evaluates polynomial with coefficients xs at point x.\n    return xs[0] + xs[1] * x + xs[1] * x^2 + .... xs[n] * x^n\n    \"\"\"\n    return sum([coeff * math.pow(x, i) for i, coeff in enumerate(xs)])\n\ndef poly_derivative(xs: list, x: float):\n    \"\"\"\n    Evaluates the derivative of the polynomial with coefficients xs at point x.\n    The derivative of sum(a_i * x^i) is sum(i * a_i * x^(i-1)) for i >= 1.\n    \"\"\"\n    if len(xs) <= 1:\n        return 0.0\n    return sum([i * coeff * math.pow(x, i - 1) for i, coeff in enumerate(xs) if i > 0])\n\ndef find_zero(xs: list):\n    \"\"\"\n    Finds a zero of the polynomial defined by coefficients xs using the Newton-Raphson method.\n    \"\"\"\n    # Initial guess: start at 0.0\n    x = 0.0\n    \n    # Tolerance for convergence\n    tolerance = 1e-10\n    \n    # Maximum number of iterations to prevent infinite loops\n    max_iterations = 1000\n    \n    for _ in range(max_iterations):\n        fx = poly(xs, x)\n        fpx = poly_derivative(xs, x)\n        \n        # If the derivative is too close to zero, break to avoid division by zero\n        if abs(fpx) < 1e-12:\n            break\n            \n        # Newton-Raphson update step\n        x_new = x - fx / fpx\n        \n        # Check for convergence\n        if abs(x_new - x) < tolerance:\n            return round(x_new, 10)\n        \n        x = x_new\n    \n    # If no convergence within max iterations, return the best estimate\n    return round(x, 10)",
+    "code_hash": "3b24078cb1d66e58",
+    "language": "python",
+    "node_id": "n_4_7115d1",
+    "revision_id": "rev_n_4_7115d1_0",
+    "thought_path_snapshot": [
+      "Implement the Newton-Raphson method using the provided poly function and its derivative to iteratively converge to a root, leveraging the guarantee that a solution exists.",
+      "Implement the Newton-Raphson method using the provided poly function and its derivative to iteratively converge to a root, leveraging the guarantee that a solution exists."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 4
+  },
+  {
+    "candidate_id": "cand_d3c557caf0",
+    "problem_id": "python_32",
+    "code": "import math\n\ndef poly(xs: list, x: float):\n    \"\"\"\n    Evaluates polynomial with coefficients xs at point x.\n    return xs[0] + xs[1] * x + xs[1] * x^2 + .... xs[n] * x^n\n    \"\"\"\n    return sum([coeff * math.pow(x, i) for i, coeff in enumerate(xs)])\n\ndef find_zero(xs: list):\n    \"\"\"\n    Finds a zero of the polynomial defined by coefficients xs.\n    Uses the bisection method after finding a sign-changing interval.\n    \"\"\"\n    # Helper to compute derivative of polynomial at x\n    def poly_derivative(xs, x):\n        # Derivative coefficients: [1*xs[1], 2*xs[2], ..., n*xs[n]]\n        if len(xs) <= 1:\n            return 0.0\n        deriv_coeffs = [i * coeff for i, coeff in enumerate(xs) if i > 0]\n        return poly(deriv_coeffs, x)\n\n    # Find an interval [a, b] such that poly(a) and poly(b) have opposite signs\n    a = 1.0\n    b = 1.0\n    fa = poly(xs, a)\n    fb = poly(xs, b)\n\n    # Expand interval until sign change is found\n    while fa * fb > 0:\n        a *= 2\n        b = -a\n        fa = poly(xs, a)\n        fb = poly(xs, b)\n\n    # Bisection method\n    tolerance = 1e-7\n    while (b - a) > tolerance:\n        c = (a + b) / 2\n        fc = poly(xs, c)\n        if fc == 0:\n            return c\n        if fa * fc < 0:\n            b = c\n            fb = fc\n        else:\n            a = c\n            fa = fc\n\n    return (a + b) / 2",
+    "code_hash": "ab312b736de1d8ae",
+    "language": "python",
+    "node_id": "n_5_e6243e",
+    "revision_id": "rev_n_5_e6243e_0",
+    "thought_path_snapshot": [
+      "Implement the Newton-Raphson method using the provided poly function and its derivative to iteratively converge to a root, leveraging the guarantee that a solution exists.",
+      "Use the bisection method by first identifying an interval [a, b] where the polynomial changes sign, then iteratively narrowing the interval until convergence."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 5
+  },
+  {
+    "candidate_id": "cand_449b1f28e5",
+    "problem_id": "python_32",
+    "code": "import math\n\ndef poly(xs: list, x: float):\n    \"\"\"\n    Evaluates polynomial with coefficients xs at point x.\n    return xs[0] + xs[1] * x + xs[1] * x^2 + .... xs[n] * x^n\n    \"\"\"\n    return sum([coeff * math.pow(x, i) for i, coeff in enumerate(xs)])\n\ndef find_zero(xs: list):\n    \"\"\"\n    Finds a zero of the polynomial defined by coefficients xs.\n    Uses the bisection method to guarantee convergence given the problem constraints.\n    \"\"\"\n    # Determine the degree of the polynomial\n    n = len(xs) - 1\n    \n    # We need to find an interval [a, b] such that poly(a) and poly(b) have opposite signs.\n    # The problem guarantees a solution exists for even number of coefficients (odd degree).\n    # We can search for such an interval by expanding outward from 0.\n    \n    a = 0.0\n    b = 1.0\n    \n    # Ensure we have opposite signs. If not, expand the interval.\n    # Since the leading term dominates for large |x|, and the degree is odd,\n    # the function will go to +inf on one side and -inf on the other.\n    while poly(xs, a) * poly(xs, b) > 0:\n        if poly(xs, a) == 0:\n            return a\n        if poly(xs, b) == 0:\n            return b\n        \n        # Expand the interval\n        b *= 2\n        if b > 1e6: # Safety break, though mathematically guaranteed to find a sign change\n            # If we haven't found it, try the negative side\n            a = -b\n            b = -a\n            # Re-evaluate to ensure sign change\n            while poly(xs, a) * poly(xs, b) > 0:\n                b *= 2\n                if b > 1e6:\n                    break\n    \n    # Bisection method\n    tolerance = 1e-7\n    for _ in range(100): # Sufficient iterations for double precision\n        c = (a + b) / 2.0\n        val = poly(xs, c)\n        if abs(val) < tolerance or (b - a) / 2.0 < tolerance:\n            return c\n        if poly(xs, a) * val < 0:\n            b = c\n        else:\n            a = c\n            \n    return (a + b) / 2.0",
+    "code_hash": "030322cfc1839e2b",
+    "language": "python",
+    "node_id": "n_5_e6243e",
+    "revision_id": "rev_n_5_e6243e_1",
+    "thought_path_snapshot": [
+      "Implement the Newton-Raphson method using the provided poly function and its derivative to iteratively converge to a root, leveraging the guarantee that a solution exists.",
+      "Thought-2 (replaced): Initialize the search interval with distinct bounds, such as a=0 and b=1, to immediately establish a valid range for the bisection method without relying on an arbitrary expansion loop that may fail for polynomials with roots outside the initial symmetric expansion or where the initial point coincides with itself."
+    ],
+    "origin": "rethink",
+    "generation_record_id": null,
+    "created_sequence": 6
+  },
+  {
+    "candidate_id": "cand_b7c0828116",
+    "problem_id": "python_32",
+    "code": "import math\n\ndef poly(xs: list, x: float):\n    \"\"\"\n    Evaluates polynomial with coefficients xs at point x.\n    return xs[0] + xs[1] * x + xs[1] * x^2 + .... xs[n] * x^n\n    \"\"\"\n    return sum([coeff * math.pow(x, i) for i, coeff in enumerate(xs)])\n\ndef find_zero(xs: list):\n    \"\"\"\n    Finds a zero of the polynomial defined by coefficients xs.\n    Uses the bisection method.\n    \"\"\"\n    # First, find an interval [a, b] such that poly(a) and poly(b) have opposite signs.\n    # We start with a small range and expand it until we find a sign change.\n    a = 1.0\n    b = -1.0\n    \n    # Ensure we have a valid interval [a, b] where a < b\n    if a > b:\n        a, b = b, a\n    \n    # Expand the interval until we find a sign change\n    # We check points from 1 to some large number and their negatives\n    limit = 1000000\n    step = 1.0\n    \n    # Check positive side\n    while poly(xs, a) * poly(xs, b) > 0:\n        a += step\n        b = a\n        if a > limit:\n            # If we haven't found a sign change by a large number, try negative side\n            break\n    \n    # If still no sign change on positive side, try negative side\n    if poly(xs, a) * poly(xs, b) > 0:\n        a = -limit\n        b = limit\n        while poly(xs, a) * poly(xs, b) > 0:\n            a -= step\n            b = a\n            if abs(a) > limit:\n                break\n    \n    # Now we have an interval [a, b] where poly(a) and poly(b) have opposite signs\n    # Apply bisection method\n    while b - a > 1e-7:\n        mid = (a + b) / 2\n        val_mid = poly(xs, mid)\n        val_a = poly(xs, a)\n        \n        if val_a * val_mid <= 0:\n            b = mid\n        else:\n            a = mid\n            \n    return (a + b) / 2",
+    "code_hash": "3aad5dce9bcd9306",
+    "language": "python",
+    "node_id": "n_7_a70f36",
+    "revision_id": "rev_n_7_a70f36_0",
+    "thought_path_snapshot": [
+      "Use the bisection method by first identifying an interval [a, b] where the polynomial changes sign, then repeatedly halving the interval to find the zero.",
+      "Implement the bisection method by first finding an interval [a, b] where the polynomial changes sign, then iteratively halving the interval until convergence."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 7
+  },
+  {
+    "candidate_id": "cand_9ac45b275f",
+    "problem_id": "python_32",
+    "code": "import math\n\ndef poly(xs: list, x: float):\n    \"\"\"\n    Evaluates polynomial with coefficients xs at point x.\n    return xs[0] + xs[1] * x + xs[1] * x^2 + .... xs[n] * x^n\n    \"\"\"\n    return sum([coeff * math.pow(x, i) for i, coeff in enumerate(xs)])\n\ndef poly_derivative(xs: list, x: float):\n    \"\"\"\n    Evaluates the derivative of the polynomial with coefficients xs at point x.\n    The derivative of sum(a_i * x^i) is sum(i * a_i * x^(i-1)) for i >= 1.\n    \"\"\"\n    if len(xs) <= 1:\n        return 0.0\n    derivative_coeffs = [i * coeff for i, coeff in enumerate(xs) if i > 0]\n    return poly(derivative_coeffs, x)\n\ndef find_zero(xs: list):\n    \"\"\"\n    Finds a zero of the polynomial defined by coefficients xs using the Newton-Raphson method.\n    \"\"\"\n    # Initial guess: start at x = 1.0\n    x = 1.0\n    \n    # Tolerance for convergence\n    tolerance = 1e-10\n    \n    # Maximum number of iterations to prevent infinite loops\n    max_iterations = 1000\n    \n    for _ in range(max_iterations):\n        fx = poly(xs, x)\n        fpx = poly_derivative(xs, x)\n        \n        # Check if we are close enough to a root\n        if abs(fx) < tolerance:\n            return x\n        \n        # Avoid division by zero\n        if abs(fpx) < 1e-12:\n            # If derivative is too small, perturb x slightly to avoid getting stuck\n            x += 0.1\n            continue\n            \n        # Newton-Raphson update step\n        x_new = x - fx / fpx\n        \n        # Check for convergence based on step size\n        if abs(x_new - x) < tolerance:\n            return x_new\n        \n        x = x_new\n    \n    # If no convergence within max iterations, return the best guess found\n    return x",
+    "code_hash": "ab589f0c9e9b0023",
+    "language": "python",
+    "node_id": "n_6_5d2992",
+    "revision_id": "rev_n_6_5d2992_0",
+    "thought_path_snapshot": [
+      "Implement the Newton-Raphson method using the provided poly function and its derivative to iteratively converge to a root, leveraging the guarantee that a solution exists.",
+      "Apply the Secant method as an alternative to Newton-Raphson that approximates the derivative using two initial points, avoiding the need to explicitly compute the derivative function."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 8
+  },
+  {
+    "candidate_id": "cand_635ea39d3a",
+    "problem_id": "python_32",
+    "code": "import math\n\ndef poly(xs: list, x: float):\n    \"\"\"\n    Evaluates polynomial with coefficients xs at point x.\n    return xs[0] + xs[1] * x + xs[1] * x^2 + .... xs[n] * x^n\n    \"\"\"\n    return sum([coeff * math.pow(x, i) for i, coeff in enumerate(xs)])\n\ndef poly_derivative(xs: list, x: float):\n    \"\"\"\n    Evaluates the derivative of the polynomial with coefficients xs at point x.\n    If degree is 0 (constant), derivative is 0.\n    Derivative of a0 + a1*x + a2*x^2 + ... is a1 + 2*a2*x + 3*a3*x^2 + ...\n    \"\"\"\n    if len(xs) <= 1:\n        return 0.0\n    \n    derivative_coeffs = [coeff * i for i, coeff in enumerate(xs) if i > 0]\n    return poly(derivative_coeffs, x)\n\ndef find_zero(xs: list):\n    \"\"\"\n    Finds a zero of the polynomial defined by coefficients xs using Newton-Raphson method.\n    \"\"\"\n    if len(xs) < 2:\n        return 0.0\n    \n    # Initial guess: use the ratio of the last two coefficients as a heuristic\n    # For large x, the highest degree term dominates, so root is approx -a_{n-1}/a_n\n    x = -xs[-2] / xs[-1] if xs[-1] != 0 else 1.0\n    \n    # Tolerance for convergence\n    tolerance = 1e-10\n    max_iterations = 1000\n    \n    for _ in range(max_iterations):\n        fx = poly(xs, x)\n        dfx = poly_derivative(xs, x)\n        \n        if abs(dfx) < 1e-12:\n            # Avoid division by zero; perturb x slightly\n            x += 1e-6\n            continue\n        \n        x_new = x - fx / dfx\n        \n        if abs(x_new - x) < tolerance:\n            return x_new\n        \n        x = x_new\n    \n    return x",
+    "code_hash": "a2fe049736841a87",
+    "language": "python",
+    "node_id": "n_10_9647ce",
+    "revision_id": "rev_n_10_9647ce_0",
+    "thought_path_snapshot": [
+      "Implement the Newton-Raphson method using the provided poly function and its derivative to iteratively converge to a root, leveraging the guarantee that a solution exists.",
+      "Implement the Newton-Raphson method using the provided poly function and its derivative to iteratively converge to a root, leveraging the guarantee that a solution exists.",
+      "Implement Newton-Raphson iteration using the provided poly function and a manually computed derivative function to iteratively approximate the root until convergence."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 9
+  },
+  {
+    "candidate_id": "cand_bb79c5d3a6",
+    "problem_id": "python_32",
+    "code": "import math\n\ndef poly(xs: list, x: float):\n    \"\"\"\n    Evaluates polynomial with coefficients xs at point x.\n    return xs[0] + xs[1] * x + xs[1] * x^2 + .... xs[n] * x^n\n    \"\"\"\n    return sum([coeff * math.pow(x, i) for i, coeff in enumerate(xs)])\n\ndef poly_derivative(xs: list):\n    \"\"\"\n    Computes the derivative of the polynomial defined by coefficients xs.\n    If poly(x) = a0 + a1*x + a2*x^2 + ..., then poly'(x) = a1 + 2*a2*x + ...\n    \"\"\"\n    if len(xs) <= 1:\n        return [0]\n    return [coeff * i for i, coeff in enumerate(xs) if i > 0]\n\ndef find_zero(xs: list):\n    \"\"\"\n    Finds a zero of the polynomial defined by coefficients xs.\n    Uses the bisection method on an interval guaranteed to contain a root.\n    \"\"\"\n    n = len(xs)\n    if n <= 1:\n        return 0.0\n    \n    # Calculate bounds for the root based on Cauchy's bound\n    # A root lies in the interval [-M, M] where M = 1 + max(|a_i|/|a_n|) for i < n\n    # However, a simpler and robust bound for polynomials with real roots is often sufficient.\n    # Let's use a wider safe bound.\n    \n    # Find the maximum absolute value of coefficients excluding the leading one\n    max_coeff = 0\n    for i in range(n - 1):\n        if abs(xs[i]) > max_coeff:\n            max_coeff = abs(xs[i])\n    \n    # Cauchy's bound: any root x satisfies |x| <= 1 + max(|a_i|/|a_n|)\n    # But we need to handle the case where the leading coefficient might be small or zero (though problem says largest non-zero is leading)\n    # Actually, the problem statement says \"largest non zero coefficient as it guarantees a solution\", implying the leading coefficient is non-zero.\n    \n    leading_coeff = xs[-1]\n    if leading_coeff == 0:\n        # If leading coeff is 0, reduce degree\n        while len(xs) > 1 and xs[-1] == 0:\n            xs.pop()\n        leading_coeff = xs[-1]\n    \n    bound = 1.0\n    if leading_coeff != 0:\n        max_ratio = 0.0\n        for i in range(n - 1):\n            ratio = abs(xs[i]) / abs(leading_coeff)\n            if ratio > max_ratio:\n                max_ratio = ratio\n        bound = 1.0 + max_ratio\n    \n    # Ensure the interval is large enough\n    low = -bound\n    high = bound\n    \n    # Evaluate at endpoints\n    f_low = poly(xs, low)\n    f_high = poly(xs, high)\n    \n    # If signs are same, expand the interval (though theoretically bound should contain a root)\n    # Given the problem guarantee, we assume a root exists. If signs are same, it might be a local extremum touching zero or the bound is tight.\n    # Let's try to find a sign change by expanding if necessary.\n    \n    while f_low * f_high > 0:\n        # Expand interval\n        low = -bound * 2\n        high = bound * 2\n        f_low = poly(xs, low)\n        f_high = poly(xs, high)\n        bound *= 2\n        \n        # Safety break to avoid infinite loop in case of weird inputs (though problem guarantees solution)\n        if bound > 1e15:\n            break\n            \n    # Bisection method\n    for _ in range(100):  # Sufficient iterations for double precision\n        mid = (low + high) / 2.0\n        f_mid = poly(xs, mid)\n        \n        if abs(f_mid) < 1e-9:\n            return mid\n        \n        if f_low * f_mid <= 0:\n            high = mid\n        else:\n            low = mid\n            \n    return (low + high) / 2.0",
+    "code_hash": "b1feb968e3e10b97",
+    "language": "python",
+    "node_id": "n_10_9647ce",
+    "revision_id": "rev_n_10_9647ce_1",
+    "thought_path_snapshot": [
+      "Implement the Newton-Raphson method using the provided poly function and its derivative to iteratively converge to a root, leveraging the guarantee that a solution exists.",
+      "Implement the Newton-Raphson method using the provided poly function and its derivative to iteratively converge to a root, leveraging the guarantee that a solution exists.",
+      "Thought-3 (replaced): The initial guess heuristic of `-xs[-2]/xs[-1]` is unreliable for polynomials with multiple positive roots, causing Newton-Raphson to diverge or converge to an incorrect root; instead, use a robust bracketing method like the bisection method on an interval guaranteed to contain a root (e.g., derived from the bounds of the coefficients) to ensure convergence to a valid zero."
+    ],
+    "origin": "rethink",
+    "generation_record_id": null,
+    "created_sequence": 10
+  },
+  {
+    "candidate_id": "cand_eaea940410",
+    "problem_id": "python_32",
+    "code": "import math\n\ndef poly(xs: list, x: float):\n    \"\"\"\n    Evaluates polynomial with coefficients xs at point x.\n    return xs[0] + xs[1] * x + xs[1] * x^2 + .... xs[n] * x^n\n    \"\"\"\n    return sum([coeff * math.pow(x, i) for i, coeff in enumerate(xs)])\n\ndef find_zero(xs: list):\n    \"\"\"\n    Finds a zero of the polynomial defined by coefficients xs.\n    Uses bisection method to find an interval [a, b] where the sign changes,\n    then refines the result using Newton's method for better precision.\n    \"\"\"\n    n = len(xs)\n    \n    # Step 1: Find an interval [a, b] such that poly(a) and poly(b) have opposite signs.\n    # We search in the range [-2, 2] first, then expand if necessary.\n    a, b = -2.0, 2.0\n    \n    # Check if sign change exists in initial range\n    fa = poly(xs, a)\n    fb = poly(xs, b)\n    \n    # If no sign change in [-2, 2], expand the range exponentially\n    while fa * fb > 0:\n        a *= 2\n        b *= 2\n        fa = poly(xs, a)\n        fb = poly(xs, b)\n    \n    # Ensure a < b for bisection\n    if a > b:\n        a, b = b, a\n        fa, fb = fb, fa\n    \n    # Step 2: Bisection method to narrow down the interval\n    for _ in range(100):  # 100 iterations give high precision\n        c = (a + b) / 2\n        fc = poly(xs, c)\n        if fc == 0:\n            return c\n        if fa * fc < 0:\n            b = c\n            fb = fc\n        else:\n            a = c\n            fa = fc\n    \n    root = (a + b) / 2\n    \n    # Step 3: Refine using Newton's method\n    def derivative(xs, x):\n        return sum([i * coeff * math.pow(x, i - 1) for i, coeff in enumerate(xs) if i > 0])\n    \n    for _ in range(50):\n        fx = poly(xs, root)\n        dfx = derivative(xs, root)\n        if abs(dfx) < 1e-12:\n            break\n        root = root - fx / dfx\n    \n    return root",
+    "code_hash": "88f032b0205d8810",
+    "language": "python",
+    "node_id": "n_8_e7ec4e",
+    "revision_id": "rev_n_8_e7ec4e_0",
+    "thought_path_snapshot": [
+      "Use the bisection method by first identifying an interval [a, b] where the polynomial changes sign, then repeatedly halving the interval to find the zero.",
+      "Use Newton's method starting from an initial guess derived from the coefficients, leveraging the derivative of the polynomial for faster convergence."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 11
+  },
+  {
+    "candidate_id": "cand_5f3e940321",
+    "problem_id": "python_32",
+    "code": "import math\n\ndef poly(xs: list, x: float):\n    \"\"\"\n    Evaluates polynomial with coefficients xs at point x.\n    return xs[0] + xs[1] * x + xs[1] * x^2 + .... xs[n] * x^n\n    \"\"\"\n    return sum([coeff * math.pow(x, i) for i, coeff in enumerate(xs)])\n\ndef poly_derivative(xs: list, x: float):\n    \"\"\"\n    Evaluates the derivative of the polynomial with coefficients xs at point x.\n    Derivative of sum(a_i * x^i) is sum(i * a_i * x^(i-1))\n    \"\"\"\n    if len(xs) <= 1:\n        return 0.0\n    return sum([i * coeff * math.pow(x, i - 1) for i, coeff in enumerate(xs) if i > 0])\n\ndef find_zero(xs: list):\n    \"\"\"\n    Finds a zero of the polynomial defined by coefficients xs.\n    Uses the bisection method to ensure robustness.\n    \"\"\"\n    # Step 1: Find an interval [a, b] such that poly(a) and poly(b) have opposite signs.\n    # We start with a small range and expand it until we find a sign change.\n    a = 0.0\n    b = 1.0\n    \n    # Ensure we have a sign change. If poly(0) and poly(1) have same sign, expand.\n    fa = poly(xs, a)\n    fb = poly(xs, b)\n    \n    # If both are zero, we found the root immediately (though unlikely given problem constraints)\n    if fa == 0:\n        return a\n    if fb == 0:\n        return b\n    \n    # Expand the interval until signs differ\n    while fa * fb > 0:\n        a = a - 1.0\n        b = b + 1.0\n        fa = poly(xs, a)\n        fb = poly(xs, b)\n        \n        # Safety break to prevent infinite loops in case of unexpected behavior,\n        # though the problem guarantees a solution exists for even degree polynomials\n        # with largest non-zero coefficient at the end (implying real roots).\n        if abs(a) > 1e9 or abs(b) > 1e9:\n            break\n\n    # Step 2: Apply Bisection Method\n    # We know fa and fb have opposite signs.\n    for _ in range(100):  # 100 iterations give high precision\n        c = (a + b) / 2.0\n        fc = poly(xs, c)\n        \n        if fc == 0:\n            return c\n        \n        # Check which half has the sign change\n        if fa * fc < 0:\n            b = c\n            fb = fc\n        else:\n            a = c\n            fa = fc\n            \n    return (a + b) / 2.0",
+    "code_hash": "ac52256fbe4911a6",
+    "language": "python",
+    "node_id": "n_11_ae7e70",
+    "revision_id": "rev_n_11_ae7e70_0",
+    "thought_path_snapshot": [
+      "Implement the Newton-Raphson method using the provided poly function and its derivative to iteratively converge to a root, leveraging the guarantee that a solution exists.",
+      "Implement the Newton-Raphson method using the provided poly function and its derivative to iteratively converge to a root, leveraging the guarantee that a solution exists.",
+      "Use the bisection method by first identifying an interval [a, b] where the polynomial changes sign, then repeatedly halving the interval to find the root, ensuring robustness without needing derivatives."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 12
+  },
+  {
+    "candidate_id": "cand_a725b75ab0",
+    "problem_id": "python_32",
+    "code": "import math\n\ndef poly(xs: list, x: float):\n    \"\"\"\n    Evaluates polynomial with coefficients xs at point x.\n    return xs[0] + xs[1] * x + xs[1] * x^2 + .... xs[n] * x^n\n    \"\"\"\n    return sum([coeff * math.pow(x, i) for i, coeff in enumerate(xs)])\n\ndef find_zero(xs: list):\n    \"\"\"\n    Finds a zero of the polynomial defined by coefficients xs.\n    Uses the bisection method.\n    \"\"\"\n    # Step 1: Find an interval [a, b] such that poly(a) and poly(b) have opposite signs.\n    # We start with a small range and expand it until we find a sign change.\n    a = 1.0\n    b = -1.0\n    \n    # Ensure we have a valid interval [a, b] where f(a) * f(b) < 0\n    # We expand the range exponentially until we find such an interval.\n    # Note: The problem guarantees a solution exists under the given constraints.\n    while poly(xs, a) * poly(xs, b) > 0:\n        a *= 2\n        b = -a\n    \n    # Step 2: Apply the bisection method\n    # We iterate until the interval is sufficiently small\n    tolerance = 1e-7\n    while (b - a) > tolerance:\n        c = (a + b) / 2.0\n        fc = poly(xs, c)\n        \n        if fc == 0:\n            return c\n        \n        # Determine which half contains the root\n        if poly(xs, a) * fc < 0:\n            b = c\n        else:\n            a = c\n            \n    return (a + b) / 2.0",
+    "code_hash": "71e8e86732041b29",
+    "language": "python",
+    "node_id": "n_9_dc5fc1",
+    "revision_id": "rev_n_9_dc5fc1_0",
+    "thought_path_snapshot": [
+      "Use the bisection method by first identifying an interval [a, b] where the polynomial changes sign, then repeatedly halving the interval to find the zero.",
+      "Apply the secant method as an alternative root-finding technique that approximates the derivative using two initial points, avoiding the need to compute the derivative explicitly."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 13
+  },
+  {
+    "candidate_id": "cand_14f44cc9a4",
+    "problem_id": "python_32",
+    "code": "import math\n\ndef poly(xs: list, x: float):\n    \"\"\"\n    Evaluates polynomial with coefficients xs at point x.\n    return xs[0] + xs[1] * x + xs[1] * x^2 + .... xs[n] * x^n\n    \"\"\"\n    return sum([coeff * math.pow(x, i) for i, coeff in enumerate(xs)])\n\ndef find_zero(xs: list):\n    \"\"\"\n    Finds a zero of the polynomial defined by coefficients xs using the bisection method.\n    Assumes the input guarantees a solution exists within a reasonable range.\n    \"\"\"\n    # Define a search range. Based on the problem constraints and typical polynomial behavior,\n    # a range of [-1000, 1000] is usually sufficient to find a root if one exists.\n    a, b = -1000.0, 1000.0\n    \n    # Ensure the interval is valid (a < b)\n    if a >= b:\n        a, b = b, a\n    \n    # Find an interval [a, b] where the polynomial changes sign\n    # We expand the interval until we find a sign change or reach a limit\n    while poly(xs, a) * poly(xs, b) > 0:\n        a -= 1.0\n        b += 1.0\n        # Safety break to prevent infinite loops in case of unexpected inputs,\n        # though the problem statement guarantees a solution.\n        if b - a > 1e9:\n            break\n\n    # Bisection method\n    for _ in range(100):  # 100 iterations give high precision\n        c = (a + b) / 2.0\n        if poly(xs, c) == 0:\n            return c\n        if poly(xs, a) * poly(xs, c) < 0:\n            b = c\n        else:\n            a = c\n            \n    return (a + b) / 2.0",
+    "code_hash": "b71f773f4b2cf2c5",
+    "language": "python",
+    "node_id": "n_9_dc5fc1",
+    "revision_id": "rev_n_9_dc5fc1_1",
+    "thought_path_snapshot": [
+      "Use the bisection method by first identifying an interval [a, b] where the polynomial changes sign, then repeatedly halving the interval to find the zero.",
+      "Thought-2 (replaced): Ensure the initial interval [a, b] is correctly ordered with a < b before applying the bisection method, and verify that the interval width is positive to prevent the loop from terminating immediately."
+    ],
+    "origin": "rethink",
+    "generation_record_id": null,
+    "created_sequence": 14
+  },
+  {
+    "candidate_id": "cand_1c93380a94",
+    "problem_id": "python_32",
+    "code": "import math\n\ndef poly(xs: list, x: float):\n    \"\"\"\n    Evaluates polynomial with coefficients xs at point x.\n    return xs[0] + xs[1] * x + xs[1] * x^2 + .... xs[n] * x^n\n    \"\"\"\n    return sum([coeff * math.pow(x, i) for i, coeff in enumerate(xs)])\n\ndef find_zero(xs: list):\n    \"\"\"\n    Finds a zero of the polynomial defined by coefficients xs.\n    Uses the Bisection Method to guarantee convergence given the problem constraints.\n    \"\"\"\n    # Helper function to compute the derivative of the polynomial\n    def poly_derivative(xs, x):\n        # Derivative coefficients: [1*xs[1], 2*xs[2], ..., n*xs[n]]\n        if len(xs) <= 1:\n            return 0.0\n        deriv_coeffs = [i * coeff for i, coeff in enumerate(xs) if i > 0]\n        return poly(deriv_coeffs, x)\n\n    # We need to find an interval [a, b] such that poly(a) and poly(b) have opposite signs.\n    # The problem guarantees a solution exists and the list has an even number of coefficients.\n    # Let's search for a sign change in a reasonable range.\n    \n    a = 0.0\n    b = 1.0\n    \n    # Expand the interval until we find a sign change\n    # Since the problem guarantees a solution, such an interval must exist.\n    # We start with a small range and expand outwards.\n    while poly(xs, a) * poly(xs, b) > 0:\n        # If the root is not in [0, 1], we need to expand.\n        # Heuristic: expand by a factor of 2 or add a fixed amount.\n        # Given the guarantee, expanding symmetrically or just one side should work.\n        # Let's try expanding b first, then a if needed.\n        b *= 2\n        if b > 1e6: # Safety break, though problem guarantees solution\n            break\n            \n    # Ensure a and b are distinct and have opposite signs\n    # If poly(a) and poly(b) are still same sign after expansion (unlikely given guarantee),\n    # we might need to adjust 'a' as well. Let's make sure we cover the root.\n    # A robust way: check intervals [0, 1], [1, 2], etc., or simply expand both ends.\n    \n    # Re-evaluating the expansion strategy to be more robust:\n    # Check if sign change exists in [0, 1]. If not, expand.\n    fa = poly(xs, a)\n    fb = poly(xs, b)\n    \n    if fa * fb > 0:\n        # No sign change in [0, 1], expand\n        # Try expanding to the right\n        b = 2.0\n        while poly(xs, a) * poly(xs, b) > 0:\n            b *= 2\n            if b > 1e7:\n                break\n        \n        if poly(xs, a) * poly(xs, b) > 0:\n            # Still no sign change, try expanding to the left\n            a = -1.0\n            while poly(xs, a) * poly(xs, b) > 0:\n                a -= 2.0\n                if a < -1e7:\n                    break\n    \n    # Now we should have poly(a) * poly(b) <= 0\n    # Handle edge case where one is exactly zero\n    if poly(xs, a) == 0:\n        return a\n    if poly(xs, b) == 0:\n        return b\n        \n    # Bisection method\n    for _ in range(100): # 100 iterations give high precision\n        c = (a + b) / 2.0\n        fc = poly(xs, c)\n        if fc == 0:\n            return c\n        if poly(xs, a) * fc < 0:\n            b = c\n        else:\n            a = c\n            \n    return (a + b) / 2.0",
+    "code_hash": "5f608e1375789b14",
+    "language": "python",
+    "node_id": "n_13_1e76e6",
+    "revision_id": "rev_n_13_1e76e6_0",
+    "thought_path_snapshot": [
+      "Implement the Newton-Raphson method using the provided poly function and its derivative to iteratively converge to a root, leveraging the guarantee that a solution exists.",
+      "Thought-2 (replaced): Initialize the search interval with distinct bounds, such as a=0 and b=1, to immediately establish a valid range for the bisection method without relying on an arbitrary expansion loop that may fail for polynomials with roots outside the initial symmetric expansion or where the initial point coincides with itself.",
+      "Implement the Bisection Method by first finding an interval [a, b] where the polynomial changes sign (f(a)*f(b) < 0), then iteratively halving the interval until convergence. This is robust because the problem guarantees a solution exists and the function is continuous."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 15
+  },
+  {
+    "candidate_id": "cand_4c4875fa12",
+    "problem_id": "python_32",
+    "code": "import math\n\ndef poly(xs: list, x: float):\n    \"\"\"\n    Evaluates polynomial with coefficients xs at point x.\n    return xs[0] + xs[1] * x + xs[1] * x^2 + .... xs[n] * x^n\n    \"\"\"\n    return sum([coeff * math.pow(x, i) for i, coeff in enumerate(xs)])\n\ndef poly_derivative(xs: list, x: float):\n    \"\"\"\n    Evaluates the derivative of the polynomial with coefficients xs at point x.\n    If xs = [a0, a1, a2, ..., an], then p(x) = a0 + a1*x + a2*x^2 + ... + an*x^n\n    p'(x) = a1 + 2*a2*x + 3*a3*x^2 + ... + n*an*x^(n-1)\n    \"\"\"\n    if len(xs) <= 1:\n        return 0.0\n    return sum([i * coeff * math.pow(x, i - 1) for i, coeff in enumerate(xs) if i > 0])\n\ndef find_zero(xs: list):\n    \"\"\"\n    Finds a zero of the polynomial defined by coefficients xs using the Newton-Raphson method.\n    \"\"\"\n    # Initial guess: start at x = 1.0\n    x = 1.0\n    \n    # Tolerance for convergence\n    tolerance = 1e-10\n    \n    # Maximum number of iterations to prevent infinite loops\n    max_iterations = 1000\n    \n    for _ in range(max_iterations):\n        fx = poly(xs, x)\n        fpx = poly_derivative(xs, x)\n        \n        # If the derivative is zero, we cannot proceed with Newton-Raphson\n        if abs(fpx) < 1e-12:\n            # Fallback: try a different starting point or return current if close enough\n            if abs(fx) < tolerance:\n                break\n            # Shift x slightly to avoid division by zero\n            x += 0.1\n            continue\n        \n        # Newton-Raphson update step\n        x_new = x - fx / fpx\n        \n        # Check for convergence\n        if abs(x_new - x) < tolerance:\n            return round(x_new, 10)\n        \n        x = x_new\n    \n    # If loop finishes without convergence, return the best estimate\n    return round(x, 10)",
+    "code_hash": "dc277ce9470055b0",
+    "language": "python",
+    "node_id": "n_12_ac60d8",
+    "revision_id": "rev_n_12_ac60d8_0",
+    "thought_path_snapshot": [
+      "Implement the Newton-Raphson method using the provided poly function and its derivative to iteratively converge to a root, leveraging the guarantee that a solution exists.",
+      "Implement the Newton-Raphson method using the provided poly function and its derivative to iteratively converge to a root, leveraging the guarantee that a solution exists.",
+      "Apply the Secant method as a derivative-free alternative to Newton-Raphson, estimating the slope using two initial points and iterating until the root is found within a tolerance."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 16
+  },
+  {
+    "candidate_id": "cand_b842d44e30",
+    "problem_id": "python_32",
+    "code": "import math\n\ndef poly(xs: list, x: float):\n    \"\"\"\n    Evaluates polynomial with coefficients xs at point x.\n    return xs[0] + xs[1] * x + xs[1] * x^2 + .... xs[n] * x^n\n    \"\"\"\n    return sum([coeff * math.pow(x, i) for i, coeff in enumerate(xs)])\n\ndef find_zero(xs: list):\n    \"\"\"\n    Finds a zero of the polynomial defined by coefficients xs.\n    Uses bisection method after robustly finding an interval [a, b] where the sign changes.\n    \"\"\"\n    n = len(xs)\n    if n % 2 != 0:\n        raise ValueError(\"Polynomial must have an even number of coefficients.\")\n    \n    # Helper to evaluate polynomial\n    def f(x):\n        return poly(xs, x)\n    \n    # Helper to evaluate derivative\n    def df(x):\n        # Derivative coefficients: [1*x1, 2*x2, ..., (n-1)*x(n-1)]\n        # If n=2, derivative is [xs[1]]\n        if n == 2:\n            return xs[1]\n        deriv_coeffs = [coeff * i for i, coeff in enumerate(xs[1:], start=1)]\n        return poly(deriv_coeffs, x)\n    \n    # Find an interval [a, b] such that f(a) * f(b) < 0\n    # We start with a small range and expand if necessary.\n    # Based on Cauchy's bound or similar, roots are bounded.\n    # A safe initial search range can be derived from coefficients.\n    \n    # Let's try to find a sign change by expanding outward from 0\n    a, b = -1.0, 1.0\n    fa, fb = f(a), f(b)\n    \n    # If we already have a sign change, great.\n    if fa * fb < 0:\n        pass\n    else:\n        # Expand until we find a sign change\n        # We need to be careful not to loop infinitely, but the problem guarantees a solution exists.\n        # We'll expand exponentially.\n        step = 1.0\n        while fa * fb >= 0:\n            a -= step\n            b += step\n            fa = f(a)\n            fb = f(b)\n            step *= 2.0\n            # Safety break, though theoretically shouldn't be needed given problem constraints\n            if step > 1e9:\n                break\n    \n    # Bisection method\n    for _ in range(100):  # Sufficient iterations for double precision\n        mid = (a + b) / 2.0\n        fm = f(mid)\n        if abs(fm) < 1e-9:\n            return mid\n        if fa * fm < 0:\n            b = mid\n            fb = fm\n        else:\n            a = mid\n            fa = fm\n            \n    return (a + b) / 2.0",
+    "code_hash": "991bda96c04c3903",
+    "language": "python",
+    "node_id": "n_16_4db2b1",
+    "revision_id": "rev_n_16_4db2b1_0",
+    "thought_path_snapshot": [
+      "Implement the Newton-Raphson method using the provided poly function and its derivative to iteratively converge to a root, leveraging the guarantee that a solution exists.",
+      "Implement the Newton-Raphson method using the provided poly function and its derivative to iteratively converge to a root, leveraging the guarantee that a solution exists.",
+      "Thought-3 (replaced): The initial guess heuristic of `-xs[-2]/xs[-1]` is unreliable for polynomials with multiple positive roots, causing Newton-Raphson to diverge or converge to an incorrect root; instead, use a robust bracketing method like the bisection method on an interval guaranteed to contain a root (e.g., derived from the bounds of the coefficients) to ensure convergence to a valid zero.",
+      "The bisection method requires an interval [a, b] where f(a) and f(b) have opposite signs. The current logic calculates a bound but fails to explicitly find such an interval or handle the case where the root is outside the calculated range or the function doesn't change sign within the initial guess range. We need to robustly search for an interval [L, R] where the polynomial changes sign, expanding the search range if necessary, before applying bisection."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 17
+  },
+  {
+    "candidate_id": "cand_bfcec6f50f",
+    "problem_id": "python_32",
+    "code": "import math\n\ndef poly(xs: list, x: float):\n    \"\"\"\n    Evaluates polynomial with coefficients xs at point x.\n    return xs[0] + xs[1] * x + xs[1] * x^2 + .... xs[n] * x^n\n    \"\"\"\n    return sum([coeff * math.pow(x, i) for i, coeff in enumerate(xs)])\n\ndef find_zero(xs: list):\n    \"\"\"\n    Finds a zero of the polynomial defined by coefficients xs.\n    Uses Newton-Raphson method with a robust initial guess strategy.\n    \"\"\"\n    n = len(xs)\n    if n < 2:\n        return 0.0\n\n    # Derivative coefficients\n    # If f(x) = a0 + a1*x + ... + an*x^n\n    # f'(x) = a1 + 2*a2*x + ... + n*an*x^(n-1)\n    deriv_coeffs = [xs[i] * i for i in range(1, n)]\n\n    # Initial guess heuristic\n    # For large x, the highest degree term dominates.\n    # We look for where the linear term (approx) balances the constant term relative to the leading term.\n    # A common heuristic for polynomials with real roots is based on the ratio of coefficients.\n    # If the polynomial is roughly c0 + c1*x + ... + cn*x^n = 0\n    # For large n, roots can be estimated.\n    # Let's try a few heuristics and pick one that seems reasonable.\n    \n    # Heuristic 1: Based on the ratio of the last two coefficients\n    # If cn*x^n + c(n-1)*x^(n-1) approx 0 => x approx -c(n-1)/cn\n    if n >= 2:\n        guess = -xs[n-2] / xs[n-1]\n    else:\n        guess = 0.0\n\n    # Newton-Raphson iteration\n    x = guess\n    tolerance = 1e-6\n    max_iterations = 1000\n\n    for _ in range(max_iterations):\n        fx = poly(xs, x)\n        if abs(fx) < tolerance:\n            return x\n        \n        # Compute derivative at x\n        if n == 1:\n            # Linear equation: a0 + a1*x = 0 => x = -a0/a1\n            return -xs[0] / xs[1]\n        \n        dfx = poly(deriv_coeffs, x)\n        \n        if abs(dfx) < 1e-12:\n            # Derivative too small, break to avoid division by zero\n            break\n        \n        x_new = x - fx / dfx\n        \n        # Check for convergence\n        if abs(x_new - x) < tolerance:\n            x = x_new\n            break\n        \n        x = x_new\n\n    return x",
+    "code_hash": "c1b49608b54b20cf",
+    "language": "python",
+    "node_id": "n_16_4db2b1",
+    "revision_id": "rev_n_16_4db2b1_1",
+    "thought_path_snapshot": [
+      "Implement the Newton-Raphson method using the provided poly function and its derivative to iteratively converge to a root, leveraging the guarantee that a solution exists.",
+      "Implement the Newton-Raphson method using the provided poly function and its derivative to iteratively converge to a root, leveraging the guarantee that a solution exists.",
+      "Thought-3 (replaced): The initial guess heuristic of `-xs[-2]/xs[-1]` is unreliable for polynomials with multiple positive roots, causing Newton-Raphson to diverge or converge to an incorrect root; instead, use a robust bracketing method like the bisection method on an interval guaranteed to contain a root (e.g., derived from the bounds of the coefficients) to ensure convergence to a valid zero.",
+      "Thought-5: The bisection method fails because the polynomial $f(x) = -6 + 11x - 6x^2 + x^3$ has a root at $x=1$ where $f(1)=0$, but the initial expansion logic incorrectly identifies $f(1)=0$ as a non-sign-change condition ($fa * fb \\ge 0$) and continues expanding, potentially missing the root or converging to a different interval; instead, the interval search should explicitly check for $f(x) == 0$ to return immediately and ensure the expansion bounds $a$ and $b$ strictly bracket a sign change ($f(a) \\cdot f(b) < 0$) before applying bisection."
+    ],
+    "origin": "rethink",
+    "generation_record_id": null,
+    "created_sequence": 18
+  },
+  {
+    "candidate_id": "cand_0e498fb093",
+    "problem_id": "python_32",
+    "code": "import math\n\ndef poly(xs: list, x: float):\n    \"\"\"\n    Evaluates polynomial with coefficients xs at point x.\n    return xs[0] + xs[1] * x + xs[1] * x^2 + .... xs[n] * x^n\n    \"\"\"\n    return sum([coeff * math.pow(x, i) for i, coeff in enumerate(xs)])\n\ndef find_zero(xs: list):\n    \"\"\"\n    Finds a zero of the polynomial defined by coefficients xs using the bisection method.\n    Assumes the input guarantees a solution exists within a reasonable range.\n    \"\"\"\n    a = -10000\n    b = 10000\n    \n    # Expand the interval [a, b] until the polynomial changes sign\n    while poly(xs, a) * poly(xs, b) > 0:\n        a *= 2\n        b *= 2\n    \n    # Bisection method\n    tolerance = 1e-7\n    while (b - a) > tolerance:\n        mid = (a + b) / 2\n        val = poly(xs, mid)\n        if val == 0:\n            return mid\n        if poly(xs, a) * val < 0:\n            b = mid\n        else:\n            a = mid\n            \n    return (a + b) / 2",
+    "code_hash": "ae97ee70a6ed837c",
+    "language": "python",
+    "node_id": "n_17_48c2a3",
+    "revision_id": "rev_n_17_48c2a3_0",
+    "thought_path_snapshot": [
+      "Use the bisection method by first identifying an interval [a, b] where the polynomial changes sign, then repeatedly halving the interval to find the zero.",
+      "Implement the bisection method by first finding an interval [a, b] where the polynomial changes sign, then iteratively halving the interval until convergence.",
+      "Implement the bisection method by first expanding the search range [a, b] until poly(a) and poly(b) have opposite signs, then iteratively halve the interval until the root is found within a small tolerance."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 19
+  },
+  {
+    "candidate_id": "cand_a48219a248",
+    "problem_id": "python_32",
+    "code": "import math\n\ndef poly(xs: list, x: float):\n    \"\"\"\n    Evaluates polynomial with coefficients xs at point x.\n    return xs[0] + xs[1] * x + xs[1] * x^2 + .... xs[n] * x^n\n    \"\"\"\n    return sum([coeff * math.pow(x, i) for i, coeff in enumerate(xs)])\n\ndef find_zero(xs: list):\n    \"\"\"\n    Finds a zero of the polynomial defined by coefficients xs using the bisection method.\n    \"\"\"\n    def sign(y):\n        if y > 0:\n            return 1\n        elif y < 0:\n            return -1\n        else:\n            return 0\n\n    # Find an interval [a, b] such that poly(a) and poly(b) have opposite signs\n    a = 1.0\n    b = -1.0\n    fa = poly(xs, a)\n    fb = poly(xs, b)\n\n    # Expand the interval until we find a sign change\n    while sign(fa) == sign(fb):\n        a *= 2\n        b = -a\n        fa = poly(xs, a)\n        fb = poly(xs, b)\n\n    # Bisection method with fixed iterations for precision\n    for _ in range(100):\n        c = (a + b) / 2\n        fc = poly(xs, c)\n        if sign(fc) == 0:\n            return c\n        if sign(fc) == sign(fa):\n            a = c\n            fa = fc\n        else:\n            b = c\n            fb = fc\n\n    return (a + b) / 2",
+    "code_hash": "efd8acff47d73efa",
+    "language": "python",
+    "node_id": "n_17_48c2a3",
+    "revision_id": "rev_n_17_48c2a3_1",
+    "thought_path_snapshot": [
+      "Use the bisection method by first identifying an interval [a, b] where the polynomial changes sign, then repeatedly halving the interval to find the zero.",
+      "Implement the bisection method by first finding an interval [a, b] where the polynomial changes sign, then iteratively halving the interval until convergence.",
+      "Thought-3 (replaced): The bisection method's convergence relies on the interval width shrinking below a tolerance, but floating-point accumulation over many iterations with a large initial range can introduce precision errors that fail strict rounding checks; instead of relying on a fixed small tolerance like 1e-7, the algorithm should iterate a fixed number of times (e.g., 100 iterations) to guarantee sufficient precision independent of the initial interval size, ensuring the midpoint is accurate enough to pass the rounding assertion."
+    ],
+    "origin": "rethink",
+    "generation_record_id": null,
+    "created_sequence": 20
+  },
+  {
+    "candidate_id": "cand_0c33f6e578",
+    "problem_id": "python_32",
+    "code": "import math\n\ndef poly(xs: list, x: float):\n    \"\"\"\n    Evaluates polynomial with coefficients xs at point x.\n    return xs[0] + xs[1] * x + xs[1] * x^2 + .... xs[n] * x^n\n    \"\"\"\n    return sum([coeff * math.pow(x, i) for i, coeff in enumerate(xs)])\n\ndef find_zero(xs: list):\n    \"\"\"\n    Finds a zero of the polynomial defined by coefficients xs.\n    Uses the Bisection Method.\n    \"\"\"\n    # The problem guarantees that the largest non-zero coefficient is at the end,\n    # and the number of coefficients is even. This implies the polynomial has at least one real root.\n    # We need to find an interval [a, b] such that poly(a) and poly(b) have opposite signs.\n    \n    # Strategy: Expand the search range until we find a sign change.\n    # Since the leading term dominates for large |x|, the sign will eventually match the sign of the leading coefficient.\n    # We start with a small range and expand outwards.\n    \n    a = 0.0\n    b = 1.0\n    \n    # Ensure we have a sign change. If poly(0) and poly(1) have the same sign, expand.\n    # We need to be careful not to divide by zero or get stuck, but the problem guarantees a solution exists.\n    # Let's expand the interval until f(a) * f(b) < 0.\n    \n    fa = poly(xs, a)\n    fb = poly(xs, b)\n    \n    # If we start with a=0, b=1 and they have the same sign, we need to expand.\n    # We can expand by increasing b (and potentially adjusting a if needed, but usually expanding one side is enough for large roots).\n    # However, to be robust, let's expand the interval symmetrically or just outward from 0.\n    # A safe approach: keep expanding b until sign change is found, assuming the root is positive or negative.\n    # But the root could be negative. So let's check both sides.\n    \n    # Actually, a simpler robust strategy for guaranteed existence:\n    # Evaluate at x = 1 and x = -1. If signs differ, we are good.\n    # If not, expand the range [L, R] starting from [-1, 1] until signs differ.\n    \n    L, R = -1.0, 1.0\n    fL = poly(xs, L)\n    fR = poly(xs, R)\n    \n    while fL * fR > 0:\n        # Expand the interval\n        L -= 1.0\n        R += 1.0\n        fL = poly(xs, L)\n        fR = poly(xs, R)\n        \n        # Safety break (though problem guarantees a solution)\n        if abs(L) > 1e9 or abs(R) > 1e9:\n            break\n            \n    # Now we have an interval [L, R] where poly(L) and poly(R) have opposite signs.\n    # Apply Bisection Method.\n    \n    tolerance = 1e-7\n    while (R - L) > tolerance:\n        mid = (L + R) / 2.0\n        fMid = poly(xs, mid)\n        \n        if fMid == 0:\n            return mid\n        \n        if fL * fMid < 0:\n            R = mid\n            fR = fMid\n        else:\n            L = mid\n            fL = fMid\n            \n    return (L + R) / 2.0",
+    "code_hash": "ec0412864bc28d5d",
+    "language": "python",
+    "node_id": "n_20_09640a",
+    "revision_id": "rev_n_20_09640a_0",
+    "thought_path_snapshot": [
+      "Apply the secant method as an alternative to Newton-Raphson that does not require explicit derivative calculation, estimating the slope between two initial points.",
+      "Implement the Bisection Method by first identifying an interval [a, b] where the polynomial changes sign, then iteratively narrowing the interval by halving it until the root is found within a tolerance."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 21
+  }
+]
