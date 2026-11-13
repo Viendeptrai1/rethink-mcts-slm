@@ -1,6 +1,6 @@
 # Cấu hình v3: RethinkMCTS đúng thiết lập bài báo, nhiều model 7–9B
 
-Bộ config này dùng cho đợt thực nghiệm mới (từ 11/2026), thay cho cấu hình 14B v1 (xem [../README.md](../README.md)). Mọi model dùng **cùng một file config**; chỉ đổi `model.model`, `model.base_url` và, với model có thinking, `model.extra_body`.
+Bộ config này dùng cho đợt thực nghiệm mới (từ 11/2026), thay cho cấu hình của cài đặt cũ (v1, đã lưu trữ ở tag `archive/pre-v3-2026-11-13`). Mọi model dùng **cùng một file config**; chỉ đổi `model.model`, `model.base_url` và, với model có thinking, `model.extra_body`.
 
 | File | Dùng cho |
 |---|---|
@@ -11,7 +11,7 @@ Bộ config này dùng cho đợt thực nghiệm mới (từ 11/2026), thay cho
 
 ## Đối chiếu với bài báo
 
-| Thiết lập | Bài báo / upstream | v3 | v1 (14B) |
+| Thiết lập | Bài báo / upstream | v3 | v1 (cài đặt cũ) |
 |---|---|---|---|
 | Ngân sách | 16 rollout | 16 rollout (`budget.max_rollouts`), rethink không tính vào | 16 lần sinh code, tính cả rethink, tối đa 16 vòng lặp |
 | Rethink mỗi node | 1 (`max_think_times=2`) | 1 | 2 |

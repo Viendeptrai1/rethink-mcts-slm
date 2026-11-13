@@ -1,5 +1,7 @@
 # Lộ trình khoảng 8 tuần
 
+> **Ghi chú 13/11/2026:** các mục viết trước protocol v3 (kế hoạch 3B/7B chính, 14B đối chiếu) là lịch sử. Kế hoạch hiện hành: [KHUNG_BAO_CAO_v2.md](../report/KHUNG_BAO_CAO_v2.md) và [PROTOCOL.md](PROTOCOL.md) mục 8; model là Qwen2.5-Coder-7B, Seed-Coder-8B, Qwen3.5-9B (D-006).
+
 Đây là kế hoạch kể từ phiên dựng nền 23/09/2026; deadline chính xác chưa được khóa. Trạng thái và bằng chứng hiện tại nằm trong CURRENT_STATE/RESEARCH_LOG, không suy từ checkbox kế hoạch.
 
 ## Tuần 1 — Khóa câu hỏi và điều kiện đo

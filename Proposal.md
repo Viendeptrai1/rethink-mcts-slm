@@ -1,5 +1,7 @@
 # ĐỀ CƯƠNG NGHIÊN CỨU (RESEARCH PROPOSAL)
 
+> **Ghi chú 13/11/2026:** đây là đề cương gốc; tên đề tài giữ nguyên. Phạm vi model và thiết lập thực nghiệm đã đổi (D-006): protocol v3.1 trên Qwen2.5-Coder-7B, Seed-Coder-8B, Qwen3.5-9B; không còn dùng 14B và Ollama. Xem [README.md](README.md).
+
 ## Tên đề tài: Cải thiện khả năng suy luận của LLM trong sinh mã nguồn bằng Monte Carlo Tree Search với phản hồi từ kiểm thử tự động
 
 * **Học viên / Sinh viên thực hiện:** Phan Quốc Viên (Kotori)

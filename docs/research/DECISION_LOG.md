@@ -55,3 +55,11 @@ Quyết định:
 4. **Tạm dừng qwen35_9b** (người dùng đồng ý sau khi thử lại lúc 10:35–11:03): với tuổi thọ runtime khoảng 23 phút và thời gian khởi động 9 phút, MCTS không tiến được. Chưa quyết định chạy lại vào lúc khác hay chỉ báo cáo 2 model.
 5. **Lưu trữ artifact.** Các file nặng của từng bài được nén theo run trong `runs/v3_raw_archives/`, phần còn lại commit trực tiếp.
 6. **Phân tích** dùng [analyze_v3.py](../../scripts/analyze_v3.py): McNemar exact với Holm, bootstrap ghép cặp, chọn lại offline (bỏ critic, dừng sớm) và Best-of-k từ k mẫu đầu, chấm lại hidden trên máy local. Kết quả cho 2 model: [docs/results/v3/analysis_qwen25c7b_seedcoder8b.json](../results/v3/analysis_qwen25c7b_seedcoder8b.json). Đây là quan sát, chưa phải kết luận của đề tài.
+
+## D-009: Gỡ kết quả trước v3, bỏ 14B (13/11/2026)
+
+Người dùng thấy các kết quả cũ không chính xác và gây nhầm lẫn, nên đã quyết định:
+1. **Gỡ toàn bộ tài liệu trước v3 khỏi nhánh:** run 14B v1, tuning, demo, nhánh 7B cũ (`external/ReThinkMCTS`), các chương báo cáo 01–06, config, script, prompt `native_v2`, dữ liệu `prepared/apps`. Tất cả vẫn lấy lại được ở tag `archive/pre-v3-2026-11-13` và trong `~/TLCN_archive_pre_v3/`. Nguồn số liệu duy nhất là [BENCHMARK_LEDGER.md](../results/BENCHMARK_LEDGER.md) cùng `docs/results/v3/`.
+2. **RQ5 chỉ còn ở dạng mô tả:** các lỗi của cài đặt cũ và cách v3 sửa. Không dùng số liệu v1. Bỏ phụ lục A và mục tham khảo 14B/7B trong khung báo cáo.
+3. **Bỏ E7 (14B theo v3).** Ba model 7–9B là phạm vi duy nhất.
+4. **MCTS APPS của Qwen3.5-9B chạy tiếp trên Colab** từ bản lưu 116/300 khi Colab ổn định, thay vì chạy lại từ đầu trên Modal. Các run Qwen3.5 khác chạy trên Modal (D-008, ledger mục 12).

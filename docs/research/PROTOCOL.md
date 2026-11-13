@@ -1,5 +1,7 @@
 # Nền thực nghiệm và protocol feedback-selection-v0
 
+> **Ghi chú 13/11/2026:** mục 1–7 mô tả protocol v2 (lịch sử; config và run của nó đã lưu trữ ở tag `archive/pre-v3-2026-11-13`). Protocol hiện hành là **v3.1, mục 8**.
+
 Trạng thái: thiết kế và kiểm chứng chức năng offline. Không có kết quả LLM mới. Phiên bản artifact mới là schema 2; bảng cũ trong `results/` thuộc exploratory protocol trước sửa.
 
 ## 1. Biến nghiên cứu

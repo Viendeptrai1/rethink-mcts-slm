@@ -11,7 +11,7 @@ Cập nhật lần cuối: 13/11/2026. Đã xong E1–E4 cho `qwen25c7b` và `se
 - Trạng thái: `⏳` chưa chạy · `▶` đang chạy · `✅` xong và đã đối chiếu artifact · `⚠️` xong nhưng có vấn đề (ghi chú) · `✗` hủy.
 - **Pass@1 (hidden):** tỷ lệ bài mà chương trình được chọn pass toàn bộ hidden test, mẫu số là cả cohort (bài lỗi hoặc không có candidate tính 0). **Pass rate:** trung bình theo bài của tỷ lệ hidden test pass.
 - Số liệu v3 lấy bằng `scripts/pilot_report.py` (search, chi phí) và [analyze_v3.py](../../scripts/analyze_v3.py) (phân tích ghép cặp, chọn lại offline, Best-of-k).
-- Tên ngắn của model: `qwen25c7b` = Qwen2.5-Coder-7B-Instruct · `seedcoder8b` = Seed-Coder-8B-Instruct · `qwen35_9b` = Qwen3.5-9B (tắt thinking) · `granite42_8b` = Granite-4.2-8B (dự phòng) · `qwen25c14b` = Qwen2.5-Coder-14B-Instruct.
+- Tên ngắn của model: `qwen25c7b` = Qwen2.5-Coder-7B-Instruct · `seedcoder8b` = Seed-Coder-8B-Instruct · `qwen35_9b` = Qwen3.5-9B (tắt thinking) · `granite42_8b` = Granite-4.2-8B (dự phòng).
 
 ---
 
@@ -37,7 +37,6 @@ Thư mục run đặt theo mẫu `runs/v3_<dataset>_<model>_<method>`. Commit, G
 | E3 | `v3_humaneval_{qwen25c7b,seedcoder8b,qwen35_9b}_bon16` | 3 model | HE-164 | Best-of-16 | `humaneval_baseline.yaml` | `d9666c4` | Colab A100-SXM4-40GB | 0.31.0 | 16 | 13/11/2026 | ✅ qwen25c7b, seedcoder8b · ⏳ qwen35_9b |
 | E5 | `v3_apps_qwen25c7b_norethink` | qwen25c7b | APPS (300 hoặc 150) | MCTS, `max_rethinks_per_node=0` | `apps_mcts.yaml` | — | — | — | — | — | ⏳ (nếu còn tiền) |
 | E6 | `v3_apps_qwen25c7b_factsonly` | qwen25c7b | APPS (300 hoặc 150) | MCTS, `feedback.mode=facts_only` | `apps_mcts.yaml` | — | — | — | — | — | ⏳ (nếu còn tiền) |
-| E7 | `v3_apps_qwen25c14b_mcts` | qwen25c14b | APPS-300 | MCTS | `apps_mcts.yaml` | — | — | — | — | — | ⏳ (nếu còn tiền) |
 
 Best-of-16 chạy với `--set sampling.code.temperature=0.8 --set sampling.code.top_p=0.95`. Nếu đổi giá trị này, ghi vào cột Config.
 

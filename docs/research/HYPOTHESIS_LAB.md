@@ -1,5 +1,7 @@
 # Giả thuyết — chưa được chứng minh
 
+> **Ghi chú 13/11/2026:** các giả thuyết dưới đây được viết trước protocol v3 (khi còn dự định 3B/7B/14B). Câu hỏi và giả thuyết hiện hành ở [KHUNG_BAO_CAO_v2.md](../report/KHUNG_BAO_CAO_v2.md) mục RQ1–RQ5.
+
 ## H-001 — Mức feedback và loại lỗi
 
 **RQ1:** Ở mô hình sinh mã 3B/7B/14B, facts, runtime trace và trace kèm phân tích LLM khác nhau thế nào về tỷ lệ sửa đúng, regression và chi phí, khi giữ nguyên pipeline và ngân sách?
