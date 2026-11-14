@@ -51,8 +51,10 @@ def vn(x, nd=1):
 
 
 def save(fig, name, source, note=None):
-    text = (note + '\n' if note else '') + f'Nguồn: {source}'
-    fig.text(0.01, -0.01, text, fontsize=7, color=MUTED, ha='left', va='top', linespacing=1.5)
+    # `source` documents which artifact each figure is built from; it is not printed on the figure
+    # (the report keeps sources out of the rendered text). `note` explains how to read the figure.
+    if note:
+        fig.text(0.01, -0.01, note, fontsize=7, color=MUTED, ha='left', va='top', linespacing=1.5)
     OUT.mkdir(parents=True, exist_ok=True)
     for ext in ('pdf', 'png'):
         fig.savefig(OUT / f'{name}.{ext}', bbox_inches='tight', pad_inches=0.08)
@@ -66,14 +68,18 @@ def method_legend(ax_or_fig, **kw):
     return ax_or_fig.legend(handles=handles, **kw)
 
 
-def run_usage(run):
-    """Per-problem usage dicts of one run (null token counts are treated as missing, i.e. 0)."""
-    return [json.loads(Path(f).read_text())['usage'] for f in glob.glob(str(ROOT / 'runs' / run / 'problems/*/completed.json'))]
-
-
-def mean_tokens(run):
-    us = run_usage(run)
-    return sum((u.get('input_tokens') or 0) + (u.get('output_tokens') or 0) for u in us) / len(us)
+def role_tokens(run):
+    """Mean tokens per problem by role and kind, summed from the per-request log (usage.json keeps a null
+    role total when one call of that role lacks a count; the request log still has the other calls)."""
+    probs = glob.glob(str(ROOT / 'runs' / run / 'problems/*/requests.json'))
+    acc = {}
+    for f in probs:
+        for q in json.loads(Path(f).read_text()):
+            r = (q.get('response') or {})
+            role = q['request']['role']
+            acc[(role, 'input')] = acc.get((role, 'input'), 0) + (r.get('prompt_tokens') or 0)
+            acc[(role, 'output')] = acc.get((role, 'output'), 0) + (r.get('completion_tokens') or 0)
+    return {k: v / len(probs) for k, v in acc.items()}
 
 
 # ---------------------------------------------------------------------------------------------- H1
@@ -150,7 +156,7 @@ def h3_cost_curve(A):
             ax = axes[r][c]
             cell = A[f'{mk}/{ds}']
             n = cell['n']
-            t = {m: mean_tokens(f'v3_{ds}_{mk}_{m}') for m, _ in METHODS}
+            t = {m: cell['methods'][m]['cost']['input_tokens'] + cell['methods'][m]['cost']['output_tokens'] for m, _ in METHODS}
             ks = sorted(int(k) for k in cell['best_of_k'])
             # Samples are i.i.d., so the expected cost of the first k samples is k/16 of the Best-of-16 cost.
             xs = [t['bon16'] * k / 16 for k in ks]
@@ -159,9 +165,17 @@ def h3_cost_curve(A):
             mk_idx = [k - 1 for k in (1, 2, 4, 8, 16)]
             ax.plot([xs[i] for i in mk_idx], [ys[i] for i in mk_idx], color=COLOR['bon16'], marker='o', markersize=4,
                     markeredgecolor=SURFACE, markeredgewidth=0.8, linestyle='')
-            for k in (1, 16):
-                ax.annotate(f'k={k}', (xs[k - 1], ys[k - 1]), xytext=(6, -10) if k == 1 else (0, 6),
-                            textcoords='offset points', fontsize=7, color=INK2, ha='left' if k == 1 else 'center')
+            # Only k=1 is labelled: the right end of each curve is k=16 (stated in the legend).
+            ax.annotate('k=1', (xs[0], ys[0]), xytext=(6, -10), textcoords='offset points', fontsize=7, color=INK2)
+            # MCTS@k: the run truncated after k rollouts (offline, analysis_v3.py), local re-judge.
+            at = cell.get('mcts_at_k')
+            if at:
+                mx = [at[str(k)]['mean_tokens'] for k in ks]
+                my = [100 * at[str(k)]['passed'] / n for k in ks]
+                ax.plot(mx, my, color=COLOR['mcts'], linewidth=1.8)
+                ax.plot([mx[i] for i in mk_idx], [my[i] for i in mk_idx], color=COLOR['mcts'], marker='D', markersize=3.6,
+                        markeredgecolor=SURFACE, markeredgewidth=0.8, linestyle='')
+                ax.annotate('k=1', (mx[0], my[0]), xytext=(6, -10), textcoords='offset points', fontsize=7, color=INK2)
             for m in ('direct', 'mcts'):
                 ax.plot(t[m], 100 * cell['methods'][m]['rate'], marker=MARKER[m], color=COLOR[m], markersize=7,
                         markeredgecolor=SURFACE, markeredgewidth=1.0, linestyle='')
@@ -177,7 +191,7 @@ def h3_cost_curve(A):
             ax.xaxis.set_major_formatter(matplotlib.ticker.FuncFormatter(
                 lambda v, _: f'{int(v / 1000)}k' if v >= 1000 else f'{int(v)}'))
             ax.xaxis.set_minor_formatter(matplotlib.ticker.NullFormatter())
-            ax.set_xlim(t['direct'] / 1.8, t['mcts'] * 1.8)
+            ax.set_xlim(min(t['direct'], at['1']['mean_tokens'] if at else t['direct']) / 1.8, t['mcts'] * 1.8)
     for r in range(2):
         lo = min(axes[r][c].get_ylim()[0] for c in range(3))
         hi = max(axes[r][c].get_ylim()[1] for c in range(3))
@@ -185,12 +199,14 @@ def h3_cost_curve(A):
             axes[r][c].set_ylim(lo - 5, hi + 3)
     handles = [Line2D([], [], color=COLOR['direct'], marker=MARKER['direct'], linestyle='', markersize=6, label='Direct'),
                Line2D([], [], color=COLOR['bon16'], marker='o', markersize=3.5, linewidth=1.8, label='Best-of-k (k = 1…16)'),
-               Line2D([], [], color=COLOR['mcts'], marker=MARKER['mcts'], linestyle='', markersize=6, label='RethinkMCTS')]
-    fig.legend(handles=handles, loc='upper center', ncol=3, bbox_to_anchor=(0.5, 1.04))
+               Line2D([], [], color=COLOR['mcts'], marker='D', markersize=3.5, linewidth=1.8, label='RethinkMCTS sau k rollout'),
+               Line2D([], [], color=COLOR['mcts'], marker=MARKER['mcts'], linestyle='', markersize=6, label='RethinkMCTS (16 rollout)')]
+    fig.legend(handles=handles, loc='upper center', ncol=2, bbox_to_anchor=(0.5, 1.07))
     fig.tight_layout()
     save(fig, 'H3_cost_vs_pass', 'analysis_v3_3models.json (best_of_k, methods); runs/v3_*/problems/*/completed.json (usage)',
-         'Best-of-k: chọn theo public test trong k mẫu đầu, chấm lại hidden trên máy local; token = k/16 token của Best-of-16. '
-         'Token = input + output trung bình mỗi bài.')
+         'Best-of-k: chọn theo public test trong k mẫu đầu; token = k/16 token của Best-of-16. RethinkMCTS sau k rollout: '
+         'cắt lần chạy sau rollout thứ k, chọn như lần chạy đầy đủ.\nCác đường chấm lại hidden trên máy local; hai điểm Direct '
+         'và RethinkMCTS (16 rollout) là kết quả chính thức. Token = input + output trung bình mỗi bài.')
 
 
 # ---------------------------------------------------------------------------------------------- H4
@@ -252,12 +268,12 @@ def h6_tokens_by_role():
     labels = []
     for ax, (ds, dsl) in zip(axes, DATASETS):
         for i, (mk, ml) in enumerate(MODELS):
-            us = run_usage(f'v3_{ds}_{mk}_mcts')
+            rt = role_tokens(f'v3_{ds}_{mk}_mcts')
             for j, kind in enumerate(('input', 'output')):
                 y = (len(MODELS) - 1 - i) * 2.6 + (0.55 if kind == 'input' else -0.55)
                 left = 0
                 for role, _ in ROLES:
-                    v = sum((((u.get('tokens_by_role') or {}).get(role) or {}).get(kind) or 0) for u in us) / len(us) / 1000
+                    v = rt.get((role, kind), 0) / 1000
                     if v > 0:
                         ax.barh(y, v, left=left, height=0.9, color=ROLE_COLOR[role], edgecolor=SURFACE, linewidth=1.0)
                     left += v
@@ -274,7 +290,7 @@ def h6_tokens_by_role():
     handles = [plt.Rectangle((0, 0), 1, 1, color=ROLE_COLOR[r], label=l) for r, l in ROLES]
     fig.legend(handles=handles, loc='upper center', ncol=5, bbox_to_anchor=(0.5, 1.07), fontsize=8)
     fig.tight_layout()
-    save(fig, 'H6_mcts_tokens_by_role', 'runs/v3_*_mcts/problems/*/completed.json (usage.tokens_by_role); số liệu dạng bảng ở ledger mục 5.1')
+    save(fig, 'H6_mcts_tokens_by_role', 'runs/v3_*_mcts/problems/*/requests.json (tokens per request, by role)')
 
 
 def main():

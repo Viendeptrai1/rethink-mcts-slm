@@ -13,6 +13,9 @@ For every model x dataset with all three methods complete (Direct, Best-of-16, R
        one is selected: the counterfactual is exact up to vLLM nondeterminism.
      - Best-of-k for k = 1..16 from the 16 stored samples (same selection rule as the run:
        max public pass rate, ties to the earliest sample).
+     - MCTS: Pass@1 per APPS difficulty, and the hidden pass rate, with and without the critic.
+     - MCTS early stop at the first all-public-pass program: Pass@1 (= without the critic) and tokens saved.
+     - MCTS@k for k = 1..16: the run truncated after k rollouts, with its tokens (see request_timeline).
 Local re-judging is cached in --cache; agreement with the VM verdict of the selected code is reported.
 
 usage: python3 scripts/analyze_v3.py --models qwen25c7b seedcoder8b [--json out.json] [--no-offline]
@@ -98,20 +101,30 @@ class LocalJudge:
         self.cache_path = cache_path
         self.cache = json.loads(cache_path.read_text()) if cache_path.exists() else {}
 
-    def verdict(self, pid, code, code_hash):
+    def _judge(self, pid, code, code_hash):
         from rethink_mcts.adapters.datasets.jsonl import parse_case_dict
         from rethink_mcts.domain.candidate import ProgramCandidate
         from rethink_mcts.domain.problem import HiddenProblem, HiddenSuite, JudgeSpec, ExecutionSpec
+        raw = json.loads((DATASETS[self.ds] / 'judge/suites' / f'{pid}.json').read_text())
+        s = raw['hidden_suite']
+        hp = HiddenProblem(pid, HiddenSuite(tuple(parse_case_dict(c) for c in s['cases']), s.get('suite_id', 'hidden'), ()),
+                           JudgeSpec(**raw.get('judge_spec', {})))
+        sd = self.meta[pid]['execution_spec']
+        spec = ExecutionSpec(**{k: v for k, v in sd.items() if k in ExecutionSpec.__dataclass_fields__})
+        r = self.judge.judge(ProgramCandidate('offline', pid, code, code_hash), hp, execution_spec=spec)
+        return dict(passed=r.all_hidden_passed, rate=r.hidden_pass_rate)
+
+    def result(self, pid, code, code_hash, need_rate=False):
+        """Cached {'passed', 'rate'}. Older cache entries hold only the boolean verdict; they are re-judged
+        when the pass rate is needed."""
         key = f'{self.ds}/{pid}/{code_hash}'
-        if key not in self.cache:
-            raw = json.loads((DATASETS[self.ds] / 'judge/suites' / f'{pid}.json').read_text())
-            s = raw['hidden_suite']
-            hp = HiddenProblem(pid, HiddenSuite(tuple(parse_case_dict(c) for c in s['cases']), s.get('suite_id', 'hidden'), ()),
-                               JudgeSpec(**raw.get('judge_spec', {})))
-            sd = self.meta[pid]['execution_spec']
-            spec = ExecutionSpec(**{k: v for k, v in sd.items() if k in ExecutionSpec.__dataclass_fields__})
-            self.cache[key] = self.judge.judge(ProgramCandidate('offline', pid, code, code_hash), hp, execution_spec=spec).all_hidden_passed
-        return self.cache[key]
+        cached = self.cache.get(key)
+        if cached is None or (need_rate and not isinstance(cached, dict)):
+            self.cache[key] = cached = self._judge(pid, code, code_hash)
+        return cached if isinstance(cached, dict) else dict(passed=cached, rate=None)
+
+    def verdict(self, pid, code, code_hash):
+        return self.result(pid, code, code_hash)['passed']
 
     def save(self):
         self.cache_path.write_text(json.dumps(self.cache))
@@ -125,7 +138,42 @@ def problem_files(run, pid):
     return pdir, cands, evals, sel
 
 
-def offline_mcts(run, pids, judge):
+def request_timeline(pdir, cands):
+    """Aligns the logged model requests of one MCTS problem with its candidates.
+
+    Every `code` request yields exactly one candidate, in creation order (checked on all six MCTS runs:
+    the i-th code request has the origin of the i-th candidate). A code request is a rethink revision when
+    it directly follows a rethink request that finished normally; otherwise it starts a new rollout.
+    Returns per-request token counts, the request index of each candidate, the rollout of each candidate,
+    and, for each rollout k, the index of the first request that belongs to rollout k+1 (the expansion
+    requests directly before a rollout's first code request belong to that rollout)."""
+    reqs = json.loads((pdir / 'requests.json').read_text())
+    tok = [((q.get('response') or {}).get('prompt_tokens') or 0, (q.get('response') or {}).get('completion_tokens') or 0) for q in reqs]
+    code_idx, kinds = [], []
+    for i, q in enumerate(reqs):
+        if q['request']['role'] != 'code':
+            continue
+        prev = reqs[i - 1] if i else None
+        ok = prev is not None and prev['request']['role'] == 'rethink' and (prev.get('response') or {}).get('finish_reason') == 'stop' and not prev.get('error')
+        code_idx.append(i)
+        kinds.append('rethink' if ok else 'initial')
+    order = sorted(cands, key=lambda c: cands[c]['created_sequence'])
+    if len(order) != len(code_idx) or any(k != cands[c]['origin'] for k, c in zip(kinds, order)):
+        raise ValueError(f'{pdir}: requests and candidates are not aligned')
+    cand_req, cand_roll, starts, r = {}, {}, [], 0
+    for c, i, k in zip(order, code_idx, kinds):
+        if k == 'initial':
+            r += 1
+            s = i
+            while s > 0 and reqs[s - 1]['request']['role'] == 'expansion':
+                s -= 1
+            starts.append(s)
+        cand_req[c], cand_roll[c] = i, r
+    ends = {k: (starts[k] if k < len(starts) else len(reqs)) for k in range(1, len(starts) + 1)}  # exclusive end of rollout k
+    return tok, cand_req, cand_roll, ends
+
+
+def offline_mcts(run, pids, judge, vm_recs, kmax=16):
     out = {}
 
     def one(pid):
@@ -137,8 +185,39 @@ def offline_mcts(run, pids, judge):
                          key=lambda c: cands[c]['created_sequence'])
         nocrit = passing[0] if passing else sel
         v = lambda c: judge.verdict(pid, cands[c]['code'], cands[c]['code_hash']) if c else False
-        return pid, dict(first=v(first), no_critic=v(nocrit), selected=v(sel), any_public_pass=bool(passing),
-                         n_public_pass_codes=len({cands[c]['code_hash'] for c in passing}))
+        row = dict(first=v(first), no_critic=v(nocrit), selected=v(sel), any_public_pass=bool(passing),
+                   n_public_pass_codes=len({cands[c]['code_hash'] for c in passing}), no_critic_same=(nocrit == sel))
+        # Hidden pass rate without the critic: the VM rate of the selected program when both rules pick it,
+        # otherwise the locally re-judged rate of the earliest public-passing program.
+        vm_rate = vm_recs[pid].get('hidden_pass_rate') or 0.0
+        row['rate_selected_vm'] = vm_rate
+        row['rate_no_critic'] = vm_rate if nocrit == sel else (
+            judge.result(pid, cands[nocrit]['code'], cands[nocrit]['code_hash'], need_rate=True)['rate'] if nocrit else 0.0)
+        tok, cand_req, cand_roll, ends = request_timeline(pdir, cands)
+        total = (sum(t[0] for t in tok), sum(t[1] for t in tok), len(tok))
+        row['tokens_full'] = total
+        # Early stop at the first all-public-pass program: everything after its code request is skipped
+        # (including the critic call on it). Without such a program the run is unchanged.
+        if passing:
+            j = cand_req[passing[0]] + 1
+            row['tokens_early'] = (sum(t[0] for t in tok[:j]), sum(t[1] for t in tok[:j]), j)
+        else:
+            row['tokens_early'] = total
+        # MCTS@k: the run truncated after k rollouts (the search is sequential and P-UCB does not depend on
+        # the total budget, so this is what a k-rollout run would have done, up to vLLM nondeterminism),
+        # with the run's final selection rule (max reward, ties to the earliest program).
+        reward = {e['candidate_id']: e['reward'] for e in evals if e.get('reward') is not None}
+        n_roll = len(ends)
+        row['at_k'] = {}
+        for k in range(1, kmax + 1):
+            kk = min(k, n_roll)
+            pool = [c for c in cands if cand_roll[c] <= kk and c in reward]
+            best = max(pool, key=lambda c: (reward[c], -cands[c]['created_sequence'])) if pool else None
+            end = ends[kk] if kk else len(tok)
+            row['at_k'][k] = dict(passed=v(best), tokens=sum(t[0] + t[1] for t in tok[:end]))
+            if k == kmax:
+                row['at_k_matches_selected'] = (best == sel)
+        return pid, row
 
     with ThreadPoolExecutor(4) as ex:
         for pid, row in ex.map(one, pids):
@@ -167,14 +246,31 @@ def offline_bok(run, pids, judge, kmax=16):
     return out
 
 
-def cost(recs):
+def problem_tokens(run, rec):
+    """(input, output) tokens of one problem. When one call lacks a token count, usage.json stores null for
+    the whole problem's totals; the per-request log still has every other call, so it is summed instead
+    (the calls without a count add nothing). Falls back to 0 when the request log is not extracted."""
+    u = rec.get('usage') or {}
+    if u.get('input_tokens') is not None and u.get('output_tokens') is not None:
+        return u['input_tokens'], u['output_tokens'], True
+    f = run / 'problems' / rec['problem_id'] / 'requests.json'
+    if not f.exists():
+        return u.get('input_tokens') or 0, u.get('output_tokens') or 0, False
+    reqs = json.loads(f.read_text())
+    return (sum((q.get('response') or {}).get('prompt_tokens') or 0 for q in reqs),
+            sum((q.get('response') or {}).get('completion_tokens') or 0 for q in reqs), False)
+
+
+def cost(run, recs):
     n = len(recs)
     g = lambda key: sum((r.get('usage') or {}).get(key) or 0 for r in recs.values()) / n
     solved = sum(r.get('all_hidden_passed', False) for r in recs.values())
-    tot = sum(((r.get('usage') or {}).get('total_tokens') or 0) for r in recs.values())
+    toks = [problem_tokens(run, r) for r in recs.values()]
+    tot = sum(i + o for i, o, _ in toks)
     return dict(calls=g('total_model_calls'), code_generations=g('code_generation_attempts'),
-                input_tokens=g('input_tokens'), output_tokens=g('output_tokens'),
-                tokens_per_solved=(tot / solved if solved else None))
+                input_tokens=sum(i for i, _, _ in toks) / n, output_tokens=sum(o for _, o, _ in toks) / n,
+                tokens_per_solved=(tot / solved if solved else None),
+                problems_with_incomplete_token_usage=sum(not ok for *_, ok in toks))
 
 
 def main():
@@ -182,7 +278,9 @@ def main():
     ap.add_argument('--models', nargs='+', required=True)
     ap.add_argument('--datasets', nargs='+', default=['apps', 'humaneval'])
     ap.add_argument('--json', default=None)
-    ap.add_argument('--cache', default=str(ROOT / 'docs/results/v3_offline_judge_cache.json'))
+    # Local re-judge cache, one file per dataset (<stem>_<dataset>.json); committed so that every analysis
+    # uses the same verdicts.
+    ap.add_argument('--cache', default=str(ROOT / 'docs/results/v3/judge_cache.json'))
     ap.add_argument('--no-offline', action='store_true')
     args = ap.parse_args()
 
@@ -202,7 +300,7 @@ def main():
                 k = sum(recs[i].get('all_hidden_passed', False) for i in ids)
                 lo, hi = wilson(k, len(ids))
                 cell['methods'][m] = dict(passed=k, rate=k / len(ids), wilson95=[lo, hi],
-                                          errors=summ.get('error_problems'), cost=cost({i: recs[i] for i in ids}))
+                                          errors=summ.get('error_problems'), cost=cost(run, {i: recs[i] for i in ids}))
             if ds == 'apps':
                 for d in ['introductory', 'interview', 'competition']:
                     sub = [i for i in ids if meta[i]['metadata']['difficulty'] == d]
@@ -218,8 +316,9 @@ def main():
                 cell['comparisons'][f'{b}_vs_{a}'] = dict(wins=w, losses=l, p=p, diff=(sum(B) - sum(A)) / len(ids), boot95=[lo, hi])
                 family.append((model, ds, f'{b}_vs_{a}', p))
             if not args.no_offline:
+                print(f'[analyze_v3] offline {model}/{ds}', file=sys.stderr, flush=True)
                 judge = LocalJudge(ds, Path(args.cache).with_name(Path(args.cache).stem + f'_{ds}.json'))
-                om = offline_mcts(runs['mcts'][0], ids, judge) if 'mcts' in runs else None
+                om = offline_mcts(runs['mcts'][0], ids, judge, runs['mcts'][1]) if 'mcts' in runs else None
                 ob = offline_bok(runs['bon16'][0], ids, judge) if 'bon16' in runs else None
                 judge.save()
             if not args.no_offline and om is not None:
@@ -230,7 +329,29 @@ def main():
                     local_vm_agreement=sum(om[i]['selected'] == vm[i] for i in ids),
                     critic_vs_no_critic=dict(zip(['wins', 'losses', 'p'], mcnemar_exact([om[i]['no_critic'] for i in ids], [om[i]['selected'] for i in ids]))),
                     search_vs_first_program=dict(zip(['wins', 'losses', 'p'], mcnemar_exact([om[i]['first'] for i in ids], [om[i]['no_critic'] for i in ids]))),
-                    problems_with_public_pass=sum(om[i]['any_public_pass'] for i in ids))
+                    problems_with_public_pass=sum(om[i]['any_public_pass'] for i in ids),
+                    no_critic_same_program=sum(om[i]['no_critic_same'] for i in ids),
+                    pass_rate=dict(selected_vm=sum(om[i]['rate_selected_vm'] for i in ids) / len(ids),
+                                   no_critic=sum(om[i]['rate_no_critic'] for i in ids) / len(ids)))
+                if ds == 'apps':
+                    cell['offline_mcts']['by_difficulty'] = {
+                        d: {k: sum(om[i][src] for i in ids if meta[i]['metadata']['difficulty'] == d)
+                            for k, src in [('first_program', 'first'), ('no_critic', 'no_critic'), ('selected_local', 'selected')]}
+                        for d in ['introductory', 'interview', 'competition']}
+                full = [om[i]['tokens_full'] for i in ids]
+                early = [om[i]['tokens_early'] for i in ids]
+                mean = lambda xs, j: sum(x[j] for x in xs) / len(xs)
+                tf, te = sum(x[0] + x[1] for x in full), sum(x[0] + x[1] for x in early)
+                cell['early_stop'] = dict(
+                    passed_local=sum(om[i]['no_critic'] for i in ids),
+                    full=dict(input_tokens=mean(full, 0), output_tokens=mean(full, 1), calls=mean(full, 2)),
+                    early=dict(input_tokens=mean(early, 0), output_tokens=mean(early, 1), calls=mean(early, 2)),
+                    tokens_saved_pct=100 * (1 - te / tf) if tf else None,
+                    problems_stopped_early=sum(om[i]['any_public_pass'] for i in ids))
+                cell['mcts_at_k'] = {k: dict(passed=sum(om[i]['at_k'][k]['passed'] for i in ids),
+                                             mean_tokens=sum(om[i]['at_k'][k]['tokens'] for i in ids) / len(ids))
+                                     for k in range(1, 17)}
+                cell['mcts_at_k_matches_selected_k16'] = sum(bool(om[i].get('at_k_matches_selected')) for i in ids)
             if not args.no_offline and ob is not None:
                 vb = {i: runs['bon16'][1][i].get('all_hidden_passed', False) for i in ids}
                 cell['best_of_k'] = {k: sum(ob[i][k] for i in ids) for k in range(1, 17)}

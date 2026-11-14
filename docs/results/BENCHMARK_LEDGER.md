@@ -2,7 +2,7 @@
 
 Bảng ghi chép **mọi** thứ của các đợt chạy benchmark: run nào, cấu hình gì, chạy ở đâu, kết quả, chi phí và độ "khỏe" của search. Khung báo cáo: [KHUNG_BAO_CAO_v2.md](../report/KHUNG_BAO_CAO_v2.md). Cấu hình v3: [configs/v3_7b/README.md](../../configs/v3_7b/README.md).
 
-Cập nhật lần cuối: 14/11/2026. Đã xong E1–E4 cho cả ba model (18 run). Với `qwen35_9b`: 5 run chạy trên Modal, MCTS APPS chạy trên Colab (mục 1, mục 12); các ô APPS có cảnh báo output bị cắt (mục 6.1).
+Cập nhật lần cuối: 14/11/2026. Đã xong E1–E4 cho cả ba model (18 run) và các phân tích offline (critic theo mức khó, dừng sớm, MCTS@k; mục 8–10). Với `qwen35_9b`: 5 run chạy trên Modal, MCTS APPS chạy trên Colab (mục 1, mục 12); các ô APPS có cảnh báo output bị cắt (mục 6.1).
 
 ## Quy ước
 
@@ -111,16 +111,18 @@ Token lấy từ `usage.json` (vLLM báo, không ước lượng). GPU-giây l�
 | qwen25c7b | HE | RethinkMCTS | 26.130 | 4.581 | 47.1 | 79 | 383 | — | — | — | `runs/v3_humaneval_qwen25c7b_mcts` |
 | seedcoder8b | APPS | Direct | 681 | 339 | 1.0 | 12 | 71 | — | — | — | `runs/v3_apps_seedcoder8b_direct` |
 | seedcoder8b | APPS | Best-of-16 | 10.898 | 5.006 | 16.0 | 159 | 1013 | — | — | — | `runs/v3_apps_seedcoder8b_bon16` |
-| seedcoder8b | APPS | RethinkMCTS | 150.357 | 20.898 | 69.4 | 600 | 1620 | — | — | — | `runs/v3_apps_seedcoder8b_mcts` |
+| seedcoder8b | APPS | RethinkMCTS | 150.860 | 20.955 | 69.4 | 600 | 1620 | — | — | — | `runs/v3_apps_seedcoder8b_mcts` |
 | seedcoder8b | HE | Direct | 309 | 75 | 1.0 | 1 | 6 | — | — | — | `runs/v3_humaneval_seedcoder8b_direct` |
 | seedcoder8b | HE | Best-of-16 | 4.942 | 1.298 | 16.0 | 20 | 66 | — | — | — | `runs/v3_humaneval_seedcoder8b_bon16` |
 | seedcoder8b | HE | RethinkMCTS | 24.274 | 3.818 | 43.7 | 76 | 404 | — | — | — | `runs/v3_humaneval_seedcoder8b_mcts` |
 | qwen35_9b | APPS | Direct | 626 | 1.813 | 1.0 | 30 | 70 | — | — | — | `runs/v3_apps_qwen35_9b_direct` |
 | qwen35_9b | APPS | Best-of-16 | 10.012 | 30.673 | 16.0 | 508 | 1100 | — | — | — | `runs/v3_apps_qwen35_9b_bon16` |
-| qwen35_9b | APPS | RethinkMCTS | 110.003 | 49.484 | 53.6 | 972 | 2860 | — | — | — | `runs/v3_apps_qwen35_9b_mcts` |
+| qwen35_9b | APPS | RethinkMCTS | 112.692 | 49.944 | 53.6 | 972 | 2860 | — | — | — | `runs/v3_apps_qwen35_9b_mcts` |
 | qwen35_9b | HE | Direct | 249 | 194 | 1.0 | 3 | 53 | — | — | — | `runs/v3_humaneval_qwen35_9b_direct` |
 | qwen35_9b | HE | Best-of-16 | 3.978 | 3.133 | 16.0 | 55 | 620 | — | — | — | `runs/v3_humaneval_qwen35_9b_bon16` |
 | qwen35_9b | HE | RethinkMCTS | 21.967 | 6.149 | 41.9 | 121 | 756 | — | — | — | `runs/v3_humaneval_qwen35_9b_mcts` |
+
+**Token của bài có lời gọi thiếu số đếm:** 4 bài MCTS APPS (`seedcoder8b`: `apps_4181`; `qwen35_9b`: `apps_3013`, `apps_3869`, `apps_624`) có một lời gọi `block_analysis` không có số token, nên `usage.json` ghi null cho tổng token của cả bài. Từ 14/11/2026, token của các bài này được cộng từ log từng request (`requests.json`, mọi lời gọi khác đều có số), thay vì tính 0 hoặc bỏ bài. Vì vậy hai dòng trên tăng so với bản trước (150.357 / 20.898 và 110.003 / 49.484); các phân tích và hình đều dùng số mới.
 
 **GPU-giây và chi phí từng run để trống:** đợt chạy 12–13/11 bị Colab thu hồi máy nhiều lần, các run chạy chen nhau và chạy lại từ bản lưu, nên không tách được thời gian GPU theo run. Tổng cả đợt (gồm phần Qwen3.5 dở và các lần mất máy): 200 → 77,5 CU = **122,5 CU** (A100 6,73 CU/giờ). Wall là thời gian giải một bài với 16 bài chạy song song trên một GPU, không phải GPU-giây. So sánh chi phí giữa các phương pháp dùng token (cột input/output), vì cùng model và cùng GPU. Với `qwen35_9b`, 5 run trên Modal chạy liên tiếp trong một container, nên cũng không tách GPU-giây theo run; trang billing Modal ghi khoảng 30,4 USD cho cả đợt (gồm các lần khởi động lỗi và lần bị hủy lúc 17:28). MCTS APPS của `qwen35_9b` trên Colab, tối 13/11 đến sáng 14/11: 66,43 → 30,52 CU = **35,9 CU** (gồm một lần mất máy sau 27 phút và khoảng 25 phút máy chạy không sau khi xong, do `watch_ls.sh` bị treo). Output token của `qwen35_9b` trên APPS cao hơn hai model kia nhiều (Direct 1.813 so với 252–339) vì model viết lập luận dài trong comment của code (mục 6.1).
 
@@ -130,9 +132,9 @@ Token lấy từ `usage.json` (vLLM báo, không ước lượng). GPU-giây l�
 |---|---|---|---|---|---|---|---|---|
 | qwen25c7b | APPS | 4,3M / 0,30M | 6,6M / 2,31M | 10,2M / 0,32M | 0,9M / 0,06M | 26,4M / 2,50M | 48,4M / 5,49M | `runs/v3_apps_qwen25c7b_mcts` |
 | qwen25c7b | HE | 0,5M / 0,16M | 1,0M / 0,25M | 0,6M / 0,03M | 1,0M / 0,11M | 1,2M / 0,20M | 4,3M / 0,75M | `runs/v3_humaneval_qwen25c7b_mcts` |
-| seedcoder8b | APPS | 4,0M / 0,24M | 6,9M / 2,86M | 9,8M / 0,28M | 1,3M / 0,07M | 23,2M / 2,81M | 45,2M / 6,28M | `runs/v3_apps_seedcoder8b_mcts` |
+| seedcoder8b | APPS | 4,0M / 0,24M | 6,9M / 2,86M | 9,8M / 0,28M | 1,3M / 0,07M | 23,3M / 2,82M | 45,3M / 6,29M | `runs/v3_apps_seedcoder8b_mcts` |
 | seedcoder8b | HE | 0,6M / 0,11M | 1,0M / 0,26M | 0,4M / 0,02M | 1,1M / 0,10M | 0,8M / 0,13M | 4,0M / 0,63M | `runs/v3_humaneval_seedcoder8b_mcts` |
-| qwen35_9b | APPS | 3,1M / 0,83M | 5,4M / 11,59M | 6,0M / 0,28M | 4,1M / 0,19M | 14,4M / 2,04M | 33,0M / 14,93M (thiếu số của 3 lời gọi `block_analysis`) | `runs/v3_apps_qwen35_9b_mcts` |
+| qwen35_9b | APPS | 3,1M / 0,83M | 5,4M / 11,59M | 6,0M / 0,28M | 4,1M / 0,19M | 15,2M / 2,10M | 33,8M / 14,98M (thiếu số của 3 lời gọi `block_analysis`) | `runs/v3_apps_qwen35_9b_mcts` |
 | qwen35_9b | HE | 0,5M / 0,20M | 0,9M / 0,50M | 0,3M / 0,01M | 1,3M / 0,14M | 0,5M / 0,16M | 3,6M / 1,01M | `runs/v3_humaneval_qwen35_9b_mcts` |
 
 ## 6. Độ "khỏe" của search (RethinkMCTS, v3)
@@ -183,37 +185,70 @@ Cùng một cây search, chỉ đổi cách chọn chương trình cuối: max r
 | qwen35_9b | APPS | 212 | 64,7 | 65,0 | 1 / 2 | 1 | [analysis](v3/analysis_v3_3models.json) |
 | qwen35_9b | HE | 162 | 94,5 | 93,9 | 3 / 2 | 1 | [analysis](v3/analysis_v3_3models.json) |
 
+Theo mức khó (APPS, số bài pass /100 mỗi mức, **Dual / Test-only**, chấm lại local):
+
+| Model | Introductory | Interview | Competition | Tổng /300 | Nguồn |
+|---|---|---|---|---|---|
+| qwen25c7b | 49 / 47 | 26 / 24 | 12 / 11 | 87 / 82 | [analysis](v3/analysis_v3_3models.json) |
+| seedcoder8b | 46 / 46 | 29 / 29 | 15 / 15 | 90 / 90 | [analysis](v3/analysis_v3_3models.json) |
+| qwen35_9b | 81 / 82 | 70 / 70 | 43 / 43 | 194 / 195 | [analysis](v3/analysis_v3_3models.json) |
+
+Số bài hai cách chọn **cùng một chương trình**, và pass rate hidden trung bình (%). Pass rate của Dual là verdict trên VM (mục 2–3). Pass rate của Test-only lấy verdict trên VM khi hai cách chọn cùng chương trình, và chấm lại local cho chương trình khác.
+
+| Model | Dataset | Chọn cùng chương trình | Pass rate Dual | Pass rate Test-only | Nguồn |
+|---|---|---|---|---|---|
+| qwen25c7b | APPS | 275 / 300 | 48,4 | 46,7 | [analysis](v3/analysis_v3_3models.json) |
+| qwen25c7b | HE | 142 / 164 | 90,9 | 92,7 | [analysis](v3/analysis_v3_3models.json) |
+| seedcoder8b | APPS | 267 / 300 | 48,8 | 48,7 | [analysis](v3/analysis_v3_3models.json) |
+| seedcoder8b | HE | 108 / 164 | 90,2 | 91,5 | [analysis](v3/analysis_v3_3models.json) |
+| qwen35_9b | APPS | 265 / 300 (gồm 17 bài không có candidate) | 73,5 | 73,5 | [analysis](v3/analysis_v3_3models.json) |
+| qwen35_9b | HE | 148 / 164 | 94,5 | 93,9 | [analysis](v3/analysis_v3_3models.json) |
+
+**Dual có thể chọn chương trình chưa pass hết public.** Với Dual, chương trình pass hết public có reward 0,8 + 0,2·v_llm, thấp nhất là 0,6 khi critic chấm −1, còn chương trình chưa pass hết public có reward bằng tỷ lệ pass public. Vì vậy một chương trình sai vài public test có thể thắng một chương trình pass hết. Chuyện này xảy ra ở 2 bài trên cả 6 ô: `apps_3736` của qwen25c7b (reward 0,967 so với 0,960) và `apps_4029` của qwen35_9b (0,692 so với 0,600).
+
 ## 9. Dừng sớm tính lại offline (từ E1)
 
-Phương án "dừng ở ứng viên đầu tiên pass hết public" được tính lại từ thứ tự sinh ứng viên trong run đầy đủ. Ứng viên được chọn khi dừng sớm trùng với ứng viên được chọn khi bỏ critic (mục 8), nên P@1 giống cột Test-only. Cột token tiết kiệm chưa tính.
+Phương án "dừng ở chương trình đầu tiên pass hết public" được tính lại từ log request của run đầy đủ: bỏ mọi lời gọi sau lời gọi sinh ra chương trình đó (kể cả lời gọi critic cho chính nó). Bài không có chương trình nào pass hết public thì chạy đủ như cũ. Chương trình được chọn khi dừng sớm trùng với chương trình được chọn khi bỏ critic (mục 8), nên P@1 giống cột Test-only. Mỗi lời gọi sinh code ứng với đúng một chương trình theo thứ tự sinh; điều này đã được kiểm tra trên cả 6 run MCTS. Token là input / output trung bình mỗi bài.
 
-| Model | Dataset | P@1 đầy đủ % | P@1 nếu dừng sớm % | Bài có kết quả khác | Token tiết kiệm % | Nguồn |
-|---|---|---|---|---|---|---|
-| qwen25c7b | APPS | 29,0 | 27,3 | 5 | — | [analysis](v3/analysis_v3_3models.json) |
-| qwen25c7b | HE | 90,9 | 92,7 | 5 | — | [analysis](v3/analysis_v3_3models.json) |
-| seedcoder8b | APPS | 30,0 | 30,0 | 4 | — | [analysis](v3/analysis_v3_3models.json) |
-| seedcoder8b | HE | 90,2 | 91,5 | 2 | — | [analysis](v3/analysis_v3_3models.json) |
-| qwen35_9b | APPS | 64,7 | 65,0 | 3 | — | [analysis](v3/analysis_v3_3models.json) |
-| qwen35_9b | HE | 94,5 | 93,9 | 5 | — | [analysis](v3/analysis_v3_3models.json) |
+| Model | Dataset | P@1 đầy đủ % | P@1 dừng sớm % | Bài dừng sớm | Token đầy đủ | Token dừng sớm | Lời gọi/bài | **Token tiết kiệm %** | Nguồn |
+|---|---|---|---|---|---|---|---|---|---|
+| qwen25c7b | APPS | 29,0 | 27,3 | 125 | 161.378 / 18.316 | 128.255 / 14.177 | 70,5 → 50,2 | **20,7** | [analysis](v3/analysis_v3_3models.json) |
+| qwen25c7b | HE | 90,9 | 92,7 | 159 | 26.130 / 4.581 | 6.145 / 1.010 | 47,1 → 6,1 | **76,7** | [analysis](v3/analysis_v3_3models.json) |
+| seedcoder8b | APPS | 30,0 | 30,0 | 120 | 150.860 / 20.955 | 120.156 / 16.423 | 69,4 → 50,2 | **20,5** | [analysis](v3/analysis_v3_3models.json) |
+| seedcoder8b | HE | 90,2 | 91,5 | 162 | 24.274 / 3.818 | 3.416 / 593 | 43,7 → 4,1 | **85,7** | [analysis](v3/analysis_v3_3models.json) |
+| qwen35_9b | APPS | 64,7 | 65,0 | 225 | 112.692 / 49.944 | 50.168 / 27.264 | 53,6 → 19,7 | **52,4** | [analysis](v3/analysis_v3_3models.json) |
+| qwen35_9b | HE | 94,5 | 93,9 | 162 | 21.967 / 6.149 | 1.980 / 607 | 41,9 → 2,9 | **90,8** | [analysis](v3/analysis_v3_3models.json) |
+
+P@1 chấm lại local, như mục 8. Trên APPS, phần lớn bài của qwen25c7b và seedcoder8b không có chương trình nào pass hết public (175–180/300 bài), nên với các bài đó dừng sớm không giúp gì và mức tiết kiệm chỉ khoảng 21%.
 
 ## 10. Đường cong theo ngân sách (APPS)
 
-Best-of-k tính offline từ 16 mẫu của E3: với mỗi k, lấy **k mẫu đầu tiên theo thứ tự sinh** (không lấy trung bình trên các tập con), chọn theo public pass rate, hòa thì lấy mẫu sinh trước, rồi chấm hidden trên máy local. Ô ghi P@1 % (số bài). MCTS@k chưa tính; dòng tham chiếu ghi P@1 của Direct (k=1, temperature 0) và của RethinkMCTS đầy đủ (khoảng 28–29 lần sinh code mỗi bài APPS, 18–19 lần mỗi bài HE).
+Best-of-k tính offline từ 16 mẫu của E3: với mỗi k, lấy **k mẫu đầu tiên theo thứ tự sinh** (không lấy trung bình trên các tập con), chọn theo public pass rate, hòa thì lấy mẫu sinh trước, rồi chấm hidden trên máy local. Ô ghi P@1 % (số bài). Token của Best-of-k bằng k/16 token của Best-of-16 (16 mẫu độc lập, nên đúng theo kỳ vọng).
+
+**RethinkMCTS@k** là run MCTS đầy đủ cắt sau rollout thứ k: chỉ giữ các chương trình sinh trong k rollout đầu (kể cả bản rethink của chúng), chọn như run đầy đủ (reward lớn nhất, hòa thì lấy chương trình sinh trước), chấm hidden trên máy local. Search chạy tuần tự và P-UCB không phụ thuộc tổng ngân sách, nên đây đúng là kết quả của một run k rollout (trừ nhiễu vLLM). Kiểm tra: ở k=16, chương trình được chọn trùng với run thật ở 300/300 bài APPS và 164/164 bài HE của mọi model. Ô ghi P@1 % (số bài) · token TB/bài (input + output). Dòng tham chiếu ghi P@1 chính thức của Direct và RethinkMCTS. Hình: `docs/report/figures/v3/H3_cost_vs_pass.pdf`.
 
 | Model | Dataset | Phương pháp | k=1 | k=2 | k=4 | k=8 | k=16 | Nguồn |
-|---|---|---|---|---|---|---|---|
+|---|---|---|---|---|---|---|---|---|
 | qwen25c7b | APPS | Best-of-k | 15,0 (45) | 19,7 (59) | 22,7 (68) | 26,0 (78) | 28,7 (86) | [analysis](v3/analysis_v3_3models.json) |
 | qwen25c7b | APPS | Tham chiếu: Direct / MCTS | 17,3 | — | — | — | MCTS 28,7 | [analysis](v3/analysis_v3_3models.json) |
+| qwen25c7b | APPS | RethinkMCTS@k | 18,7 (56) · 8,8k | 20,7 (62) · 16,9k | 23,7 (71) · 42,9k | 26,3 (79) · 86,5k | 29,0 (87) · 179,7k | [analysis](v3/analysis_v3_3models.json) |
 | qwen25c7b | HE | Best-of-k | 73,2 (120) | 84,1 (138) | 88,4 (145) | 88,4 (145) | 89,0 (146) | [analysis](v3/analysis_v3_3models.json) |
 | qwen25c7b | HE | Tham chiếu: Direct / MCTS | 77,4 | — | — | — | MCTS 90,9 | [analysis](v3/analysis_v3_3models.json) |
+| qwen25c7b | HE | RethinkMCTS@k | 87,8 (144) · 1,9k | 90,9 (149) · 3,8k | 90,2 (148) · 8,0k | 89,6 (147) · 15,8k | 90,9 (149) · 30,7k | [analysis](v3/analysis_v3_3models.json) |
 | seedcoder8b | APPS | Best-of-k | 14,3 (43) | 23,0 (69) | 28,0 (84) | 32,7 (98) | 35,7 (107) | [analysis](v3/analysis_v3_3models.json) |
 | seedcoder8b | APPS | Tham chiếu: Direct / MCTS | 17,0 | — | — | — | MCTS 30,7 | [analysis](v3/analysis_v3_3models.json) |
+| seedcoder8b | APPS | RethinkMCTS@k | 19,3 (58) · 8,8k | 22,3 (67) · 16,6k | 27,7 (83) · 40,5k | 28,3 (85) · 82,8k | 30,0 (90) · 171,8k | [analysis](v3/analysis_v3_3models.json) |
 | seedcoder8b | HE | Best-of-k | 78,7 (129) | 82,3 (135) | 84,1 (138) | 87,2 (143) | 89,6 (147) | [analysis](v3/analysis_v3_3models.json) |
 | seedcoder8b | HE | Tham chiếu: Direct / MCTS | 78,7 | — | — | — | MCTS 90,2 | [analysis](v3/analysis_v3_3models.json) |
+| seedcoder8b | HE | RethinkMCTS@k | 84,8 (139) · 1,9k | 89,0 (146) · 3,6k | 90,2 (148) · 7,5k | 90,2 (148) · 14,5k | 90,2 (148) · 28,1k | [analysis](v3/analysis_v3_3models.json) |
 | qwen35_9b | APPS ⚠️ | Best-of-k | 40,3 (121) | 50,3 (151) | 57,7 (173) | 63,3 (190) | 66,0 (198) | [analysis](v3/analysis_v3_3models.json) |
 | qwen35_9b | APPS | Tham chiếu: Direct / MCTS | 44,3 | — | — | — | MCTS 64,7 | [analysis](v3/analysis_v3_3models.json) |
+| qwen35_9b | APPS | RethinkMCTS@k | 53,0 (159) · 10,0k | 59,0 (177) · 18,2k | 62,0 (186) · 41,8k | 63,3 (190) · 82,9k | 64,7 (194) · 162,6k | [analysis](v3/analysis_v3_3models.json) |
 | qwen35_9b | HE | Best-of-k | 84,1 (138) | 89,0 (146) | 90,9 (149) | 92,1 (151) | 93,3 (153) | [analysis](v3/analysis_v3_3models.json) |
 | qwen35_9b | HE | Tham chiếu: Direct / MCTS | 86,0 | — | — | — | MCTS 94,5 | [analysis](v3/analysis_v3_3models.json) |
+| qwen35_9b | HE | RethinkMCTS@k | 91,5 (150) · 1,9k | 94,5 (155) · 3,8k | 94,5 (155) · 7,5k | 94,5 (155) · 14,3k | 94,5 (155) · 28,1k | [analysis](v3/analysis_v3_3models.json) |
+
+Token TB/bài của Best-of-k ở k=1 / k=16: qwen25c7b APPS 0,9k / 14,2k, HE 0,3k / 5,3k; seedcoder8b APPS 1,0k / 15,9k, HE 0,4k / 6,2k; qwen35_9b APPS 2,5k / 40,7k, HE 0,4k / 7,1k. Trên APPS, ở cùng mức token, đường Best-of-k luôn nằm trên đường RethinkMCTS@k (ví dụ qwen25c7b: Best-of-16 28,7% ở 14,2k token, RethinkMCTS@1 18,7% ở 8,8k và @4 23,7% ở 42,9k). Trên HE, RethinkMCTS@2 (3,6k–3,8k token) đạt 149 / 146 / 155 bài, so với Best-of-16 (5,3k–7,1k token) 146 / 147 / 153 bài (qwen25c7b / seedcoder8b / qwen35_9b, chấm local), tức chênh không quá 3 bài với ít token hơn. Đây là quan sát; chênh lệch trên HE chỉ vài bài.
 
 Với `qwen35_9b` APPS, chấm lại local khớp verdict trên Modal ở 295/300 bài (k=16: local 198, Modal 203). Cả 5 bài lệch đều pass trên Modal và TLE ở giới hạn 4 s khi chấm local lúc máy đang chạy 4 bài song song; chấm lại riêng thì 2/5 bài pass. Vậy các ô Best-of-k của ô này có thể thấp hơn thực tế khoảng 1–2 điểm %. Verdict chính thức (mục 2) là verdict trên Modal.
 
