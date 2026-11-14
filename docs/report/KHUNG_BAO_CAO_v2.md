@@ -28,6 +28,8 @@ Ký hiệu trạng thái (theo [README.md](README.md)): `✅` đã có số li�
 | Chuyên code, thế hệ 2025 | Seed-Coder-8B-Instruct | 06/2025 |
 | Đa dụng, thế hệ 2026, tắt thinking | Qwen3.5-9B (dự phòng: Granite-4.2-8B) | 02/2026 (08/2026) |
 
+**Cách đặt vấn đề trong báo cáo (thống nhất 14/11/2026):** mở đầu bằng một bài toán tổng quát là *giải bài với bộ kiểm chứng một phần* (yêu cầu $x$, lời giải thực thi được $y$, kiểm chứng lúc giải $V_{pub}$ có phản hồi nhưng không đầy đủ, kiểm chứng ẩn $V_{hid}$, ngân sách $B$). **Text-to-SQL** là bài toán ứng dụng dùng làm ví dụ xuyên suốt; **sinh mã nguồn** là trường hợp được thực nghiệm, vì có sẵn public/hidden test và benchmark chuẩn. Không chạy thực nghiệm Text-to-SQL; phần kết luận quay lại bài toán này (điều kiện áp dụng: chất lượng bộ kiểm chứng, critic chưa đủ tin cậy). Lưu ý: bài báo **có** baseline Base(16) và bảng token; khoảng trống là chỉ có hai mô hình đóng, một lần chạy, chưa có kiểm định ghép cặp và chưa đặt độ chính xác cạnh chi phí trên LLM mở cỡ nhỏ.
+
 **Phạm vi:**
 - Dữ liệu: APPS-300 (cohort đóng băng, seed 2027) và HumanEval-164.
 - Một seed, temperature 0 theo bài báo.

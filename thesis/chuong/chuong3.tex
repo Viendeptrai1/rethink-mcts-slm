@@ -1,0 +1,172 @@
+\chapter{THIẾT LẬP THỰC NGHIỆM}
+\label{chap:thietlap}
+% Nguồn (chỉ để truy vết, không in ra): docs/research/PROTOCOL.md mục 8, configs/v3_7b/README.md,
+% configs/v3_7b/apps_mcts.yaml, docs/research/DECISION_LOG.md (D-006 đến D-010),
+% docs/results/BENCHMARK_LEDGER.md (mục 1, 11, 12), data/cohorts/apps_benchmark_300.json.
+
+Chương này mô tả toàn bộ thiết lập dùng cho các thực nghiệm ở Chương~\ref{chap:ketqua} và Chương~\ref{chap:phantich}: dữ liệu, mô hình, phần cứng, cấu hình thuật toán, các phương pháp so sánh, độ đo và quy trình chạy. Mọi lần chạy được báo cáo trong tiểu luận đều theo cùng một bộ quy tắc, được cố định trước khi chạy dữ liệu chính thức, để không có tham số nào được chỉnh sau khi đã nhìn thấy kết quả.
+
+\section{DỮ LIỆU VÀ CÁCH CHIA TEST}
+\label{sec:dulieu}
+
+Tiểu luận dùng hai bộ dữ liệu sinh mã nguồn Python: APPS \cite{hendrycks2021apps} và HumanEval \cite{chen2021humaneval}.
+
+\subsection{APPS-300}
+
+APPS gồm các bài lập trình thi đấu; chương trình đọc dữ liệu từ đầu vào chuẩn và ghi kết quả ra đầu ra chuẩn. Tập test của APPS có 5.000 bài, chia thành ba mức khó: introductory, interview và competition. Do chi phí chạy MCTS trên toàn bộ tập là quá lớn, tiểu luận lấy một tập con cố định 300 bài, gọi là \emph{APPS-300}:
+
+\begin{itemize}
+  \item Chỉ xét các bài có ít nhất 3 test và có số đầu vào bằng số đầu ra. Số bài thỏa điều kiện là 758 (introductory), 2.712 (interview) và 640 (competition).
+  \item Lấy mẫu ngẫu nhiên phân tầng, không hoàn lại, mỗi mức khó 100 bài, với seed 2027.
+  \item Danh sách 300 bài được cố định và dùng chung cho mọi mô hình và mọi phương pháp. Không có bước lọc nào khác sau đó.
+\end{itemize}
+
+Bộ test của mỗi bài được chia thành hai phần: \emph{public test} để thuật toán dùng trong quá trình tìm kiếm, và \emph{hidden test} để chấm kết quả cuối cùng. Số public test bằng phần nguyên của một nửa số test, phần còn lại là hidden. Phép chia được thực hiện trên các test \emph{khác nhau}, vì một số bài trong APPS liệt kê lặp lại cùng một test; chẳng hạn \texttt{apps\_4349} có 10 test nhưng chỉ 5 test khác nhau. Nếu chia trên danh sách gốc, một test có thể vừa nằm trong public vừa nằm trong hidden, khiến hidden không còn là dữ liệu chưa thấy. Mỗi test có giới hạn thời gian 4 giây.
+
+Bảng~\ref{tab:phanbotest} cho thấy số test rất khác nhau giữa các mức khó. Ở mức competition, trung vị chỉ là 2 public test và 2 hidden test; 48 bài chỉ có đúng một public test và 57 bài có không quá hai hidden test. Với những bài như vậy, một chương trình sai vẫn có thể vượt qua toàn bộ hidden test. Điểm này được thảo luận lại ở Mục~\ref{sec:hople}.
+
+\begin{table}[htbp]
+  \caption{Phân bố số public test và hidden test trong APPS-300 theo mức khó}
+  \label{tab:phanbotest}
+  % Nguồn: prepared/apps_half (public/problems.jsonl, judge/suites) + data/cohorts/apps_benchmark_300.json.
+  \begin{tabularx}{\linewidth}{>{\raggedright\arraybackslash}p{2.6cm}*{4}{>{\centering\arraybackslash}X}}
+    \toprule
+    Mức khó & Số public test: trung vị (min--max) & Số hidden test: trung vị (min--max) & Số bài chỉ có 1 public test & Số bài có $\le 2$ hidden test \\
+    \midrule
+    Introductory & 4 (1--67)    & 5 (2--67)  & 24 & 34 \\
+    Interview    & 10,5 (1--62) & 11 (2--62) & 13 & 16 \\
+    Competition  & 2 (1--56)    & 2 (2--57)  & 48 & 57 \\
+    \bottomrule
+  \end{tabularx}
+  \ghichubang{Mỗi mức khó gồm 100 bài.}
+\end{table}
+
+\subsection{HumanEval-164}
+
+HumanEval gồm 164 bài viết hàm Python theo mô tả trong docstring. Public test là các ví dụ đi kèm đề bài (trung vị 2 ví dụ mỗi bài, từ 1 đến 8). Hidden test là hàm kiểm tra \texttt{check} chính thức của bộ dữ liệu. Toàn bộ hàm kiểm tra được chấm như một khối: chương trình chỉ được tính là đúng khi mọi \texttt{assert} trong đó đều đúng. Mỗi lần chạy kiểm tra có giới hạn 3 giây. Tiểu luận dùng toàn bộ 164 bài.
+
+\subsection{Tách biệt public và hidden test}
+
+Để tránh rò rỉ hidden test vào quá trình tìm kiếm, hệ thống tách dữ liệu thành hai đối tượng riêng (Chương~\ref{chap:caidat}). Mọi phương pháp sinh mã chỉ nhận đề bài và public test. Hidden test chỉ được nạp bởi bộ chấm, và chỉ sau khi chương trình được chọn của bài đó đã được ghi ra đĩa. Như vậy, việc chọn chương trình cuối cùng không thể phụ thuộc vào kết quả hidden.
+
+\section{MÔ HÌNH VÀ PHẦN CỨNG}
+\label{sec:mohinh}
+
+\subsection{Mô hình}
+
+Tiểu luận dùng ba LLM mở cỡ nhỏ, từ 7 đến 9 tỷ tham số (Bảng~\ref{tab:mohinh}). Hai mô hình đầu là mô hình chuyên cho mã nguồn; mô hình thứ ba là mô hình đa dụng. Cả ba được dùng nguyên trọng số, không tinh chỉnh.
+
+\begin{table}[htbp]
+  \caption{Các mô hình được sử dụng}
+  \label{tab:mohinh}
+  \begin{tabular}{l>{\footnotesize}ll}
+    \toprule
+    Tên trong tiểu luận & \normalsize Định danh trên Hugging Face & Loại \\
+    \midrule
+    Qwen2.5-Coder-7B & \texttt{Qwen/Qwen2.5-Coder-7B-Instruct} & Chuyên mã nguồn \\
+    Seed-Coder-8B & \texttt{ByteDance-Seed/Seed-Coder-8B-Instruct} & Chuyên mã nguồn \\
+    Qwen3.5-9B & \texttt{Qwen/Qwen3.5-9B} & Đa dụng \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+Qwen2.5-Coder-7B và Seed-Coder-8B không có chế độ suy nghĩ (thinking). Qwen3.5-9B mặc định suy nghĩ dài trước khi trả lời; chế độ này được tắt cho mọi phương pháp bằng tham số \texttt{enable\_thinking: false} của chat template, để ba mô hình được so sánh trong cùng điều kiện: mô hình trả lời trực tiếp, mọi quá trình suy luận thêm đều đến từ thuật toán tìm kiếm.
+
+\subsection{Phần cứng và phần mềm}
+
+Mô hình được phục vụ bằng vLLM \cite{kwon2023vllm} phiên bản 0.31.0, độ chính xác bf16, độ dài ngữ cảnh tối đa 32.768 token, seed 0 và có bật prefix caching. vLLM và chương trình tìm kiếm chạy chung trên một máy có GPU NVIDIA A100-SXM4-40GB. Chương trình tìm kiếm, phần trace và phần chạy test dùng Python 3.11. Phiên bản này được cố định vì ở Python 3.13, ba kiểm thử về trace bị lỗi (hàm đệ quy bị bỏ sót lượt chạy), làm phản hồi mức block thiếu dữ liệu mà không báo lỗi. Mỗi lần chạy giải 16 bài song song; mỗi bài chạy tối đa 4 test cùng lúc và toàn hệ thống có tối đa 8 tiến trình test.
+
+Các lần chạy được thực hiện trên hai nền tảng thuê GPU theo giờ là Google Colab và Modal, cùng loại GPU và cùng gói mã nguồn:
+
+\begin{itemize}
+  \item Qwen2.5-Coder-7B và Seed-Coder-8B: cả 12 lần chạy trên Colab.
+  \item Qwen3.5-9B: lần chạy RethinkMCTS trên APPS-300 dùng Colab; năm lần chạy còn lại dùng Modal. Lý do là trong ngày 13/11/2026, máy Colab liên tục bị thu hồi sau khoảng 23--29 phút, không đủ cho một lần chạy MCTS dài. Trước khi chạy, bước kiểm tra cấu hình (gate, Mục~\ref{sec:quytrinh}) được chạy lại trên Modal và cho kết quả khớp với Colab ở 12/13 bài.
+\end{itemize}
+
+Việc ô APPS của Qwen3.5-9B chạy trên hai nền tảng là một sai lệch so với quy tắc ban đầu (mọi phương pháp của một mô hình chạy trên cùng nền tảng), và được ghi nhận ở Mục~\ref{sec:hople}.
+
+\section{CẤU HÌNH THUẬT TOÁN}
+\label{sec:cauhinh}
+
+Bảng~\ref{tab:cauhinh} liệt kê các tham số của RethinkMCTS dùng trong mọi lần chạy. Ý nghĩa của từng tham số được trình bày ở Chương~\ref{chap:lythuyet}.
+
+\begin{table}[htbp]
+  \caption{Cấu hình RethinkMCTS}
+  \label{tab:cauhinh}
+  % Nguồn: configs/v3_7b/apps_mcts.yaml, configs/v3_7b/README.md, docs/research/PROTOCOL.md mục 8.
+  \begin{tabularx}{\linewidth}{>{\raggedright\arraybackslash}p{5cm}>{\raggedright\arraybackslash}X}
+    \toprule
+    Tham số & Giá trị \\
+    \midrule
+    Ngân sách tìm kiếm & 16 rollout; lượt rethink không tính vào ngân sách \\
+    Độ rộng mở rộng & 3 thought con mỗi node \\
+    Số lần rethink mỗi node & 1 \\
+    Chọn node & P-UCB, $c = 4$, $c_{\text{base}} = 10$ \\
+    Lan truyền giá trị & Max \\
+    Phần thưởng & $0{,}8\,v_{\text{test}} + 0{,}2\,v_{\text{llm}}$; critic cho điểm trong $[-1, 1]$, chỉ được gọi khi chương trình pass toàn bộ public test \\
+    Phản hồi khi chương trình sai & Phản hồi mức block (phân tích theo từng khối lệnh) \\
+    Dừng sớm & Không; phương án dừng sớm được tính lại offline \\
+    Chọn kết quả & Chương trình có phần thưởng lớn nhất \\
+    Temperature & 0 \\
+    Giới hạn an toàn mỗi bài & 4 triệu token, 400 lời gọi, 3.600 giây \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+Mỗi vai trò gọi mô hình có giới hạn số token đầu ra riêng: sinh thought (expansion) 1.024, sinh mã 4.096, rethink 512, critic 256 và phân tích block 3.072. Các giới hạn này được đặt sau khi lần chạy thử đầu tiên với giới hạn nhỏ hơn cho thấy 5,9\% lời gọi của Qwen3.5-9B bị cắt giữa chừng, và được áp dụng chung cho cả ba mô hình.
+
+\section{CÁC PHƯƠNG PHÁP SO SÁNH}
+\label{sec:phuongphap}
+
+Ba phương pháp được chạy trên mỗi mô hình và mỗi bộ dữ liệu, tổng cộng $3 \times 3 \times 2 = 18$ lần chạy. Cả ba dùng chung prompt sinh mã.
+
+\begin{description}[style=nextline,leftmargin=1cm]
+  \item[Direct] Sinh một chương trình duy nhất với temperature 0. Đây là mức năng lực của mô hình khi không có tìm kiếm.
+  \item[Best-of-16] Sinh 16 chương trình độc lập với temperature 0,8 và top-p 0,95, chạy cả 16 trên public test, chọn chương trình có tỷ lệ pass public cao nhất; nếu bằng nhau thì lấy chương trình sinh trước. Đây là baseline lấy mẫu với cùng số lần sinh mã ban đầu như RethinkMCTS (16 rollout).
+  \item[RethinkMCTS] Thuật toán tìm kiếm với cấu hình ở Bảng~\ref{tab:cauhinh}.
+\end{description}
+
+Best-of-16 và RethinkMCTS có cùng số rollout nhưng không cùng chi phí: RethinkMCTS còn gọi mô hình cho các bước sinh thought, rethink, phân tích block và critic. Vì vậy, tiểu luận báo cáo chi phí (token và số lời gọi) song song với độ chính xác, và so sánh thêm với Best-of-$k$ ($k = 1, \ldots, 16$) tính lại từ 16 mẫu đã sinh (Chương~\ref{chap:ketqua}).
+
+Hai thí nghiệm ablation trên Qwen2.5-Coder-7B (tắt rethink; chỉ dùng thông tin thực thi thay vì phản hồi mức block) đã được lên kế hoạch nhưng chưa được thực hiện trong phạm vi tiểu luận vì giới hạn kinh phí GPU. Riêng vai trò của critic và của việc dừng sớm được phân tích offline từ các lần chạy RethinkMCTS sẵn có, không cần chạy thêm.
+
+\section{ĐỘ ĐO VÀ KIỂM ĐỊNH}
+\label{sec:dodo}
+
+\subsection{Độ đo}
+
+\begin{itemize}
+  \item \textbf{Pass@1 (độ đo chính):} tỷ lệ bài mà chương trình được chọn vượt qua \emph{toàn bộ} hidden test. Mẫu số là toàn bộ bài của bộ dữ liệu; bài lỗi kỹ thuật hoặc không sinh được chương trình nào được tính là không pass.
+  \item \textbf{Pass rate:} trung bình theo bài của tỷ lệ hidden test mà chương trình được chọn vượt qua.
+  \item \textbf{Chi phí:} số token đầu vào và đầu ra, số lời gọi mô hình (tính cả expansion, sinh mã, rethink, critic và phân tích block) và thời gian giải mỗi bài. Lời gọi được thử lại do lỗi mạng được đếm riêng; lời gọi không có thông tin token được ghi là thiếu, không ghi là 0.
+\end{itemize}
+
+\subsection{Kiểm định thống kê}
+
+Vì mọi phương pháp chạy trên cùng các bài, so sánh giữa hai phương pháp là so sánh \emph{ghép cặp} theo từng bài:
+
+\begin{itemize}
+  \item Khoảng tin cậy 95\% của Pass@1 tính theo phương pháp Wilson \cite{wilson1927}.
+  \item Kiểm định McNemar dạng chính xác \cite{mcnemar1947} trên số bài mà chỉ một trong hai phương pháp giải được.
+  \item Có 18 phép so sánh (3 mô hình $\times$ 2 bộ dữ liệu $\times$ 3 cặp phương pháp), nên p-value được hiệu chỉnh bằng phương pháp Holm \cite{holm1979} trên cả 18 phép. Một khác biệt chỉ được xem là có ý nghĩa thống kê khi p-value sau hiệu chỉnh nhỏ hơn 0,05.
+  \item Khoảng tin cậy 95\% của chênh lệch Pass@1 tính bằng bootstrap ghép cặp theo bài, 10.000 lần lấy mẫu lại.
+\end{itemize}
+% Tính bằng scripts/analyze_v3.py (bootstrap seed 0); kết quả: docs/results/v3/analysis_v3_3models.json.
+
+\section{QUY TRÌNH THỰC NGHIỆM}
+\label{sec:quytrinh}
+
+Quy trình gồm bốn bước, theo thứ tự:
+
+\begin{enumerate}[label=\arabic*.]
+  \item \textbf{Pilot.} Chạy Qwen2.5-Coder-7B trên 20 bài APPS \emph{nằm ngoài} APPS-300, với cả ba phương pháp. Pilot dùng để kiểm tra rằng mọi thành phần hoạt động đúng và ước lượng chi phí. Tiêu chí đạt gồm: không có lỗi template prompt; tối đa 1/20 bài lỗi kỹ thuật; ít nhất 90\% kết quả phân tích block được đưa vào phản hồi; đủ 16 rollout và có cây đạt độ sâu từ 3 trở lên; không quá 5\% lời gọi bị cắt; không bài nào chạm giới hạn 3.600 giây. Kết quả pilot không được dùng làm kết quả của tiểu luận.
+  \item \textbf{Cố định cấu hình.} Sau khi pilot đạt, mã nguồn, prompt và cấu hình được cố định (ngày 12/11/2026). Mọi lần chạy chính thức dùng đúng phiên bản này. Không được đổi cấu hình, prompt, mã nguồn hay danh sách bài sau khi đã bắt đầu chạy; nếu buộc phải sửa thì bỏ toàn bộ kết quả của mô hình đó và chạy lại.
+  \item \textbf{Kiểm tra trước cho từng mô hình (gate).} Trước khi chạy một mô hình, chạy thử trên 5 bài APPS ngoài APPS-300 (RethinkMCTS và Direct) và 3 bài HumanEval (chỉ để kiểm tra định dạng đầu ra). Nếu không đạt thì dừng, không chạy dữ liệu chính thức.
+  \item \textbf{Chạy chính thức.} Chạy 18 lần, mỗi tổ hợp mô hình $\times$ bộ dữ liệu $\times$ phương pháp ghi vào một thư mục riêng, kèm một file manifest ghi lại cấu hình, mã băm của dữ liệu, mã nguồn và prompt.
+\end{enumerate}
+% Commit đóng băng: d9666c4.
+
+Trong đợt chạy, máy Colab nhiều lần bị thu hồi giữa chừng. Hệ thống xử lý bằng cách chạy tiếp theo từng bài: bài đã có kết quả được giữ nguyên, bài đang giải dở thì được giải lại từ đầu, và việc chạy tiếp chỉ được phép khi manifest khớp hoàn toàn với lần chạy trước. Có 3 bài Best-of-16 của Qwen2.5-Coder-7B bị một lỗi kiểm tra khi chạy tiếp (do ký tự xuống dòng kiểu Windows trong mã sinh ra) nên được giải lại; tiêu chí chọn các bài này không phụ thuộc vào kết quả chấm, nên không gây thiên lệch.
+% Chi tiết vận hành: docs/results/BENCHMARK_LEDGER.md mục 12.
+
+Kết thúc đợt chạy, cả 18 lần chạy đều hoàn tất đủ số bài, không có bài nào lỗi kỹ thuật. Chấm lại hidden test cho chương trình được RethinkMCTS chọn trên máy cá nhân cho cùng kết quả với máy chạy ở 298--300/300 bài APPS và 164/164 bài HumanEval, tùy mô hình.

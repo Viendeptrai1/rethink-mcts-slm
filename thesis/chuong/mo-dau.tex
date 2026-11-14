@@ -1,0 +1,88 @@
+\addchap{PHẦN MỞ ĐẦU}
+% Theo mẫu: tính cấp thiết, mục đích, đối tượng và phạm vi, các công trình liên quan, kết quả dự kiến, bố cục.
+% Khung đặt vấn đề (thống nhất 14/11/2026): bài toán tổng quát là "giải bài với bộ kiểm chứng một phần";
+% Text-to-SQL là bài toán ứng dụng dùng làm ví dụ xuyên suốt; sinh mã nguồn là trường hợp được thực nghiệm.
+% Nguồn ý: docs/report/KHUNG_BAO_CAO_v2.md mục 1-2; Rethink_extracted.md (mô hình, baseline, số rollout của bài báo).
+% Phần này cố ý không nêu con số kết quả; số liệu nằm ở Chương 4-5 và Phần kết luận.
+
+\addsec{TÍNH CẤP THIẾT CỦA ĐỀ TÀI}
+
+Mô hình ngôn ngữ lớn (LLM) ngày càng được dùng để trực tiếp thực hiện công việc thay vì chỉ trả lời câu hỏi. Một ví dụ điển hình là trợ lý hỏi đáp trên dữ liệu doanh nghiệp: người dùng hỏi bằng ngôn ngữ tự nhiên, chẳng hạn ``doanh thu quý 3 của từng chi nhánh là bao nhiêu?'', hệ thống chuyển câu hỏi thành một truy vấn SQL, thực thi truy vấn trên cơ sở dữ liệu và trả lời từ kết quả. Bài toán này được gọi là Text-to-SQL \cite{yu2018spider,li2023bird}. Cái khó của nó nằm ở bước suy luận hơn là ở cú pháp. Một truy vấn có thể chạy không lỗi, trả về những con số trông hợp lý, nhưng vẫn sai vì nối nhầm bảng, quên loại các đơn hàng đã hủy hoặc lọc theo nhầm cột ngày. Khi LLM chỉ sinh một lần, những lỗi như vậy rất khó tự phát hiện.
+
+Có hai cách chính để giảm loại lỗi này. Cách thứ nhất là dùng mô hình lớn hơn hoặc tinh chỉnh thêm, vốn đòi hỏi nhiều dữ liệu và tài nguyên huấn luyện. Cách thứ hai là giữ nguyên mô hình và dùng thêm tính toán \emph{lúc suy luận}: sinh nhiều lời giải, kiểm tra chúng, sửa dựa trên phản hồi, hoặc tìm kiếm có hệ thống trong không gian các hướng giải. Các nghiên cứu gần đây cho thấy tăng tính toán lúc suy luận có thể hiệu quả không kém tăng kích thước mô hình \cite{snell2024scaling}, và riêng việc lấy mẫu lặp lại đã nâng đáng kể tỷ lệ tìm được lời giải đúng khi có cách kiểm chứng tự động \cite{brown2024monkeys}.
+
+Điều kiện ``có cách kiểm chứng tự động'' là then chốt. Trong Text-to-SQL, lúc trả lời, hệ thống chỉ kiểm tra được một phần: truy vấn có chạy được không, có đúng lược đồ dữ liệu không, có cho kết quả đúng trên một vài câu hỏi mẫu đã biết đáp án không. Còn truy vấn có đúng với ý người hỏi trên toàn bộ dữ liệu thật hay không thì lúc đó không biết được. Một truy vấn cho kết quả đúng trên một cơ sở dữ liệu vẫn có thể sai trên cơ sở dữ liệu khác \cite{zhong2020testsuite}. Có thể khái quát cấu trúc này thành một lớp bài toán chung, tạm gọi là \emph{giải bài với bộ kiểm chứng một phần}:
+
+\begin{itemize}
+  \item đầu vào là một yêu cầu $x$ bằng ngôn ngữ tự nhiên;
+  \item LLM sinh ra một lời giải thực thi được $y$, ví dụ một truy vấn hoặc một chương trình;
+  \item lúc giải chỉ có bộ kiểm chứng một phần $V_{\text{pub}}$: chấm được tự động, cho phản hồi khi sai, nhưng không đầy đủ;
+  \item độ đúng thật sự do bộ kiểm chứng ẩn $V_{\text{hid}}$ quyết định, và bộ này không được dùng lúc giải;
+  \item tổng chi phí gọi mô hình bị giới hạn bởi một ngân sách $B$.
+\end{itemize}
+
+Mục tiêu là trong ngân sách $B$, dùng $V_{\text{pub}}$ và phản hồi của nó để tìm lời giải $y$ có khả năng vượt qua $V_{\text{hid}}$ cao nhất. Phát biểu hình thức của bài toán được trình bày ở Chương~\ref{chap:lythuyet}.
+
+Bài toán này đặc biệt đáng quan tâm với các \emph{LLM mở cỡ nhỏ}, từ 7 đến 9 tỷ tham số. Các mô hình này chạy được trên một GPU và triển khai được ngay trong hạ tầng của tổ chức, điều quan trọng khi dữ liệu doanh nghiệp không được phép gửi ra ngoài. Đổi lại, khả năng sinh đúng ngay lần đầu của chúng thấp hơn các mô hình lớn, nên tính toán thêm lúc suy luận là một cách bù đắp hấp dẫn. Câu hỏi thực tế đặt ra là: với cùng một ngân sách, một phương pháp tìm kiếm phức tạp có cho kết quả tốt hơn cách đơn giản là sinh nhiều lần rồi lọc bằng $V_{\text{pub}}$ hay không, và phải trả thêm bao nhiêu chi phí.
+
+Để trả lời câu hỏi đó một cách khách quan, cần một môi trường mà $V_{\text{pub}}$ và $V_{\text{hid}}$ được tách sẵn và chấm được tự động. \emph{Sinh mã nguồn} từ đề bài thỏa đúng yêu cầu này: test công khai đi kèm đề bài đóng vai trò $V_{\text{pub}}$, bộ test ẩn đóng vai trò $V_{\text{hid}}$, và đã có các bộ dữ liệu chuẩn được dùng rộng rãi như APPS \cite{hendrycks2021apps} và HumanEval \cite{chen2021humaneval}. Sinh truy vấn SQL cũng là một dạng sinh mã. Vì vậy, tiểu luận chọn sinh mã nguồn làm bài toán thực nghiệm, còn Text-to-SQL là bài toán ứng dụng mà các kết quả hướng tới.
+
+\addsec{MỤC ĐÍCH CỦA ĐỀ TÀI}
+
+Tiểu luận nghiên cứu việc tăng cường khả năng suy luận của LLM mở cỡ nhỏ trong sinh mã nguồn bằng tìm kiếm cây Monte Carlo (MCTS) kết hợp phản hồi từ thực thi kiểm thử. Phương pháp được chọn để nghiên cứu là RethinkMCTS \cite{li2024rethinkmcts}. Phương pháp này tìm kiếm ở mức ý tưởng (thought) thay vì mức token, dùng phản hồi chi tiết theo từng khối mã để sửa lại những ý tưởng sai (rethink), và dùng chính LLM để đánh giá thêm các chương trình đã vượt qua test công khai (critic).
+
+Cụ thể, tiểu luận cài đặt RethinkMCTS cùng hai phương pháp so sánh là sinh một lần (Direct) và sinh 16 lần rồi chọn theo test công khai (Best-of-16), chạy trên ba LLM mở cỡ nhỏ, và trả lời các câu hỏi nghiên cứu sau:
+
+\begin{enumerate}
+  \item RethinkMCTS có cho tỷ lệ giải đúng cao hơn Direct và Best-of-16 trên cả ba mô hình không?
+  \item Mức cải thiện thay đổi thế nào giữa các mô hình, giữa mô hình chuyên mã nguồn và mô hình đa dụng, và giữa các mức độ khó của bài toán?
+  \item Critic có giúp chọn được chương trình tốt hơn so với chỉ dựa vào test công khai không, và có thể dừng tìm kiếm sớm mà không giảm độ chính xác không?
+  \item Chi phí tính toán (số lời gọi mô hình, số token) của từng phương pháp là bao nhiêu, và độ chính xác thay đổi thế nào theo ngân sách?
+  \item Những sai lệch nhỏ nào trong cài đặt có thể làm mất tác dụng của các cơ chế tìm kiếm mà hệ thống không báo lỗi?
+\end{enumerate}
+
+Các câu hỏi trên được trả lời bằng thực nghiệm và kiểm định thống kê ở Chương~\ref{chap:ketqua} và Chương~\ref{chap:phantich}. Tiểu luận không giả định trước câu trả lời theo hướng nào.
+
+\addsec{ĐỐI TƯỢNG VÀ PHẠM VI NGHIÊN CỨU}
+
+\textbf{Đối tượng nghiên cứu} là các phương pháp tăng cường suy luận lúc suy luận cho LLM có sử dụng phản hồi từ thực thi, trọng tâm là RethinkMCTS, áp dụng cho bài toán sinh chương trình Python từ đề bài có test công khai và test ẩn.
+
+\textbf{Phạm vi nghiên cứu:}
+\begin{itemize}
+  \item \emph{Mô hình:} ba LLM mở cỡ nhỏ thuộc ba thế hệ, gồm Qwen2.5-Coder-7B-Instruct (chuyên mã nguồn, 2024), Seed-Coder-8B-Instruct (chuyên mã nguồn, 2025) và Qwen3.5-9B (đa dụng, 2026, tắt chế độ suy nghĩ). Các mô hình được dùng nguyên trọng số, không tinh chỉnh.
+  \item \emph{Dữ liệu:} APPS-300, gồm 300 bài lấy ngẫu nhiên có phân tầng từ tập test của APPS (100 bài mỗi mức khó), và toàn bộ 164 bài của HumanEval.
+  \item \emph{Phương pháp so sánh:} Direct, Best-of-16 và RethinkMCTS với 16 rollout, tổng cộng 18 lần chạy (ba mô hình, hai bộ dữ liệu, ba phương pháp). Mỗi cấu hình chạy một lần.
+  \item \emph{Hạ tầng:} suy luận trên GPU A100 40\,GB bằng vLLM \cite{kwon2023vllm}.
+  \item \emph{Ngoài phạm vi:} tiểu luận không chạy thực nghiệm trên Text-to-SQL; bài toán này chỉ dùng làm bối cảnh ứng dụng và được bàn lại ở Phần kết luận. Các thí nghiệm loại bỏ từng thành phần (tắt rethink, thay phản hồi mức khối bằng thông tin thực thi đơn giản) chưa được thực hiện vì giới hạn kinh phí GPU; riêng vai trò của critic và của việc dừng sớm được phân tích lại từ dữ liệu đã chạy.
+\end{itemize}
+
+\addsec{CÁC CÔNG TRÌNH LIÊN QUAN}
+
+\textbf{Lấy mẫu nhiều lần và lọc bằng test.} AlphaCode \cite{li2022alphacode} sinh rất nhiều chương trình cho mỗi bài rồi lọc bằng các ví dụ trong đề, cho thấy chỉ riêng lấy mẫu và lọc đã đạt mức thi đấu. CodeT \cite{chen2022codet} để LLM tự sinh thêm test rồi chọn chương trình theo mức đồng thuận khi thực thi. Brown và cộng sự \cite{brown2024monkeys} cho thấy tỷ lệ bài có ít nhất một lời giải đúng tăng đều theo số mẫu. Nhóm phương pháp này đơn giản, dễ song song hóa, và là mốc so sánh tự nhiên cho mọi phương pháp tìm kiếm phức tạp hơn.
+
+\textbf{Sửa lỗi lặp dựa trên phản hồi thực thi.} Self-Debugging \cite{chen2023selfdebug} cho LLM đọc kết quả thực thi để tự sửa chương trình, và được đánh giá trên cả sinh mã lẫn Text-to-SQL. Reflexion \cite{shinn2023reflexion} lưu các nhận xét về lỗi trước đó vào bộ nhớ để dùng cho lần thử sau. LDB \cite{zhong2024ldb} chia chương trình thành các khối và theo dõi giá trị biến qua từng khối để định vị lỗi. Riêng với Text-to-SQL, việc thực thi các truy vấn trung gian để loại bỏ truy vấn lỗi đã được dùng từ trước khi có LLM \cite{wang2018egd}.
+
+\textbf{Tìm kiếm có cấu trúc.} PG-TD \cite{zhang2023pgtd} dùng MCTS ở mức token với phần thưởng là tỷ lệ vượt qua test. Tree of Thoughts \cite{yao2023tot} tìm kiếm trên các bước suy nghĩ trung gian. LATS \cite{zhou2023lats} kết hợp MCTS với phản tư. RethinkMCTS \cite{li2024rethinkmcts} kết hợp các hướng trên: tìm kiếm ở mức ý tưởng, dùng phản hồi mức khối để sửa lại ý tưởng sai ngay trong cây, và kết hợp tỷ lệ vượt test với đánh giá của LLM làm phần thưởng. Phương pháp này được đánh giá trên APPS và HumanEval với GPT-3.5-turbo và GPT-4o-mini, so với các phương pháp trên ở cùng số rollout.
+
+\textbf{Khoảng trống.} Các kết quả của RethinkMCTS mới được báo cáo trên hai mô hình đóng, mỗi cấu hình một lần chạy. Chưa rõ phương pháp còn giữ được lợi thế khi chuyển sang LLM mở cỡ nhỏ hay không, khi so với lấy mẫu nhiều lần ở cùng số chương trình sinh ra, có kiểm định thống kê ghép cặp trên cùng tập bài, và khi đặt độ chính xác cạnh chi phí tính toán. Đây là khoảng trống mà tiểu luận hướng tới.
+
+\addsec{KẾT QUẢ DỰ KIẾN VÀ ĐÓNG GÓP}
+
+\begin{enumerate}
+  \item Một hệ thống cài đặt RethinkMCTS và các phương pháp so sánh, có kiểm thử, tách biệt nghiêm ngặt test công khai và test ẩn, lưu vết đầy đủ từng lời gọi mô hình và có thể chạy lại cho cùng kết quả.
+  \item Một bộ kết quả thực nghiệm ghép cặp trên ba LLM mở cỡ nhỏ và hai bộ dữ liệu, với kiểm định McNemar và hiệu chỉnh đa so sánh Holm.
+  \item Phân tích quan hệ giữa độ chính xác và chi phí, vai trò của critic và của việc dừng sớm, cùng các bài học về những sai lệch cài đặt có thể làm mất tác dụng của cơ chế tìm kiếm.
+  \item Các nhận xét về điều kiện để áp dụng hướng tiếp cận này cho bài toán ứng dụng Text-to-SQL.
+\end{enumerate}
+
+\addsec{BỐ CỤC TIỂU LUẬN}
+
+Ngoài Phần mở đầu và Phần kết luận, tiểu luận gồm năm chương.
+\begin{itemize}
+  \item \textbf{Chương~\ref{chap:lythuyet}} trình bày cơ sở lý thuyết: sinh mã nguồn bằng LLM, phát biểu bài toán giải bài với bộ kiểm chứng một phần, các phương pháp tìm kiếm lúc suy luận, RethinkMCTS và các kiểm định thống kê được sử dụng.
+  \item \textbf{Chương~\ref{chap:caidat}} mô tả thiết kế và cài đặt hệ thống.
+  \item \textbf{Chương~\ref{chap:thietlap}} mô tả thiết lập thực nghiệm: dữ liệu, mô hình, cấu hình, phương pháp so sánh và độ đo.
+  \item \textbf{Chương~\ref{chap:ketqua}} trình bày kết quả thực nghiệm.
+  \item \textbf{Chương~\ref{chap:phantich}} phân tích vai trò của từng thành phần, hành vi tìm kiếm, bài học từ quá trình cài đặt và các yếu tố ảnh hưởng đến tính hợp lệ của kết quả.
+\end{itemize}
+Phần kết luận tóm tắt kết quả, đóng góp, hạn chế và hướng phát triển, trong đó có việc áp dụng cho Text-to-SQL.
