@@ -18,11 +18,12 @@ finish(){
   log "stopping session"
   colab stop -s "$SESSION" >> "$LOG" 2>&1 || log "colab stop failed: STOP IT BY HAND"
   log "finished: $1"
+  pkill -P "$KEEPBUSY" 2>/dev/null; kill "$KEEPBUSY" 2>/dev/null
   exit 0
 }
 
 log "watch_ls attached; submitting keep-busy cell (MAX_HOURS=$MAX_HOURS)"
-python3 - "$MAX_HOURS" <<'PY' | colab exec -s "$SESSION" --timeout 60 >> "$LOG" 2>&1
+(python3 - "$MAX_HOURS" <<'PY' | colab exec -s "$SESSION" --timeout 60 >> "$LOG" 2>&1
 import sys
 h = float(sys.argv[1])
 print(f'''import os, time
@@ -37,6 +38,11 @@ if not (os.path.exists("/content/QUEUE_DONE") or os.path.exists("/content/QUEUE_
     subprocess.run("cd /content && tar czf /content/results.tar.gz runs *.log; touch /content/WATCH_TIMEOUT", shell=True)
 print("keep-busy cell finished")''')
 PY
+# Background the keep-busy cell: on 14/11/2026 its `colab exec` hung after the queue finished (websocket
+# dropped) and, run in the foreground, blocked the polling loop below, so results were not collected and the
+# session kept billing until it was stopped by hand. The cell keeps running on the kernel either way.
+) &
+KEEPBUSY=$!
 started=$(date +%s); unreachable=0
 while true; do
   listing=$(colab ls -s "$SESSION" /content 2>/dev/null)

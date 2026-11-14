@@ -1,0 +1,262 @@
+[
+  {
+    "candidate_id": "cand_ee3650310e",
+    "problem_id": "apps_3214",
+    "code": "import sys\n\ndef get_core(word):\n    core = []\n    for char in word:\n        if char.isalpha():\n            core.append(char.lower())\n    return ''.join(core)\n\ndef is_similar(w1, w2):\n    if len(w1) == len(w2):\n        if abs(len(w1) - len(w2)) == 0:\n            # Same length: check replace or transpose\n            if w1 == w2:\n                return False\n            # Replace\n            diff = 0\n            for c1, c2 in zip(w1, w2):\n                if c1 != c2:\n                    diff += 1\n                    if diff > 1:\n                        return False\n            if diff == 1:\n                return True\n            # Transpose\n            if len(w1) >= 2:\n                for i in range(len(w1) - 1):\n                    if w1[i] == w2[i+1] and w1[i+1] == w2[i]:\n                        # Check if swapping i and i+1 in w1 gives w2\n                        if w1[:i] + w1[i+1] + w1[i] + w1[i+2:] == w2:\n                            return True\n            return False\n        else:\n            return False\n    else:\n        # Different length: check insert/delete (which is symmetric)\n        shorter, longer = (w1, w2) if len(w1) < len(w2) else (w2, w1)\n        if len(longer) - len(shorter) != 1:\n            return False\n        i = 0\n        j = 0\n        diff = 0\n        while i < len(shorter) and j < len(longer):\n            if shorter[i] == longer[j]:\n                i += 1\n                j += 1\n            else:\n                diff += 1\n                if diff > 1:\n                    return False\n                j += 1\n        return True\n\ndef solve():\n    lines = sys.stdin.read().splitlines()\n    cores = set()\n    for line in lines:\n        if line.strip() == \"***\":\n            break\n        words = line.split()\n        for w in words:\n            core = get_core(w)\n            if core:\n                cores.add(core)\n    \n    similar_map = {}\n    for core in cores:\n        neighbors = []\n        for other in cores:\n            if core != other and is_similar(core, other):\n                neighbors.append(other)\n        if neighbors:\n            similar_map[core] = sorted(list(set(neighbors)))\n    \n    if not similar_map:\n        print(\"***\")\n    else:\n        for core in sorted(similar_map.keys()):\n            print(f\"{core}: {' '.join(similar_map[core])}\")\n\nif __name__ == \"__main__\":\n    solve()",
+    "code_hash": "6ec19e9f1b7c2a1e",
+    "language": "python",
+    "node_id": "n_3_ee2be2",
+    "revision_id": "rev_n_3_ee2be2_0",
+    "thought_path_snapshot": [
+      "For each unique core in the text, check if any of its generated neighbors also exist in the text's core set. If matches are found, format the output line as specified, sort the results alphabetically, and handle the edge case where no similar words exist."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 1
+  },
+  {
+    "candidate_id": "cand_003114adf8",
+    "problem_id": "apps_3214",
+    "code": "import sys\n\ndef get_cores(text):\n    cores = set()\n    current_word = []\n    for char in text:\n        if char.isalpha():\n            current_word.append(char.lower())\n        else:\n            if current_word:\n                core = ''.join(current_word)\n                if core:\n                    cores.add(core)\n                current_word = []\n    if current_word:\n        core = ''.join(current_word)\n        if core:\n            cores.add(core)\n    return cores\n\ndef is_similar(w1, w2):\n    if len(w1) == len(w2):\n        if w1 == w2:\n            return False\n        # Replace\n        diff = 0\n        for c1, c2 in zip(w1, w2):\n            if c1 != c2:\n                diff += 1\n                if diff > 1:\n                    return False\n        return diff == 1\n    elif abs(len(w1) - len(w2)) == 1:\n        # Insert/Delete\n        shorter, longer = (w1, w2) if len(w1) < len(w2) else (w2, w1)\n        i = 0\n        j = 0\n        diff = 0\n        while i < len(shorter) and j < len(longer):\n            if shorter[i] != longer[j]:\n                diff += 1\n                if diff > 1:\n                    return False\n                j += 1\n            else:\n                i += 1\n                j += 1\n        return diff == 1\n    else:\n        return False\n\ndef transpose_check(w1, w2):\n    if len(w1) != len(w2):\n        return False\n    if w1 == w2:\n        return False\n    diff = 0\n    for c1, c2 in zip(w1, w2):\n        if c1 != c2:\n            diff += 1\n            if diff > 2:\n                return False\n    if diff == 2:\n        i = 0\n        while i < len(w1) - 1:\n            if w1[i] == w2[i+1] and w1[i+1] == w2[i]:\n                # Check if swapping these two makes them equal\n                swapped = list(w1)\n                swapped[i], swapped[i+1] = swapped[i+1], swapped[i]\n                if ''.join(swapped) == w2:\n                    return True\n            i += 1\n    return False\n\ndef solve():\n    lines = sys.stdin.readlines()\n    text = \"\"\n    for line in lines:\n        if line.strip() == \"***\":\n            break\n        text += line\n\n    cores = get_cores(text)\n    if not cores:\n        print(\"***\")\n        return\n\n    similar_map = {}\n    core_list = sorted(cores)\n\n    for i, w1 in enumerate(core_list):\n        similar = []\n        for j, w2 in enumerate(core_list):\n            if i == j:\n                continue\n            if is_similar(w1, w2) or transpose_check(w1, w2):\n                similar.append(w2)\n        if similar:\n            similar_map[w1] = sorted(set(similar))\n\n    if not similar_map:\n        print(\"***\")\n    else:\n        for w in sorted(similar_map.keys()):\n            print(f\"{w}: {' '.join(similar_map[w])}\")\n\nif __name__ == \"__main__\":\n    solve()",
+    "code_hash": "ce498782f3eb6910",
+    "language": "python",
+    "node_id": "n_1_cc1fda",
+    "revision_id": "rev_n_1_cc1fda_0",
+    "thought_path_snapshot": [
+      "Parse the input text line by line, extracting words based on the 'maximal string of non-whitespace containing at least one alphabetic' rule. For each word, compute its 'core' by stripping non-alphabetic chars and lowercasing. Store all unique cores in a list."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 2
+  },
+  {
+    "candidate_id": "cand_307b147ec5",
+    "problem_id": "apps_3214",
+    "code": "import sys\n\ndef get_core(word):\n    core = []\n    for char in word:\n        if char.isalpha():\n            core.append(char.lower())\n    return ''.join(core)\n\ndef get_neighbors(core):\n    neighbors = set()\n    n = len(core)\n    if n == 0:\n        return neighbors\n\n    # Delete a single character\n    for i in range(n):\n        new_core = core[:i] + core[i+1:]\n        if new_core:\n            neighbors.add(new_core)\n\n    # Insert a single alphabetic character\n    for i in range(n + 1):\n        for char_code in range(ord('a'), ord('z') + 1):\n            new_core = core[:i] + chr(char_code) + core[i:]\n            neighbors.add(new_core)\n\n    # Replace a single character\n    for i in range(n):\n        for char_code in range(ord('a'), ord('z') + 1):\n            if chr(char_code) != core[i]:\n                new_core = core[:i] + chr(char_code) + core[i+1:]\n                neighbors.add(new_core)\n\n    # Transpose adjacent characters\n    for i in range(n - 1):\n        new_core = core[:i] + core[i+1] + core[i] + core[i+2:]\n        neighbors.add(new_core)\n\n    return neighbors\n\ndef solve():\n    lines = sys.stdin.read().splitlines()\n    text_lines = []\n    for line in lines:\n        if line.strip() == \"***\":\n            break\n        text_lines.append(line)\n\n    full_text = ' '.join(text_lines)\n    words = full_text.split()\n\n    cores = []\n    for w in words:\n        c = get_core(w)\n        if c and c.isalpha():\n            cores.append(c)\n\n    core_set = set(cores)\n    core_list = sorted(list(core_set))\n\n    result = {}\n    for c in core_list:\n        neighbors = get_neighbors(c)\n        similar = [n for n in neighbors if n in core_set and n != c]\n        if similar:\n            result[c] = sorted(list(set(similar)))\n\n    if not result:\n        print(\"***\")\n    else:\n        for c in sorted(result.keys()):\n            print(f\"{c}: {' '.join(result[c])}\")\n\nif __name__ == \"__main__\":\n    solve()",
+    "code_hash": "98cb8213a93dff32",
+    "language": "python",
+    "node_id": "n_2_f63d01",
+    "revision_id": "rev_n_2_f63d01_0",
+    "thought_path_snapshot": [
+      "Implement the four transformation functions (delete, insert, replace, transpose) to generate all possible 'neighbors' for a given core. Filter these neighbors to ensure they are valid alphabetic strings of appropriate length."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 3
+  },
+  {
+    "candidate_id": "cand_3bb85e015c",
+    "problem_id": "apps_3214",
+    "code": "import sys\n\ndef get_core(word):\n    core = []\n    for char in word:\n        if char.isalpha():\n            core.append(char.lower())\n    return ''.join(core)\n\ndef generate_neighbors(core):\n    neighbors = set()\n    n = len(core)\n    if n == 0:\n        return neighbors\n    \n    # Delete one character\n    for i in range(n):\n        neighbor = core[:i] + core[i+1:]\n        neighbors.add(neighbor)\n    \n    # Insert one alphabetic character\n    for i in range(n + 1):\n        for c in 'abcdefghijklmnopqrstuvwxyz':\n            neighbor = core[:i] + c + core[i:]\n            neighbors.add(neighbor)\n    \n    # Replace one character\n    for i in range(n):\n        for c in 'abcdefghijklmnopqrstuvwxyz':\n            if c != core[i]:\n                neighbor = core[:i] + c + core[i+1:]\n                neighbors.add(neighbor)\n    \n    # Transpose adjacent characters\n    for i in range(n - 1):\n        neighbor = core[:i] + core[i+1] + core[i] + core[i+2:]\n        neighbors.add(neighbor)\n    \n    return neighbors\n\ndef solve():\n    lines = sys.stdin.read().splitlines()\n    cores = set()\n    \n    for line in lines:\n        if line.strip() == \"***\":\n            break\n        words = line.split()\n        for word in words:\n            core = get_core(word)\n            if core:\n                cores.add(core)\n    \n    if not cores:\n        print(\"***\")\n        return\n    \n    similar_words = {}\n    for core in cores:\n        neighbors = generate_neighbors(core)\n        similar = [n for n in neighbors if n in cores and n != core]\n        if similar:\n            similar_words[core] = sorted(list(set(similar)))\n    \n    if not similar_words:\n        print(\"***\")\n    else:\n        for core in sorted(similar_words.keys()):\n            print(f\"{core}: {' '.join(similar_words[core])}\")\n\nif __name__ == \"__main__\":\n    solve()",
+    "code_hash": "99bc38fd6f28ab93",
+    "language": "python",
+    "node_id": "n_6_0feaf9",
+    "revision_id": "rev_n_6_0feaf9_0",
+    "thought_path_snapshot": [
+      "For each unique core in the text, check if any of its generated neighbors also exist in the text's core set. If matches are found, format the output line as specified, sort the results alphabetically, and handle the edge case where no similar words exist.",
+      "Optimize the neighbor generation by pre-calculating the maximum possible neighbors per word length and ensuring no duplicates in the neighbor list before checking against the core set."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 4
+  },
+  {
+    "candidate_id": "cand_6b8573d330",
+    "problem_id": "apps_3214",
+    "code": "import sys\n\ndef get_core(word):\n    core = []\n    for char in word:\n        if char.isalpha():\n            core.append(char.lower())\n    return ''.join(core)\n\ndef get_neighbors(core):\n    neighbors = set()\n    n = len(core)\n    \n    # Delete a single character\n    for i in range(n):\n        new_core = core[:i] + core[i+1:]\n        if len(new_core) > 0:\n            neighbors.add(new_core)\n    \n    # Insert a single alphabetic character\n    for i in range(n + 1):\n        for char_code in range(ord('a'), ord('z') + 1):\n            char = chr(char_code)\n            new_core = core[:i] + char + core[i:]\n            neighbors.add(new_core)\n    \n    # Replace a single character\n    for i in range(n):\n        for char_code in range(ord('a'), ord('z') + 1):\n            char = chr(char_code)\n            if char != core[i]:\n                new_core = core[:i] + char + core[i+1:]\n                neighbors.add(new_core)\n    \n    # Transpose adjacent characters\n    for i in range(n - 1):\n        new_core = core[:i] + core[i+1] + core[i] + core[i+2:]\n        neighbors.add(new_core)\n    \n    return neighbors\n\ndef main():\n    lines = sys.stdin.read().splitlines()\n    cores = set()\n    \n    for line in lines:\n        if line.strip() == \"***\":\n            break\n        words = line.split()\n        for word in words:\n            core = get_core(word)\n            if core:\n                cores.add(core)\n    \n    if not cores:\n        print(\"***\")\n        return\n    \n    similar = {}\n    for core in cores:\n        neighbors = get_neighbors(core)\n        similar_words = [w for w in neighbors if w in cores and w != core]\n        if similar_words:\n            similar_words.sort()\n            similar[core] = similar_words\n    \n    if not similar:\n        print(\"***\")\n    else:\n        for core in sorted(similar.keys()):\n            print(f\"{core}: {' '.join(similar[core])}\")\n\nif __name__ == \"__main__\":\n    main()",
+    "code_hash": "cf27988e9f156bea",
+    "language": "python",
+    "node_id": "n_9_bdc80a",
+    "revision_id": "rev_n_9_bdc80a_0",
+    "thought_path_snapshot": [
+      "Implement the four transformation functions (delete, insert, replace, transpose) to generate all possible 'neighbors' for a given core. Filter these neighbors to ensure they are valid alphabetic strings of appropriate length.",
+      "For each unique core, check if it has any neighbors that also exist in the text's core set; if so, collect them, sort alphabetically, and format the output lines, finally printing '***' if no matches are found."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 5
+  },
+  {
+    "candidate_id": "cand_d73e6eb8c5",
+    "problem_id": "apps_3214",
+    "code": "import sys\n\ndef get_core(word):\n    core = []\n    for char in word:\n        if char.isalpha():\n            core.append(char.lower())\n    return ''.join(core)\n\ndef generate_neighbors(core):\n    if not core:\n        return set()\n    \n    neighbors = set()\n    n = len(core)\n    \n    # Delete one character\n    for i in range(n):\n        new_core = core[:i] + core[i+1:]\n        neighbors.add(new_core)\n    \n    # Insert one alphabetic character\n    for i in range(n + 1):\n        for char_code in range(ord('a'), ord('z') + 1):\n            char = chr(char_code)\n            new_core = core[:i] + char + core[i:]\n            neighbors.add(new_core)\n    \n    # Replace one character\n    for i in range(n):\n        for char_code in range(ord('a'), ord('z') + 1):\n            char = chr(char_code)\n            if char != core[i]:\n                new_core = core[:i] + char + core[i+1:]\n                neighbors.add(new_core)\n    \n    # Transpose adjacent characters\n    for i in range(n - 1):\n        new_core = core[:i] + core[i+1] + core[i] + core[i+2:]\n        neighbors.add(new_core)\n    \n    return neighbors\n\ndef main():\n    lines = sys.stdin.read().splitlines()\n    \n    words = []\n    for line in lines:\n        if line.strip() == \"***\":\n            break\n        words.extend(line.split())\n    \n    cores = set()\n    for w in words:\n        c = get_core(w)\n        if c:\n            cores.add(c)\n    \n    core_list = sorted(cores)\n    results = []\n    \n    for core in core_list:\n        neighbors = generate_neighbors(core)\n        similar = sorted([n for n in neighbors if n in cores and n != core])\n        if similar:\n            results.append(f\"{core}: {' '.join(similar)}\")\n    \n    if not results:\n        print(\"***\")\n    else:\n        for line in results:\n            print(line)\n\nif __name__ == \"__main__\":\n    main()",
+    "code_hash": "517c5c44952b9a8e",
+    "language": "python",
+    "node_id": "n_4_c2bbd9",
+    "revision_id": "rev_n_4_c2bbd9_0",
+    "thought_path_snapshot": [
+      "For each unique core in the text, check if any of its generated neighbors also exist in the text's core set. If matches are found, format the output line as specified, sort the results alphabetically, and handle the edge case where no similar words exist.",
+      "Parse the input to extract words, compute their cores by stripping non-alphabetic chars and lowercasing, then generate all valid neighbors (delete, insert, replace, transpose) for each unique core to find matches in the set."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 6
+  },
+  {
+    "candidate_id": "cand_d577ecaa38",
+    "problem_id": "apps_3214",
+    "code": "import sys\n\ndef get_core(word):\n    core = \"\"\n    for char in word:\n        if char.isalpha():\n            core += char.lower()\n    return core\n\ndef is_similar(w1, w2):\n    if len(w1) == len(w2):\n        if abs(len(w1) - len(w2)) == 0:\n            # Check replace or transpose\n            if len(w1) == 0:\n                return False\n            # Transpose\n            if len(w1) == 2:\n                return w1[0] == w2[1] and w1[1] == w2[0]\n            # Replace\n            diff = 0\n            for i in range(len(w1)):\n                if w1[i] != w2[i]:\n                    diff += 1\n                    if diff > 1:\n                        return False\n            return diff == 1\n        return False\n    \n    # Length difference must be 1\n    if abs(len(w1) - len(w2)) != 1:\n        return False\n    \n    shorter = w1 if len(w1) < len(w2) else w2\n    longer = w2 if len(w1) < len(w2) else w1\n    \n    i = 0\n    j = 0\n    diff = 0\n    while i < len(shorter) and j < len(longer):\n        if shorter[i] != longer[j]:\n            diff += 1\n            if diff > 1:\n                return False\n            j += 1\n        else:\n            i += 1\n            j += 1\n    \n    return True\n\ndef get_neighbors(core):\n    neighbors = set()\n    n = len(core)\n    \n    # Delete\n    for i in range(n):\n        new_word = core[:i] + core[i+1:]\n        if len(new_word) > 0:\n            neighbors.add(new_word)\n    \n    # Insert\n    for i in range(n + 1):\n        for char_code in range(ord('a'), ord('z') + 1):\n            char = chr(char_code)\n            new_word = core[:i] + char + core[i:]\n            neighbors.add(new_word)\n    \n    # Replace\n    for i in range(n):\n        for char_code in range(ord('a'), ord('z') + 1):\n            char = chr(char_code)\n            if char != core[i]:\n                new_word = core[:i] + char + core[i+1:]\n                neighbors.add(new_word)\n    \n    # Transpose\n    for i in range(n - 1):\n        new_word = core[:i] + core[i+1] + core[i] + core[i+2:]\n        neighbors.add(new_word)\n    \n    return neighbors\n\ndef main():\n    lines = sys.stdin.readlines()\n    text_lines = []\n    for line in lines:\n        if line.strip() == \"***\":\n            break\n        text_lines.append(line.strip())\n    \n    all_cores = set()\n    for line in text_lines:\n        words = line.split()\n        for word in words:\n            core = get_core(word)\n            if core:\n                all_cores.add(core)\n    \n    similar_map = {}\n    cores_list = sorted(list(all_cores))\n    \n    for core in cores_list:\n        neighbors = get_neighbors(core)\n        similar = []\n        for n in neighbors:\n            if n in all_cores and n != core:\n                similar.append(n)\n        if similar:\n            similar.sort()\n            similar_map[core] = similar\n    \n    if not similar_map:\n        print(\"***\")\n    else:\n        for core in sorted(similar_map.keys()):\n            print(f\"{core}: {' '.join(similar_map[core])}\")\n\nif __name__ == \"__main__\":\n    main()",
+    "code_hash": "18bbee8087a3c8f9",
+    "language": "python",
+    "node_id": "n_7_e45e36",
+    "revision_id": "rev_n_7_e45e36_0",
+    "thought_path_snapshot": [
+      "Implement the four transformation functions (delete, insert, replace, transpose) to generate all possible 'neighbors' for a given core. Filter these neighbors to ensure they are valid alphabetic strings of appropriate length.",
+      "Parse the input text line by line, extracting words based on the 'maximal string of non-whitespace containing at least one alphabetic character' rule, then normalize each to its 'core' (lowercase, non-alphabetic chars removed). Store all unique cores in a set."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 7
+  },
+  {
+    "candidate_id": "cand_d17f043119",
+    "problem_id": "apps_3214",
+    "code": "import sys\n\ndef get_core(word):\n    core = []\n    for char in word:\n        if char.isalpha():\n            core.append(char.lower())\n    return ''.join(core)\n\ndef generate_neighbors(core):\n    neighbors = set()\n    n = len(core)\n    if n == 0:\n        return neighbors\n    \n    # Delete a single character\n    for i in range(n):\n        new_core = core[:i] + core[i+1:]\n        neighbors.add(new_core)\n    \n    # Insert a single alphabetic character\n    for i in range(n + 1):\n        for c in 'abcdefghijklmnopqrstuvwxyz':\n            new_core = core[:i] + c + core[i:]\n            neighbors.add(new_core)\n    \n    # Replace a single character\n    for i in range(n):\n        for c in 'abcdefghijklmnopqrstuvwxyz':\n            if c != core[i]:\n                new_core = core[:i] + c + core[i+1:]\n                neighbors.add(new_core)\n    \n    # Transpose adjacent characters\n    for i in range(n - 1):\n        new_core = core[:i] + core[i+1] + core[i] + core[i+2:]\n        neighbors.add(new_core)\n    \n    return neighbors\n\ndef main():\n    lines = sys.stdin.read().splitlines()\n    cores = set()\n    \n    for line in lines:\n        if line.strip() == \"***\":\n            break\n        words = line.split()\n        for word in words:\n            core = get_core(word)\n            if core:\n                cores.add(core)\n    \n    if not cores:\n        print(\"***\")\n        return\n    \n    similar_words = {}\n    for core in cores:\n        neighbors = generate_neighbors(core)\n        matches = [n for n in neighbors if n in cores and n != core]\n        if matches:\n            similar_words[core] = sorted(matches)\n    \n    if not similar_words:\n        print(\"***\")\n    else:\n        for core in sorted(similar_words.keys()):\n            print(f\"{core}: {' '.join(similar_words[core])}\")\n\nif __name__ == \"__main__\":\n    main()",
+    "code_hash": "2edca9b92767b94c",
+    "language": "python",
+    "node_id": "n_5_5aaf3b",
+    "revision_id": "rev_n_5_5aaf3b_0",
+    "thought_path_snapshot": [
+      "For each unique core in the text, check if any of its generated neighbors also exist in the text's core set. If matches are found, format the output line as specified, sort the results alphabetically, and handle the edge case where no similar words exist.",
+      "Use a set for O(1) lookup of cores, iterate through each core to generate its 4 types of transformations, collect matches, sort the output lists and lines alphabetically, and handle the empty result case by printing '***'."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 8
+  },
+  {
+    "candidate_id": "cand_8bb26b0837",
+    "problem_id": "apps_3214",
+    "code": "import sys\n\ndef get_core(word):\n    core = \"\"\n    for char in word:\n        if char.isalpha():\n            core += char.lower()\n    return core\n\ndef get_neighbors(core):\n    neighbors = set()\n    n = len(core)\n    \n    # Delete a single character\n    for i in range(n):\n        new_core = core[:i] + core[i+1:]\n        if new_core:\n            neighbors.add(new_core)\n    \n    # Insert a single alphabetic character\n    for i in range(n + 1):\n        for char_code in range(ord('a'), ord('z') + 1):\n            char = chr(char_code)\n            new_core = core[:i] + char + core[i:]\n            neighbors.add(new_core)\n    \n    # Replace a single character\n    for i in range(n):\n        for char_code in range(ord('a'), ord('z') + 1):\n            char = chr(char_code)\n            if char != core[i]:\n                new_core = core[:i] + char + core[i+1:]\n                neighbors.add(new_core)\n    \n    # Transpose adjacent characters\n    for i in range(n - 1):\n        new_core = core[:i] + core[i+1] + core[i] + core[i+2:]\n        neighbors.add(new_core)\n    \n    return neighbors\n\ndef main():\n    lines = sys.stdin.read().splitlines()\n    text_lines = []\n    for line in lines:\n        if line.strip() == \"***\":\n            break\n        text_lines.append(line)\n    \n    text = \" \".join(text_lines)\n    \n    words = text.split()\n    cores = set()\n    for word in words:\n        core = get_core(word)\n        if core:\n            cores.add(core)\n    \n    core_list = sorted(cores)\n    similar_map = {}\n    \n    for core in core_list:\n        neighbors = get_neighbors(core)\n        similar = []\n        for neighbor in neighbors:\n            if neighbor in cores and neighbor != core:\n                similar.append(neighbor)\n        if similar:\n            similar_map[core] = sorted(list(set(similar)))\n    \n    if not similar_map:\n        print(\"***\")\n    else:\n        for core in sorted(similar_map.keys()):\n            print(f\"{core}: {' '.join(similar_map[core])}\")\n\nif __name__ == \"__main__\":\n    main()",
+    "code_hash": "3ef6855c57af40b4",
+    "language": "python",
+    "node_id": "n_8_434139",
+    "revision_id": "rev_n_8_434139_0",
+    "thought_path_snapshot": [
+      "Implement the four transformation functions (delete, insert, replace, transpose) to generate all possible 'neighbors' for a given core. Filter these neighbors to ensure they are valid alphabetic strings of appropriate length.",
+      "Implement the four transformation functions (delete, insert, replace, transpose) to generate all possible neighbor cores for each unique word core found in the text, ensuring neighbors are valid alphabetic strings."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 9
+  },
+  {
+    "candidate_id": "cand_bb7ad237c8",
+    "problem_id": "apps_3214",
+    "code": "import sys\n\ndef get_core(word):\n    core = \"\"\n    for char in word:\n        if char.isalpha():\n            core += char.lower()\n    return core\n\ndef generate_neighbors(core):\n    neighbors = set()\n    n = len(core)\n    \n    # Delete a single character\n    for i in range(n):\n        neighbor = core[:i] + core[i+1:]\n        if neighbor:\n            neighbors.add(neighbor)\n    \n    # Insert a single alphabetic character\n    for i in range(n + 1):\n        for char_code in range(ord('a'), ord('z') + 1):\n            char = chr(char_code)\n            neighbor = core[:i] + char + core[i:]\n            neighbors.add(neighbor)\n    \n    # Replace a single character\n    for i in range(n):\n        for char_code in range(ord('a'), ord('z') + 1):\n            char = chr(char_code)\n            if char != core[i]:\n                neighbor = core[:i] + char + core[i+1:]\n                neighbors.add(neighbor)\n    \n    # Transpose adjacent characters\n    for i in range(n - 1):\n        neighbor = core[:i] + core[i+1] + core[i] + core[i+2:]\n        neighbors.add(neighbor)\n    \n    return neighbors\n\ndef main():\n    lines = sys.stdin.read().splitlines()\n    cores = set()\n    \n    for line in lines:\n        if line.strip() == \"***\":\n            break\n        words = line.split()\n        for word in words:\n            core = get_core(word)\n            if core:\n                cores.add(core)\n    \n    if not cores:\n        print(\"***\")\n        return\n    \n    results = []\n    for core in cores:\n        neighbors = generate_neighbors(core)\n        similar = [n for n in neighbors if n in cores and n != core]\n        if similar:\n            similar.sort()\n            results.append((core, similar))\n    \n    if not results:\n        print(\"***\")\n    else:\n        results.sort(key=lambda x: x[0])\n        for core, similar in results:\n            print(f\"{core}: {' '.join(similar)}\")\n\nif __name__ == \"__main__\":\n    main()",
+    "code_hash": "4d90fa4b480a1611",
+    "language": "python",
+    "node_id": "n_10_06f710",
+    "revision_id": "rev_n_10_06f710_0",
+    "thought_path_snapshot": [
+      "For each unique core in the text, check if any of its generated neighbors also exist in the text's core set. If matches are found, format the output line as specified, sort the results alphabetically, and handle the edge case where no similar words exist.",
+      "Use a set for O(1) lookup of cores, iterate through each core to generate its 4 types of transformations, collect matches, sort the output lists and lines alphabetically, and handle the empty result case by printing '***'.",
+      "Extract all word cores into a set for O(1) lookup, then iterate through each unique core to generate all possible neighbors via the four transformation rules (delete, insert, replace, transpose). Filter neighbors that exist in the set and are not the core itself, sort the results, and format the output lines alphabetically, printing '***' if no matches are found."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 10
+  },
+  {
+    "candidate_id": "cand_b0aecfde08",
+    "problem_id": "apps_3214",
+    "code": "import sys\n\ndef get_core(word):\n    core = \"\"\n    for char in word:\n        if char.isalpha():\n            core += char.lower()\n    return core\n\ndef get_neighbors(core):\n    neighbors = set()\n    n = len(core)\n    \n    # Delete a single character\n    for i in range(n):\n        new_core = core[:i] + core[i+1:]\n        if new_core:\n            neighbors.add(new_core)\n    \n    # Insert a single alphabetic character\n    for i in range(n + 1):\n        for char_code in range(ord('a'), ord('z') + 1):\n            char = chr(char_code)\n            new_core = core[:i] + char + core[i:]\n            neighbors.add(new_core)\n    \n    # Replace a single character\n    for i in range(n):\n        for char_code in range(ord('a'), ord('z') + 1):\n            char = chr(char_code)\n            if char != core[i]:\n                new_core = core[:i] + char + core[i+1:]\n                neighbors.add(new_core)\n    \n    # Transpose adjacent characters\n    for i in range(n - 1):\n        new_core = core[:i] + core[i+1] + core[i] + core[i+2:]\n        neighbors.add(new_core)\n    \n    return neighbors\n\ndef main():\n    lines = sys.stdin.read().splitlines()\n    cores = set()\n    \n    for line in lines:\n        if line.strip() == \"***\":\n            break\n        words = line.split()\n        for word in words:\n            core = get_core(word)\n            if core:\n                cores.add(core)\n    \n    if not cores:\n        print(\"***\")\n        return\n    \n    similar_words = {}\n    for core in cores:\n        neighbors = get_neighbors(core)\n        similar = [n for n in neighbors if n in cores and n != core]\n        if similar:\n            similar.sort()\n            similar_words[core] = similar\n    \n    if not similar_words:\n        print(\"***\")\n    else:\n        sorted_cores = sorted(similar_words.keys())\n        for core in sorted_cores:\n            print(f\"{core}: {' '.join(similar_words[core])}\")\n\nif __name__ == \"__main__\":\n    main()",
+    "code_hash": "62db7e8af3f6c37a",
+    "language": "python",
+    "node_id": "n_13_76157d",
+    "revision_id": "rev_n_13_76157d_0",
+    "thought_path_snapshot": [
+      "Implement the four transformation functions (delete, insert, replace, transpose) to generate all possible 'neighbors' for a given core. Filter these neighbors to ensure they are valid alphabetic strings of appropriate length.",
+      "For each unique core, check if it has any neighbors that also exist in the text's core set; if so, collect them, sort alphabetically, and format the output lines, finally printing '***' if no matches are found.",
+      "Parse the input to extract all words, normalize them to their 'core' form (lowercase, alphabetic only), and store them in a set for O(1) lookup. Then, for each unique core, generate all possible neighbors using the four transformation rules (delete, insert, replace, transpose) and check if any neighbor exists in the set. Finally, format the output as specified, sorting the cores and their neighbors alphabetically."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 11
+  },
+  {
+    "candidate_id": "cand_9c88e5a919",
+    "problem_id": "apps_3214",
+    "code": "import sys\n\ndef get_core(word):\n    core = []\n    for char in word:\n        if char.isalpha():\n            core.append(char.lower())\n    return ''.join(core)\n\ndef generate_neighbors(core):\n    neighbors = set()\n    n = len(core)\n    \n    # Delete one character\n    for i in range(n):\n        neighbors.add(core[:i] + core[i+1:])\n    \n    # Insert one alphabetic character\n    for i in range(n + 1):\n        for c in 'abcdefghijklmnopqrstuvwxyz':\n            neighbors.add(core[:i] + c + core[i:])\n    \n    # Replace one character\n    for i in range(n):\n        for c in 'abcdefghijklmnopqrstuvwxyz':\n            if c != core[i]:\n                neighbors.add(core[:i] + c + core[i+1:])\n    \n    # Transpose adjacent characters\n    for i in range(n - 1):\n        lst = list(core)\n        lst[i], lst[i+1] = lst[i+1], lst[i]\n        neighbors.add(''.join(lst))\n    \n    return neighbors\n\ndef main():\n    lines = sys.stdin.read().splitlines()\n    cores = set()\n    \n    for line in lines:\n        if line.strip() == \"***\":\n            break\n        words = line.split()\n        for word in words:\n            core = get_core(word)\n            if core:\n                cores.add(core)\n    \n    if not cores:\n        print(\"***\")\n        return\n    \n    similar_words = {}\n    for core in cores:\n        neighbors = generate_neighbors(core)\n        similar = [n for n in neighbors if n in cores and n != core]\n        if similar:\n            similar_words[core] = sorted(list(set(similar)))\n    \n    if not similar_words:\n        print(\"***\")\n    else:\n        for core in sorted(similar_words.keys()):\n            print(f\"{core}: {' '.join(similar_words[core])}\")\n\nif __name__ == \"__main__\":\n    main()",
+    "code_hash": "e299e74ea5fd6cee",
+    "language": "python",
+    "node_id": "n_16_b980b6",
+    "revision_id": "rev_n_16_b980b6_0",
+    "thought_path_snapshot": [
+      "For each unique core in the text, check if any of its generated neighbors also exist in the text's core set. If matches are found, format the output line as specified, sort the results alphabetically, and handle the edge case where no similar words exist.",
+      "Optimize the neighbor generation by pre-calculating the maximum possible neighbors per word length and ensuring no duplicates in the neighbor list before checking against the core set.",
+      "Parse the input to extract all words, compute their lowercase alphabetic cores, and store them in a set for O(1) lookup. Then, for each unique core, generate all possible neighbors via the four transformations (delete, insert, replace, transpose) and check if they exist in the set. Finally, format the output by sorting cores and their neighbors alphabetically, handling the empty case."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 12
+  },
+  {
+    "candidate_id": "cand_77cbb79ad8",
+    "problem_id": "apps_3214",
+    "code": "import sys\n\ndef get_core(word):\n    core = []\n    for char in word:\n        if char.isalpha():\n            core.append(char.lower())\n    return ''.join(core)\n\ndef get_neighbors(core):\n    neighbors = set()\n    n = len(core)\n    \n    # Delete a single character\n    for i in range(n):\n        new_core = core[:i] + core[i+1:]\n        if new_core:\n            neighbors.add(new_core)\n    \n    # Insert a single alphabetic character\n    for i in range(n + 1):\n        for char_code in range(ord('a'), ord('z') + 1):\n            char = chr(char_code)\n            new_core = core[:i] + char + core[i:]\n            neighbors.add(new_core)\n    \n    # Replace a single character\n    for i in range(n):\n        for char_code in range(ord('a'), ord('z') + 1):\n            if char_code == ord(core[i]):\n                continue\n            char = chr(char_code)\n            new_core = core[:i] + char + core[i+1:]\n            neighbors.add(new_core)\n    \n    # Transpose adjacent characters\n    for i in range(n - 1):\n        new_core = core[:i] + core[i+1] + core[i] + core[i+2:]\n        neighbors.add(new_core)\n    \n    return neighbors\n\ndef main():\n    lines = sys.stdin.read().splitlines()\n    text_lines = []\n    for line in lines:\n        if line.strip() == \"***\":\n            break\n        text_lines.append(line)\n    \n    text = ' '.join(text_lines)\n    \n    words = text.split()\n    cores = set()\n    for word in words:\n        c = get_core(word)\n        if c:\n            cores.add(c)\n    \n    similar = {}\n    for core in cores:\n        neighbors = get_neighbors(core)\n        similar_neighbors = [n for n in neighbors if n in cores and n != core]\n        if similar_neighbors:\n            similar[core] = sorted(similar_neighbors)\n    \n    if not similar:\n        print(\"***\")\n    else:\n        for core in sorted(similar.keys()):\n            print(f\"{core}: {' '.join(similar[core])}\")\n\nif __name__ == \"__main__\":\n    main()",
+    "code_hash": "1b0001ad2f1829ad",
+    "language": "python",
+    "node_id": "n_19_606e80",
+    "revision_id": "rev_n_19_606e80_0",
+    "thought_path_snapshot": [
+      "Implement the four transformation functions (delete, insert, replace, transpose) to generate all possible 'neighbors' for a given core. Filter these neighbors to ensure they are valid alphabetic strings of appropriate length.",
+      "Implement the four transformation functions (delete, insert, replace, transpose) to generate all possible neighbor cores for each unique word core found in the text, ensuring neighbors are valid alphabetic strings.",
+      "Parse the input text to extract all word cores by stripping non-alphabetic characters and lowercasing, then store unique cores in a set. Generate all possible neighbors for each core using the four transformation rules (delete, insert, replace, transpose), filter valid alphabetic neighbors, and check if they exist in the set of unique cores. Finally, format the output by sorting cores and their neighbors alphabetically, handling the edge case where no similar words exist."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 13
+  },
+  {
+    "candidate_id": "cand_a48440206d",
+    "problem_id": "apps_3214",
+    "code": "import sys\n\ndef get_core(word):\n    core = []\n    for char in word:\n        if char.isalpha():\n            core.append(char.lower())\n    return ''.join(core)\n\ndef generate_neighbors(core):\n    if not core:\n        return set()\n    \n    neighbors = set()\n    n = len(core)\n    \n    # Delete a single character\n    for i in range(n):\n        new_core = core[:i] + core[i+1:]\n        neighbors.add(new_core)\n    \n    # Insert a single alphabetic character\n    for i in range(n + 1):\n        for char_code in range(ord('a'), ord('z') + 1):\n            char = chr(char_code)\n            new_core = core[:i] + char + core[i:]\n            neighbors.add(new_core)\n    \n    # Replace a single character by a different alphabetic character\n    for i in range(n):\n        for char_code in range(ord('a'), ord('z') + 1):\n            char = chr(char_code)\n            if char != core[i]:\n                new_core = core[:i] + char + core[i+1:]\n                neighbors.add(new_core)\n    \n    # Transpose any two adjacent characters\n    for i in range(n - 1):\n        new_core = core[:i] + core[i+1] + core[i] + core[i+2:]\n        neighbors.add(new_core)\n    \n    return neighbors\n\ndef main():\n    lines = sys.stdin.read().splitlines()\n    cores = set()\n    \n    for line in lines:\n        if line.strip() == \"***\":\n            break\n        words = line.split()\n        for word in words:\n            core = get_core(word)\n            if core:\n                cores.add(core)\n    \n    if not cores:\n        print(\"***\")\n        return\n    \n    similar_words = {}\n    \n    for core in cores:\n        neighbors = generate_neighbors(core)\n        similar = [n for n in neighbors if n in cores and n != core]\n        if similar:\n            similar_words[core] = sorted(list(set(similar)))\n    \n    if not similar_words:\n        print(\"***\")\n    else:\n        for core in sorted(similar_words.keys()):\n            print(f\"{core}: {' '.join(similar_words[core])}\")\n\nif __name__ == \"__main__\":\n    main()",
+    "code_hash": "688dbdd565872ac5",
+    "language": "python",
+    "node_id": "n_22_940144",
+    "revision_id": "rev_n_22_940144_0",
+    "thought_path_snapshot": [
+      "For each unique core in the text, check if any of its generated neighbors also exist in the text's core set. If matches are found, format the output line as specified, sort the results alphabetically, and handle the edge case where no similar words exist.",
+      "Parse the input to extract words, compute their cores by stripping non-alphabetic chars and lowercasing, then generate all valid neighbors (delete, insert, replace, transpose) for each unique core to find matches in the set.",
+      "Parse the input to extract all words, compute their cores by removing non-alphabetic characters and lowercasing, then generate all valid neighbors (delete, insert, replace, transpose) for each unique core to find matches in the set."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 14
+  },
+  {
+    "candidate_id": "cand_76bca7ce4f",
+    "problem_id": "apps_3214",
+    "code": "import sys\n\ndef get_core(word):\n    core = \"\"\n    for char in word:\n        if char.isalpha():\n            core += char.lower()\n    return core\n\ndef is_similar(w1, w2):\n    if len(w1) == len(w2):\n        if abs(len(w1) - len(w2)) == 0:\n            # Check replace or transpose\n            if len(w1) == 0:\n                return False\n            # Transpose\n            if len(w1) == 2:\n                return w1[0] == w2[1] and w1[1] == w2[0]\n            # Replace\n            diff = 0\n            for c1, c2 in zip(w1, w2):\n                if c1 != c2:\n                    diff += 1\n                    if diff > 1:\n                        return False\n            return diff == 1\n        return False\n    elif len(w1) + 1 == len(w2):\n        # w2 has one more char than w1 -> delete from w2 to get w1\n        return w1 in w2\n    elif len(w1) + 1 == len(w2):\n        # w1 has one more char than w2 -> delete from w1 to get w2\n        return w2 in w1\n    else:\n        return False\n\ndef get_neighbors(core):\n    neighbors = set()\n    n = len(core)\n    if n == 0:\n        return neighbors\n    \n    # Delete\n    for i in range(n):\n        new_word = core[:i] + core[i+1:]\n        if new_word:\n            neighbors.add(new_word)\n    \n    # Insert\n    for i in range(n + 1):\n        for c in 'abcdefghijklmnopqrstuvwxyz':\n            new_word = core[:i] + c + core[i:]\n            neighbors.add(new_word)\n    \n    # Replace\n    for i in range(n):\n        for c in 'abcdefghijklmnopqrstuvwxyz':\n            if c != core[i]:\n                new_word = core[:i] + c + core[i+1:]\n                neighbors.add(new_word)\n    \n    # Transpose\n    if n >= 2:\n        for i in range(n - 1):\n            new_word = core[:i] + core[i+1] + core[i] + core[i+2:]\n            neighbors.add(new_word)\n    \n    return neighbors\n\ndef main():\n    lines = sys.stdin.readlines()\n    text_lines = []\n    for line in lines:\n        if line.strip() == \"***\":\n            break\n        text_lines.append(line.strip())\n    \n    all_cores = set()\n    for line in text_lines:\n        words = line.split()\n        for word in words:\n            core = get_core(word)\n            if core:\n                all_cores.add(core)\n    \n    similar_map = {}\n    for core in all_cores:\n        neighbors = get_neighbors(core)\n        similar = [n for n in neighbors if n in all_cores and n != core]\n        if similar:\n            similar_map[core] = sorted(list(set(similar)))\n    \n    if not similar_map:\n        print(\"***\")\n    else:\n        for core in sorted(similar_map.keys()):\n            print(f\"{core}: {' '.join(similar_map[core])}\")\n\nif __name__ == \"__main__\":\n    main()",
+    "code_hash": "c9c2f4c941b091ea",
+    "language": "python",
+    "node_id": "n_27_6f5577",
+    "revision_id": "rev_n_27_6f5577_0",
+    "thought_path_snapshot": [
+      "Implement the four transformation functions (delete, insert, replace, transpose) to generate all possible 'neighbors' for a given core. Filter these neighbors to ensure they are valid alphabetic strings of appropriate length.",
+      "Parse the input text line by line, extracting words based on the 'maximal string of non-whitespace containing at least one alphabetic character' rule, then normalize each to its 'core' (lowercase, non-alphabetic chars removed). Store all unique cores in a set.",
+      "Iterate through each unique core, find its neighbors that also exist in the text set (excluding the core itself), group results by core, sort the output lists and lines alphabetically, and handle the edge case where no similar words exist."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 15
+  },
+  {
+    "candidate_id": "cand_cb3664e3ba",
+    "problem_id": "apps_3214",
+    "code": "import sys\n\ndef get_core(word):\n    core = []\n    for char in word:\n        if char.isalpha():\n            core.append(char.lower())\n    return ''.join(core)\n\ndef generate_neighbors(core):\n    neighbors = set()\n    n = len(core)\n    if n == 0:\n        return neighbors\n    \n    # Delete one character\n    for i in range(n):\n        neighbor = core[:i] + core[i+1:]\n        neighbors.add(neighbor)\n    \n    # Insert one alphabetic character\n    for i in range(n + 1):\n        for c in 'abcdefghijklmnopqrstuvwxyz':\n            neighbor = core[:i] + c + core[i:]\n            neighbors.add(neighbor)\n    \n    # Replace one character\n    for i in range(n):\n        for c in 'abcdefghijklmnopqrstuvwxyz':\n            if c != core[i]:\n                neighbor = core[:i] + c + core[i+1:]\n                neighbors.add(neighbor)\n    \n    # Transpose adjacent characters\n    for i in range(n - 1):\n        neighbor = core[:i] + core[i+1] + core[i] + core[i+2:]\n        neighbors.add(neighbor)\n    \n    return neighbors\n\ndef solve():\n    lines = sys.stdin.read().splitlines()\n    cores = set()\n    \n    for line in lines:\n        if line.strip() == \"***\":\n            break\n        words = line.split()\n        for word in words:\n            core = get_core(word)\n            if core:\n                cores.add(core)\n    \n    if not cores:\n        print(\"***\")\n        return\n    \n    similar_words = {}\n    for core in cores:\n        neighbors = generate_neighbors(core)\n        similar = [n for n in neighbors if n in cores and n != core]\n        if similar:\n            similar_words[core] = sorted(list(set(similar)))\n    \n    if not similar_words:\n        print(\"***\")\n    else:\n        for core in sorted(similar_words.keys()):\n            print(f\"{core}: {' '.join(similar_words[core])}\")\n\nif __name__ == \"__main__\":\n    solve()",
+    "code_hash": "99bc38fd6f28ab93",
+    "language": "python",
+    "node_id": "n_17_9658b4",
+    "revision_id": "rev_n_17_9658b4_0",
+    "thought_path_snapshot": [
+      "For each unique core in the text, check if any of its generated neighbors also exist in the text's core set. If matches are found, format the output line as specified, sort the results alphabetically, and handle the edge case where no similar words exist.",
+      "Optimize the neighbor generation by pre-calculating the maximum possible neighbors per word length and ensuring no duplicates in the neighbor list before checking against the core set.",
+      "Optimize the neighbor generation by pre-computing the maximum number of neighbors based on word length to avoid redundant checks. Use a hash set for the core collection to ensure fast lookups. Ensure that the output strictly follows the formatting rules, including sorting and the specific '***' condition for no matches."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 16
+  }
+]

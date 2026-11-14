@@ -1,0 +1,264 @@
+[
+  {
+    "candidate_id": "cand_d25568fedd",
+    "problem_id": "apps_2857",
+    "code": "import sys\n\ndef solve():\n    input = sys.stdin.read\n    data = input().split()\n    \n    if not data:\n        return\n    \n    iterator = iter(data)\n    try:\n        n = int(next(iterator))\n    except StopIteration:\n        return\n    \n    points = []\n    for _ in range(n):\n        x = int(next(iterator))\n        y = int(next(iterator))\n        points.append((x, y))\n    \n    # Store points in sets for O(1) average time complexity lookups\n    # x_to_points: maps x-coordinate to a set of y-coordinates at that x\n    # y_to_points: maps y-coordinate to a set of x-coordinates at that y\n    x_to_points = {}\n    y_to_points = {}\n    \n    for x, y in points:\n        if x not in x_to_points:\n            x_to_points[x] = set()\n        if y not in y_to_points:\n            y_to_points[y] = set()\n        x_to_points[x].add(y)\n        y_to_points[y].add(x)\n    \n    count = 0\n    \n    # Iterate through each point considering it as the right-angle vertex\n    for x, y in points:\n        # Count points sharing the same x-coordinate (vertical leg candidates)\n        # Exclude the point itself\n        vertical_count = len(x_to_points[x]) - 1\n        \n        # Count points sharing the same y-coordinate (horizontal leg candidates)\n        # Exclude the point itself\n        horizontal_count = len(y_to_points[y]) - 1\n        \n        # If there are points in both directions, we can form triangles\n        if vertical_count > 0 and horizontal_count > 0:\n            count += vertical_count * horizontal_count\n    \n    print(count)\n\nif __name__ == \"__main__\":\n    solve()",
+    "code_hash": "a4fd3047167e8277",
+    "language": "python",
+    "node_id": "n_1_05102d",
+    "revision_id": "rev_n_1_05102d_0",
+    "thought_path_snapshot": [
+      "Iterate through every point as the potential right-angle vertex, then use hash sets to count how many other points share the same x-coordinate and how many share the same y-coordinate. The number of valid triangles for that vertex is the product of these two counts. Sum these products for all vertices."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 1
+  },
+  {
+    "candidate_id": "cand_4ba1cfec32",
+    "problem_id": "apps_2857",
+    "code": "import sys\n\ndef solve():\n    input_data = sys.stdin.read().split()\n    if not input_data:\n        return\n\n    iterator = iter(input_data)\n    try:\n        n = int(next(iterator))\n    except StopIteration:\n        return\n\n    points = []\n    for _ in range(n):\n        x = int(next(iterator))\n        y = int(next(iterator))\n        points.append((x, y))\n\n    # We need to count triplets (A, B, C) such that:\n    # - A and B share the same x-coordinate (vertical leg)\n    # - A and C share the same y-coordinate (horizontal leg)\n    # - B and C do not share the same x or y (otherwise it's degenerate or not a right triangle with legs parallel to axes in the standard sense where the right angle is at A)\n    # Actually, the condition \"legs parallel to coordinate axes\" implies the right angle is at the vertex where the horizontal and vertical legs meet.\n    # So if the right angle is at point P, then there must be another point Q with the same x as P, and another point R with the same y as P.\n    # The triplet is {P, Q, R}.\n    # We iterate over each point P and count how many points share its x-coordinate (excluding P itself) and how many share its y-coordinate (excluding P itself).\n    # If P has 'vx' other points with the same x, and 'vy' other points with the same y, then P can form vx * vy triangles as the right-angle vertex.\n\n    # Precompute counts for each x and each y\n    x_counts = {}\n    y_counts = {}\n\n    for x, y in points:\n        x_counts[x] = x_counts.get(x, 0) + 1\n        y_counts[y] = y_counts.get(y, 0) + 1\n\n    total_triangles = 0\n    for x, y in points:\n        # Number of other points with same x\n        vx = x_counts[x] - 1\n        # Number of other points with same y\n        vy = y_counts[y] - 1\n        \n        if vx > 0 and vy > 0:\n            total_triangles += vx * vy\n\n    print(total_triangles)\n\nif __name__ == \"__main__\":\n    solve()",
+    "code_hash": "f25336995c92fe3a",
+    "language": "python",
+    "node_id": "n_2_458c5d",
+    "revision_id": "rev_n_2_458c5d_0",
+    "thought_path_snapshot": [
+      "Sort the points by x-coordinate and then by y-coordinate. Iterate through the sorted list to efficiently find points with matching coordinates, though this might be more complex to implement correctly than using hash sets for the counting logic."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 2
+  },
+  {
+    "candidate_id": "cand_8a7e4e1d06",
+    "problem_id": "apps_2857",
+    "code": "import sys\n\ndef solve():\n    input = sys.stdin.read\n    data = input().split()\n    \n    if not data:\n        return\n    \n    iterator = iter(data)\n    try:\n        n = int(next(iterator))\n    except StopIteration:\n        return\n\n    points = set()\n    xs = set()\n    ys = set()\n    \n    for _ in range(n):\n        x = int(next(iterator))\n        y = int(next(iterator))\n        points.add((x, y))\n        xs.add(x)\n        ys.add(y)\n    \n    count = 0\n    \n    # Iterate over each point as the potential right-angle vertex\n    for (x, y) in points:\n        # Count points with the same x-coordinate (vertical neighbors)\n        vertical_count = 0\n        for other_x in xs:\n            if (other_x, y) in points:\n                vertical_count += 1\n        \n        # Count points with the same y-coordinate (horizontal neighbors)\n        horizontal_count = 0\n        for other_y in ys:\n            if (x, other_y) in points:\n                horizontal_count += 1\n        \n        # The number of right triangles with the right angle at (x, y)\n        # is the product of the number of vertical neighbors and horizontal neighbors.\n        # Note: The loops above include the point itself if we are not careful,\n        # but since we iterate over 'other_x' and 'other_y' from the sets of all x and y,\n        # we need to ensure we don't count the point itself.\n        # However, a simpler way is to count how many other points share the x or y.\n        \n        # Let's re-calculate more directly to avoid confusion:\n        # vertical_count = number of points (x', y) where x' != x\n        # horizontal_count = number of points (x, y') where y' != y\n        \n        v = 0\n        for other_x in xs:\n            if (other_x, y) in points and other_x != x:\n                v += 1\n        \n        h = 0\n        for other_y in ys:\n            if (x, other_y) in points and other_y != y:\n                h += 1\n        \n        count += v * h\n    \n    print(count)\n\nif __name__ == \"__main__\":\n    solve()",
+    "code_hash": "2a11f228e867eb77",
+    "language": "python",
+    "node_id": "n_3_0fd3cc",
+    "revision_id": "rev_n_3_0fd3cc_0",
+    "thought_path_snapshot": [
+      "Use a 2D grid or frequency array to mark the presence of points at each coordinate, then iterate through all possible pairs of x and y coordinates to find intersections, but this approach is inefficient given the coordinate range and point count constraints compared to the hash set method."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 3
+  },
+  {
+    "candidate_id": "cand_de7fbc1ca2",
+    "problem_id": "apps_2857",
+    "code": "import sys\n\ndef solve():\n    input = sys.stdin.read\n    data = input().split()\n    \n    if not data:\n        return\n    \n    iterator = iter(data)\n    try:\n        n = int(next(iterator))\n    except StopIteration:\n        return\n\n    points = []\n    for _ in range(n):\n        x = int(next(iterator))\n        y = int(next(iterator))\n        points.append((x, y))\n\n    # Store points in sets for O(1) average time complexity lookups\n    # set_x: maps x-coordinate to a set of y-coordinates sharing that x\n    # set_y: maps y-coordinate to a set of x-coordinates sharing that y\n    set_x = {}\n    set_y = {}\n\n    for x, y in points:\n        if x not in set_x:\n            set_x[x] = set()\n        set_x[x].add(y)\n        \n        if y not in set_y:\n            set_y[y] = set()\n        set_y[y].add(x)\n\n    total_triangles = 0\n\n    for x, y in points:\n        # Count points with the same x-coordinate (excluding current point)\n        count_x = len(set_x[x]) - 1\n        # Count points with the same y-coordinate (excluding current point)\n        count_y = len(set_y[y]) - 1\n        \n        # If there are points on both the vertical and horizontal lines through this point,\n        # they form right triangles with this point as the right-angle vertex.\n        if count_x > 0 and count_y > 0:\n            total_triangles += count_x * count_y\n\n    print(total_triangles)\n\nif __name__ == \"__main__\":\n    solve()",
+    "code_hash": "13e3a48da9d069c6",
+    "language": "python",
+    "node_id": "n_4_716e3e",
+    "revision_id": "rev_n_4_716e3e_0",
+    "thought_path_snapshot": [
+      "Iterate through every point as the potential right-angle vertex, then use hash sets to count how many other points share the same x-coordinate and how many share the same y-coordinate. The number of valid triangles for that vertex is the product of these two counts. Sum these products for all vertices.",
+      "Iterate through each point as the potential right-angle vertex, then use hash sets to count how many other points share the same x-coordinate and how many share the same y-coordinate. The number of valid triangles for that vertex is the product of these two counts. Sum these products for all vertices."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 4
+  },
+  {
+    "candidate_id": "cand_f4931ca4f2",
+    "problem_id": "apps_2857",
+    "code": "import sys\n\ndef solve():\n    input_data = sys.stdin.read().split()\n    if not input_data:\n        return\n\n    iterator = iter(input_data)\n    try:\n        n = int(next(iterator))\n    except StopIteration:\n        return\n\n    points = []\n    for _ in range(n):\n        x = int(next(iterator))\n        y = int(next(iterator))\n        points.append((x, y))\n\n    # Map x -> set of y's\n    x_to_ys = {}\n    # Map y -> set of x's\n    y_to_xs = {}\n\n    for x, y in points:\n        if x not in x_to_ys:\n            x_to_ys[x] = set()\n        if y not in y_to_xs:\n            y_to_xs[y] = set()\n        x_to_ys[x].add(y)\n        y_to_xs[y].add(x)\n\n    total_triangles = 0\n\n    for x, y in points:\n        count_x = len(x_to_ys[x]) - 1  # exclude the point itself\n        count_y = len(y_to_xs[y]) - 1  # exclude the point itself\n        if count_x > 0 and count_y > 0:\n            total_triangles += count_x * count_y\n\n    print(total_triangles)\n\nif __name__ == \"__main__\":\n    solve()",
+    "code_hash": "f93337a611283ea5",
+    "language": "python",
+    "node_id": "n_5_224f7f",
+    "revision_id": "rev_n_5_224f7f_0",
+    "thought_path_snapshot": [
+      "Iterate through every point as the potential right-angle vertex, then use hash sets to count how many other points share the same x-coordinate and how many share the same y-coordinate. The number of valid triangles for that vertex is the product of these two counts. Sum these products for all vertices.",
+      "Pre-process the input into two hash maps: one mapping x-coordinates to a list of y-coordinates, and another mapping y-coordinates to a list of x-coordinates. For each point, look up the sizes of these lists to calculate the product directly, avoiding the overhead of building sets during the main loop."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 5
+  },
+  {
+    "candidate_id": "cand_b20b19df49",
+    "problem_id": "apps_2857",
+    "code": "import sys\n\ndef solve():\n    input = sys.stdin.read\n    data = input().split()\n    \n    if not data:\n        return\n    \n    iterator = iter(data)\n    try:\n        n = int(next(iterator))\n    except StopIteration:\n        return\n\n    points = []\n    for _ in range(n):\n        x = int(next(iterator))\n        y = int(next(iterator))\n        points.append((x, y))\n\n    # Store points in a set for O(1) average time complexity lookups\n    point_set = set(points)\n\n    # Count frequency of each x and y coordinate\n    x_count = {}\n    y_count = {}\n\n    for x, y in points:\n        x_count[x] = x_count.get(x, 0) + 1\n        y_count[y] = y_count.get(y, 0) + 1\n\n    total_triangles = 0\n\n    # Iterate through each point considering it as the right-angle vertex\n    for x, y in points:\n        # Number of points sharing the same x-coordinate (vertical leg candidates)\n        # Exclude the point itself\n        vertical_count = x_count[x] - 1\n        \n        # Number of points sharing the same y-coordinate (horizontal leg candidates)\n        # Exclude the point itself\n        horizontal_count = y_count[y] - 1\n        \n        # If there are points in both directions, we can form triangles\n        if vertical_count > 0 and horizontal_count > 0:\n            total_triangles += vertical_count * horizontal_count\n\n    print(total_triangles)\n\nif __name__ == \"__main__\":\n    solve()",
+    "code_hash": "27489ffb29ad0632",
+    "language": "python",
+    "node_id": "n_6_280268",
+    "revision_id": "rev_n_6_280268_0",
+    "thought_path_snapshot": [
+      "Iterate through every point as the potential right-angle vertex, then use hash sets to count how many other points share the same x-coordinate and how many share the same y-coordinate. The number of valid triangles for that vertex is the product of these two counts. Sum these products for all vertices.",
+      "Sort the points by x-coordinate and then by y-coordinate. Use a sliding window or two-pointer approach to efficiently count points with matching coordinates, though this adds complexity compared to the hash map approach and may not offer significant performance gains given the constraints."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 6
+  },
+  {
+    "candidate_id": "cand_de0178255d",
+    "problem_id": "apps_2857",
+    "code": "import sys\n\ndef solve():\n    input = sys.stdin.read\n    data = input().split()\n    \n    if not data:\n        return\n    \n    iterator = iter(data)\n    try:\n        n = int(next(iterator))\n    except StopIteration:\n        return\n\n    points = []\n    for _ in range(n):\n        x = int(next(iterator))\n        y = int(next(iterator))\n        points.append((x, y))\n\n    # Count points for each x-coordinate and each y-coordinate\n    x_count = {}\n    y_count = {}\n\n    for x, y in points:\n        x_count[x] = x_count.get(x, 0) + 1\n        y_count[y] = y_count.get(y, 0) + 1\n\n    total_triangles = 0\n\n    # Iterate through each point and treat it as the right-angle vertex\n    for x, y in points:\n        # Number of other points on the same vertical line (same x)\n        vertical_options = x_count[x] - 1\n        # Number of other points on the same horizontal line (same y)\n        horizontal_options = y_count[y] - 1\n        \n        # If there are points on both lines, we can form triangles\n        if vertical_options > 0 and horizontal_options > 0:\n            total_triangles += vertical_options * horizontal_options\n\n    print(total_triangles)\n\nif __name__ == \"__main__\":\n    solve()",
+    "code_hash": "3d3395cbd5b4adc7",
+    "language": "python",
+    "node_id": "n_7_8ff995",
+    "revision_id": "rev_n_7_8ff995_0",
+    "thought_path_snapshot": [
+      "Sort the points by x-coordinate and then by y-coordinate. Iterate through the sorted list to efficiently find points with matching coordinates, though this might be more complex to implement correctly than using hash sets for the counting logic.",
+      "Use a hash map (dictionary) to store the count of points for each x-coordinate and each y-coordinate. Iterate through every point, treating it as the right-angle vertex, and multiply the count of points sharing its x-coordinate by the count of points sharing its y-coordinate, then subtract 1 for the point itself to get the number of valid pairs forming legs."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 7
+  },
+  {
+    "candidate_id": "cand_b2f3112529",
+    "problem_id": "apps_2857",
+    "code": "import sys\n\ndef solve():\n    input = sys.stdin.read\n    data = input().split()\n    \n    if not data:\n        return\n    \n    iterator = iter(data)\n    n = int(next(iterator))\n    \n    points = []\n    for _ in range(n):\n        x = int(next(iterator))\n        y = int(next(iterator))\n        points.append((x, y))\n    \n    # Dictionary to store count of points for each x-coordinate\n    x_counts = {}\n    # Dictionary to store count of points for each y-coordinate\n    y_counts = {}\n    \n    for x, y in points:\n        x_counts[x] = x_counts.get(x, 0) + 1\n        y_counts[y] = y_counts.get(y, 0) + 1\n    \n    total_triangles = 0\n    \n    for x, y in points:\n        # Number of other points with the same x-coordinate\n        same_x = x_counts[x] - 1\n        # Number of other points with the same y-coordinate\n        same_y = y_counts[y] - 1\n        \n        # If there are points on both the vertical and horizontal lines through this point,\n        # they form right triangles with this point as the right-angle vertex.\n        if same_x > 0 and same_y > 0:\n            total_triangles += same_x * same_y\n            \n    print(total_triangles)\n\nif __name__ == \"__main__\":\n    solve()",
+    "code_hash": "3ecf996844f4a3f4",
+    "language": "python",
+    "node_id": "n_10_56736b",
+    "revision_id": "rev_n_10_56736b_0",
+    "thought_path_snapshot": [
+      "Iterate through every point as the potential right-angle vertex, then use hash sets to count how many other points share the same x-coordinate and how many share the same y-coordinate. The number of valid triangles for that vertex is the product of these two counts. Sum these products for all vertices.",
+      "Iterate through each point as the potential right-angle vertex, then use hash sets to count how many other points share the same x-coordinate and how many share the same y-coordinate. The number of valid triangles for that vertex is the product of these two counts. Sum these products for all vertices.",
+      "Iterate through each point as the potential right-angle vertex, maintaining hash maps to count points sharing the same x and y coordinates, then sum the product of these counts for each vertex."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 8
+  },
+  {
+    "candidate_id": "cand_fa4b1f7a80",
+    "problem_id": "apps_2857",
+    "code": "import sys\n\ndef solve():\n    input = sys.stdin.read\n    data = input().split()\n    \n    if not data:\n        return\n    \n    iterator = iter(data)\n    try:\n        n = int(next(iterator))\n    except StopIteration:\n        return\n\n    points = []\n    for _ in range(n):\n        x = int(next(iterator))\n        y = int(next(iterator))\n        points.append((x, y))\n\n    # Dictionary to store count of points for each x-coordinate\n    x_counts = {}\n    # Dictionary to store count of points for each y-coordinate\n    y_counts = {}\n\n    for x, y in points:\n        x_counts[x] = x_counts.get(x, 0) + 1\n        y_counts[y] = y_counts.get(y, 0) + 1\n\n    total_triangles = 0\n\n    for x, y in points:\n        # Number of other points with the same x-coordinate\n        same_x = x_counts[x] - 1\n        # Number of other points with the same y-coordinate\n        same_y = y_counts[y] - 1\n        \n        # If there are points on both the vertical and horizontal lines through this point,\n        # they form right triangles with this point as the right-angle vertex.\n        if same_x > 0 and same_y > 0:\n            total_triangles += same_x * same_y\n\n    print(total_triangles)\n\nif __name__ == \"__main__\":\n    solve()",
+    "code_hash": "f7df25bb4e5fd1d6",
+    "language": "python",
+    "node_id": "n_11_f8ab29",
+    "revision_id": "rev_n_11_f8ab29_0",
+    "thought_path_snapshot": [
+      "Iterate through every point as the potential right-angle vertex, then use hash sets to count how many other points share the same x-coordinate and how many share the same y-coordinate. The number of valid triangles for that vertex is the product of these two counts. Sum these products for all vertices.",
+      "Iterate through each point as the potential right-angle vertex, then use hash sets to count how many other points share the same x-coordinate and how many share the same y-coordinate. The number of valid triangles for that vertex is the product of these two counts. Sum these products for all vertices.",
+      "Sort the points by x-coordinate and then by y-coordinate to efficiently group points with identical coordinates, allowing for a linear or near-linear scan to count valid triangles without hash overhead."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 9
+  },
+  {
+    "candidate_id": "cand_b83edc6acb",
+    "problem_id": "apps_2857",
+    "code": "import sys\n\ndef solve():\n    input = sys.stdin.read\n    data = input().split()\n    \n    if not data:\n        return\n    \n    iterator = iter(data)\n    try:\n        n = int(next(iterator))\n    except StopIteration:\n        return\n\n    points = []\n    for _ in range(n):\n        x = int(next(iterator))\n        y = int(next(iterator))\n        points.append((x, y))\n\n    # We need to count triplets (A, B, C) such that:\n    # A and B share the same x-coordinate (vertical leg)\n    # B and C share the same y-coordinate (horizontal leg)\n    # A and C do not share coordinates (guaranteed by geometry if legs are parallel to axes and form a right angle at B)\n    # The right angle is at point B.\n    \n    # Strategy:\n    # 1. Group points by x-coordinate.\n    # 2. Group points by y-coordinate.\n    # 3. For each point B (which will be the vertex of the right angle), \n    #    count how many other points share its x-coordinate (potential A's)\n    #    and how many other points share its y-coordinate (potential C's).\n    #    The number of triangles with right angle at B is (count_x - 1) * (count_y - 1).\n    #    We sum this over all points B.\n\n    from collections import defaultdict\n    \n    x_counts = defaultdict(int)\n    y_counts = defaultdict(int)\n    \n    for x, y in points:\n        x_counts[x] += 1\n        y_counts[y] += 1\n    \n    total_triangles = 0\n    \n    for x, y in points:\n        # Number of points with same x (including itself)\n        same_x = x_counts[x]\n        # Number of points with same y (including itself)\n        same_y = y_counts[y]\n        \n        # Points other than B with same x\n        vertical_options = same_x - 1\n        # Points other than B with same y\n        horizontal_options = same_y - 1\n        \n        if vertical_options > 0 and horizontal_options > 0:\n            total_triangles += vertical_options * horizontal_options\n            \n    print(total_triangles)\n\nif __name__ == '__main__':\n    solve()",
+    "code_hash": "60ab63d4b3902879",
+    "language": "python",
+    "node_id": "n_8_5f0a4d",
+    "revision_id": "rev_n_8_5f0a4d_0",
+    "thought_path_snapshot": [
+      "Sort the points by x-coordinate and then by y-coordinate. Iterate through the sorted list to efficiently find points with matching coordinates, though this might be more complex to implement correctly than using hash sets for the counting logic.",
+      "Sort the points by x-coordinate and then by y-coordinate. Iterate through the sorted list and use binary search or two pointers to find points with matching coordinates, though this approach is likely less efficient ($O(N^2)$ or $O(N^2 \\log N)$) compared to the hash map method given the constraints."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 10
+  },
+  {
+    "candidate_id": "cand_7a9c5aabb9",
+    "problem_id": "apps_2857",
+    "code": "import sys\n\ndef solve():\n    input = sys.stdin.read\n    data = input().split()\n    \n    if not data:\n        return\n    \n    iterator = iter(data)\n    try:\n        n = int(next(iterator))\n    except StopIteration:\n        return\n\n    points = []\n    for _ in range(n):\n        x = int(next(iterator))\n        y = int(next(iterator))\n        points.append((x, y))\n\n    # Use dictionaries to store counts of points sharing the same x or y coordinate\n    # key: coordinate value, value: count of points with that coordinate\n    x_counts = {}\n    y_counts = {}\n\n    for x, y in points:\n        x_counts[x] = x_counts.get(x, 0) + 1\n        y_counts[y] = y_counts.get(y, 0) + 1\n\n    total_triangles = 0\n\n    for x, y in points:\n        # Number of other points on the same vertical line (same x)\n        same_x = x_counts[x] - 1\n        # Number of other points on the same horizontal line (same y)\n        same_y = y_counts[y] - 1\n        \n        # If there are points on both the same row and same column,\n        # we can form a right triangle with this point as the right-angle vertex.\n        if same_x > 0 and same_y > 0:\n            total_triangles += same_x * same_y\n\n    print(total_triangles)\n\nif __name__ == \"__main__\":\n    solve()",
+    "code_hash": "da1eac65a65790b4",
+    "language": "python",
+    "node_id": "n_12_df0307",
+    "revision_id": "rev_n_12_df0307_0",
+    "thought_path_snapshot": [
+      "Iterate through every point as the potential right-angle vertex, then use hash sets to count how many other points share the same x-coordinate and how many share the same y-coordinate. The number of valid triangles for that vertex is the product of these two counts. Sum these products for all vertices.",
+      "Iterate through each point as the potential right-angle vertex, then use hash sets to count how many other points share the same x-coordinate and how many share the same y-coordinate. The number of valid triangles for that vertex is the product of these two counts. Sum these products for all vertices.",
+      "Use a 2D grid or frequency array to mark the presence of points, then for each point, iterate through its row and column to count neighbors, leveraging the constraint that coordinates are up to 100,000."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 11
+  },
+  {
+    "candidate_id": "cand_0b3b5abab7",
+    "problem_id": "apps_2857",
+    "code": "import sys\n\ndef solve():\n    input = sys.stdin.read\n    data = input().split()\n    \n    if not data:\n        return\n    \n    iterator = iter(data)\n    try:\n        n = int(next(iterator))\n    except StopIteration:\n        return\n\n    points = []\n    for _ in range(n):\n        x = int(next(iterator))\n        y = int(next(iterator))\n        points.append((x, y))\n\n    x_to_ys = {}\n    y_to_xs = {}\n\n    for x, y in points:\n        if x not in x_to_ys:\n            x_to_ys[x] = []\n        x_to_ys[x].append(y)\n        \n        if y not in y_to_xs:\n            y_to_xs[y] = []\n        y_to_xs[y].append(x)\n\n    count = 0\n    for x, y in points:\n        ys_count = len(x_to_ys.get(x, []))\n        xs_count = len(y_to_xs.get(y, []))\n        # Subtract 1 because the point itself is counted in both lists\n        count += (ys_count - 1) * (xs_count - 1)\n\n    print(count)\n\nif __name__ == \"__main__\":\n    solve()",
+    "code_hash": "02f9e4d2222ddb0a",
+    "language": "python",
+    "node_id": "n_14_f869ec",
+    "revision_id": "rev_n_14_f869ec_0",
+    "thought_path_snapshot": [
+      "Iterate through every point as the potential right-angle vertex, then use hash sets to count how many other points share the same x-coordinate and how many share the same y-coordinate. The number of valid triangles for that vertex is the product of these two counts. Sum these products for all vertices.",
+      "Pre-process the input into two hash maps: one mapping x-coordinates to a list of y-coordinates, and another mapping y-coordinates to a list of x-coordinates. For each point, look up the sizes of these lists to calculate the product directly, avoiding the overhead of building sets during the main loop.",
+      "Pre-process the input into two dictionaries mapping each x-coordinate to a list of y-coordinates and each y-coordinate to a list of x-coordinates. During the main loop, simply look up the lengths of these lists for the current point to calculate the product, avoiding the overhead of dynamic set insertion during iteration."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 12
+  },
+  {
+    "candidate_id": "cand_af0bfc6171",
+    "problem_id": "apps_2857",
+    "code": "import sys\n\ndef solve():\n    input = sys.stdin.read\n    data = input().split()\n    \n    if not data:\n        return\n    \n    iterator = iter(data)\n    try:\n        n = int(next(iterator))\n    except StopIteration:\n        return\n\n    points = []\n    for _ in range(n):\n        x = int(next(iterator))\n        y = int(next(iterator))\n        points.append((x, y))\n\n    # Count frequency of each x-coordinate and y-coordinate\n    x_counts = {}\n    y_counts = {}\n    \n    for x, y in points:\n        x_counts[x] = x_counts.get(x, 0) + 1\n        y_counts[y] = y_counts.get(y, 0) + 1\n\n    total_triangles = 0\n    \n    for x, y in points:\n        # Number of other points with the same x-coordinate\n        same_x = x_counts[x] - 1\n        # Number of other points with the same y-coordinate\n        same_y = y_counts[y] - 1\n        \n        # If there are points on both the vertical and horizontal lines through this point,\n        # they form right triangles with this point as the right-angle vertex.\n        if same_x > 0 and same_y > 0:\n            total_triangles += same_x * same_y\n\n    print(total_triangles)\n\nif __name__ == \"__main__\":\n    solve()",
+    "code_hash": "dd19f2706b2ce7dc",
+    "language": "python",
+    "node_id": "n_17_d906f2",
+    "revision_id": "rev_n_17_d906f2_0",
+    "thought_path_snapshot": [
+      "Iterate through every point as the potential right-angle vertex, then use hash sets to count how many other points share the same x-coordinate and how many share the same y-coordinate. The number of valid triangles for that vertex is the product of these two counts. Sum these products for all vertices.",
+      "Iterate through each point as the potential right-angle vertex, then use hash sets to count how many other points share the same x-coordinate and how many share the same y-coordinate. The number of valid triangles for that vertex is the product of these two counts. Sum these products for all vertices.",
+      "Iterate through each point as the potential right-angle vertex, maintaining hash maps to count points sharing the same x and y coordinates, then sum the product of these counts for each vertex.",
+      "Pre-process points into two hash maps (one for x-coordinates, one for y-coordinates) to allow O(1) lookups, then iterate through points to calculate the product of counts for each vertex."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 13
+  },
+  {
+    "candidate_id": "cand_f79df9495a",
+    "problem_id": "apps_2857",
+    "code": "import sys\n\ndef solve():\n    input = sys.stdin.read\n    data = input().split()\n    \n    if not data:\n        return\n    \n    iterator = iter(data)\n    try:\n        n = int(next(iterator))\n    except StopIteration:\n        return\n\n    points = []\n    for _ in range(n):\n        x = int(next(iterator))\n        y = int(next(iterator))\n        points.append((x, y))\n\n    # We need to count triplets (A, B, C) such that:\n    # - A and B share the same x-coordinate (vertical leg)\n    # - B and C share the same y-coordinate (horizontal leg)\n    # - A and C do not share the same x or y coordinate (otherwise it's degenerate or not a triangle with legs parallel to axes in the strict sense of distinct legs meeting at B)\n    # Actually, the condition \"legs parallel to coordinate axes\" implies:\n    # One leg is vertical (same x), one leg is horizontal (same y).\n    # The right angle is at the vertex where these two legs meet.\n    # So we look for a vertex B = (x, y) such that there exists A = (x, y') and C = (x', y) with A != B, C != B, and A != C.\n    # Note: A != C is guaranteed if x != x' and y != y'. Since A=(x,y') and C=(x',y), if x=x' then A=C which is impossible since points are distinct. If y=y' then A=C.\n    # So we just need A != B and C != B.\n    # A != B means y' != y.\n    # C != B means x' != x.\n\n    # Strategy:\n    # Group points by x-coordinate.\n    # Group points by y-coordinate.\n    # For each point (x, y), let:\n    #   count_x = number of other points with the same x (i.e., len(group_x[x]) - 1)\n    #   count_y = number of other points with the same y (i.e., len(group_y[y]) - 1)\n    # The number of valid triangles with the right angle at (x, y) is count_x * count_y.\n    # Sum this over all points.\n\n    from collections import defaultdict\n\n    group_x = defaultdict(list)\n    group_y = defaultdict(list)\n\n    for i in range(n):\n        x, y = points[i]\n        group_x[x].append(i)\n        group_y[y].append(i)\n\n    total_triangles = 0\n\n    for i in range(n):\n        x, y = points[i]\n        # Number of points sharing x (excluding self)\n        cnt_x = len(group_x[x]) - 1\n        # Number of points sharing y (excluding self)\n        cnt_y = len(group_y[y]) - 1\n        \n        total_triangles += cnt_x * cnt_y\n\n    print(total_triangles)\n\nif __name__ == '__main__':\n    solve()",
+    "code_hash": "21914fc789b4cb72",
+    "language": "python",
+    "node_id": "n_9_9eaae7",
+    "revision_id": "rev_n_9_9eaae7_0",
+    "thought_path_snapshot": [
+      "Sort the points by x-coordinate and then by y-coordinate. Iterate through the sorted list to efficiently find points with matching coordinates, though this might be more complex to implement correctly than using hash sets for the counting logic.",
+      "Implement a brute-force solution checking all triplets of points to see if they form a right triangle with axis-parallel legs. This would require $O(N^3)$ time complexity, which will definitely time out given $N$ can be up to 100,000."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 14
+  },
+  {
+    "candidate_id": "cand_7e6c64fff1",
+    "problem_id": "apps_2857",
+    "code": "import sys\n\ndef solve():\n    input = sys.stdin.read\n    data = input().split()\n    \n    if not data:\n        return\n    \n    iterator = iter(data)\n    n = int(next(iterator))\n    \n    points = []\n    for _ in range(n):\n        x = int(next(iterator))\n        y = int(next(iterator))\n        points.append((x, y))\n    \n    # Dictionary to store count of points for each x-coordinate\n    x_counts = {}\n    # Dictionary to store count of points for each y-coordinate\n    y_counts = {}\n    \n    for x, y in points:\n        x_counts[x] = x_counts.get(x, 0) + 1\n        y_counts[y] = y_counts.get(y, 0) + 1\n    \n    total_triangles = 0\n    \n    for x, y in points:\n        # Number of other points with the same x-coordinate\n        same_x = x_counts[x] - 1\n        # Number of other points with the same y-coordinate\n        same_y = y_counts[y] - 1\n        \n        # If there are points on both the vertical and horizontal lines through this point,\n        # we can form a right triangle with this point as the right-angle vertex.\n        if same_x > 0 and same_y > 0:\n            total_triangles += same_x * same_y\n            \n    print(total_triangles)\n\nif __name__ == \"__main__\":\n    solve()",
+    "code_hash": "78a8056ea57e6daf",
+    "language": "python",
+    "node_id": "n_16_d2f535",
+    "revision_id": "rev_n_16_d2f535_0",
+    "thought_path_snapshot": [
+      "Iterate through every point as the potential right-angle vertex, then use hash sets to count how many other points share the same x-coordinate and how many share the same y-coordinate. The number of valid triangles for that vertex is the product of these two counts. Sum these products for all vertices.",
+      "Iterate through each point as the potential right-angle vertex, then use hash sets to count how many other points share the same x-coordinate and how many share the same y-coordinate. The number of valid triangles for that vertex is the product of these two counts. Sum these products for all vertices.",
+      "Iterate through each point as the potential right-angle vertex, maintaining hash maps to count points sharing the same x and y coordinates, then sum the product of these counts for each vertex.",
+      "Iterate through each point as the potential right-angle vertex, using hash sets to count points sharing the same x and y coordinates, then sum the product of these counts."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 15
+  },
+  {
+    "candidate_id": "cand_14de03fe6e",
+    "problem_id": "apps_2857",
+    "code": "import sys\n\ndef solve():\n    input = sys.stdin.read\n    data = input().split()\n    \n    if not data:\n        return\n    \n    iterator = iter(data)\n    try:\n        n = int(next(iterator))\n    except StopIteration:\n        return\n\n    points = []\n    for _ in range(n):\n        x = int(next(iterator))\n        y = int(next(iterator))\n        points.append((x, y))\n\n    # Map x -> count of points with that x\n    x_counts = {}\n    # Map y -> count of points with that y\n    y_counts = {}\n\n    for x, y in points:\n        x_counts[x] = x_counts.get(x, 0) + 1\n        y_counts[y] = y_counts.get(y, 0) + 1\n\n    total_triangles = 0\n\n    for x, y in points:\n        # Number of other points on the same vertical line (same x)\n        same_x = x_counts[x] - 1\n        # Number of other points on the same horizontal line (same y)\n        same_y = y_counts[y] - 1\n        \n        # If there is at least one point on each line, we can form triangles\n        if same_x > 0 and same_y > 0:\n            total_triangles += same_x * same_y\n\n    print(total_triangles)\n\nif __name__ == \"__main__\":\n    solve()",
+    "code_hash": "9da53a0a678bfd6f",
+    "language": "python",
+    "node_id": "n_13_8425f0",
+    "revision_id": "rev_n_13_8425f0_0",
+    "thought_path_snapshot": [
+      "Iterate through every point as the potential right-angle vertex, then use hash sets to count how many other points share the same x-coordinate and how many share the same y-coordinate. The number of valid triangles for that vertex is the product of these two counts. Sum these products for all vertices.",
+      "Pre-process the input into two hash maps: one mapping x-coordinates to a list of y-coordinates, and another mapping y-coordinates to a list of x-coordinates. For each point, look up the sizes of these lists to calculate the product directly, avoiding the overhead of building sets during the main loop.",
+      "Iterate through each point as the potential right-angle vertex, maintaining two hash sets (or maps) for x-coordinates and y-coordinates. For each point, multiply the count of other points sharing its x-coordinate by the count of other points sharing its y-coordinate, then sum these products."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 16
+  }
+]

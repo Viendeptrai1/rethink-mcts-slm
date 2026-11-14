@@ -1,0 +1,325 @@
+[
+  {
+    "candidate_id": "cand_28243bdf82",
+    "problem_id": "apps_3821",
+    "code": "import sys\n\ndef solve():\n    input_data = sys.stdin.read().split()\n    if not input_data:\n        return\n\n    n = int(input_data[0])\n    p = []\n    for i in range(n):\n        p.append(float(input_data[i + 1]))\n\n    p.sort(reverse=True)\n\n    best_prob = 0.0\n    current_prob = 1.0  # Probability of 0 successes initially\n\n    # Try including friends one by one in descending order of probability\n    for i in range(n):\n        prob_i = p[i]\n        # Probability of exactly one success if we include friend i\n        # = P(already had 1 success) * (1 - prob_i) + P(already had 0 successes) * prob_i\n        new_prob = current_prob * (1.0 - prob_i) + (1.0 - current_prob) * prob_i\n\n        if new_prob > best_prob:\n            best_prob = new_prob\n            current_prob = new_prob\n        else:\n            # Since probabilities are sorted descending, adding more friends will not improve the result\n            break\n\n    print(f\"{best_prob:.12f}\")\n\nif __name__ == \"__main__\":\n    solve()",
+    "code_hash": "7fff9c3af3fa443f",
+    "language": "python",
+    "node_id": "n_1_ac2f3e",
+    "revision_id": "rev_n_1_ac2f3e_0",
+    "thought_path_snapshot": [
+      "Sort probabilities in descending order and greedily add friends to the set as long as the probability of getting exactly one problem increases, stopping when adding the next friend decreases it."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 1
+  },
+  {
+    "candidate_id": "cand_0da6c707c6",
+    "problem_id": "apps_3821",
+    "code": "import sys\n\ndef solve():\n    input_data = sys.stdin.read().split()\n    if not input_data:\n        return\n\n    n = int(input_data[0])\n    p = []\n    for i in range(n):\n        p.append(float(input_data[i + 1]))\n\n    # Sort probabilities in descending order\n    p.sort(reverse=True)\n\n    max_prob = 0.0\n\n    # Try all possible prefixes of the sorted list\n    # The optimal set is always a prefix of the sorted probabilities\n    current_zero = 1.0  # Probability of 0 successes with empty set\n    current_one = 0.0   # Probability of 1 success with empty set\n\n    for i in range(n):\n        prob = p[i]\n        # When adding a new friend with probability 'prob':\n        # New zero successes = old_zero * (1 - prob)\n        # New one success = old_zero * prob + old_one * (1 - prob)\n        new_zero = current_zero * (1.0 - prob)\n        new_one = current_zero * prob + current_one * (1.0 - prob)\n\n        current_zero = new_zero\n        current_one = new_one\n\n        if current_one > max_prob:\n            max_prob = current_one\n\n    print(f\"{max_prob:.12f}\")\n\nif __name__ == \"__main__\":\n    solve()",
+    "code_hash": "17781baee8498f68",
+    "language": "python",
+    "node_id": "n_1_ac2f3e",
+    "revision_id": "rev_n_1_ac2f3e_1",
+    "thought_path_snapshot": [
+      "The previous greedy approach failed because it incorrectly updated the state by treating the probability of \"exactly one success\" as the new baseline for the next iteration, whereas the correct state must track the probability of \"zero successes\" separately to accurately compute the probability of \"exactly one success\" when adding a new friend. The optimal strategy requires iterating through all possible subsets (or using a specific mathematical property where we sort probabilities and include friends until the marginal gain becomes negative) while correctly maintaining the probability of having exactly zero successes in the current set to calculate the transition to exactly one success."
+    ],
+    "origin": "rethink",
+    "generation_record_id": null,
+    "created_sequence": 2
+  },
+  {
+    "candidate_id": "cand_bf0d0bc497",
+    "problem_id": "apps_3821",
+    "code": "import sys\n\ndef solve():\n    input_data = sys.stdin.read().split()\n    if not input_data:\n        return\n\n    n = int(input_data[0])\n    p = []\n    for i in range(n):\n        p.append(float(input_data[i + 1]))\n\n    p.sort(reverse=True)\n\n    max_prob = 0.0\n\n    # Try all possible prefixes of the sorted probabilities\n    for i in range(1, n + 1):\n        current_prob = 1.0\n        for j in range(i):\n            current_prob *= (1.0 - p[j])\n        \n        # Probability of exactly one success = 1 - P(no one succeeds) - P(more than one succeeds)\n        # But easier: sum over all j in [0, i-1] of (p[j] * product of (1-p[k]) for k != j)\n        # We can compute this efficiently:\n        # Let P_fail = product(1 - p[k]) for all k in range(i)\n        # Let P_one = 0\n        # For each j: P_one += p[j] * (P_fail / (1 - p[j])) if p[j] < 1 else p[j] * (product of others)\n        \n        # Simpler direct calculation for small n (n <= 100):\n        prob_one = 0.0\n        for j in range(i):\n            term = p[j]\n            for k in range(i):\n                if k != j:\n                    term *= (1.0 - p[k])\n            prob_one += term\n        \n        if prob_one > max_prob:\n            max_prob = prob_one\n\n    print(f\"{max_prob:.12f}\")\n\nif __name__ == \"__main__\":\n    solve()",
+    "code_hash": "fb39541365d79cd8",
+    "language": "python",
+    "node_id": "n_2_c1cced",
+    "revision_id": "rev_n_2_c1cced_0",
+    "thought_path_snapshot": [
+      "Since the optimal set must be a prefix of the sorted probabilities, iterate through all possible prefix lengths (from 1 to n), calculate the exact probability of success for each, and return the maximum."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 3
+  },
+  {
+    "candidate_id": "cand_ea7f91f97f",
+    "problem_id": "apps_3821",
+    "code": "import sys\n\ndef solve():\n    input_data = sys.stdin.read().split()\n    if not input_data:\n        return\n\n    n = int(input_data[0])\n    p = []\n    idx = 1\n    for _ in range(n):\n        p.append(float(input_data[idx]))\n        idx += 1\n\n    # Sort probabilities in descending order to greedily pick the most reliable ones first\n    p.sort(reverse=True)\n\n    # dp[j] will store the probability of getting exactly j problems from the friends considered so far\n    # We only need to track up to j=1 because getting more than 1 is a failure state for our goal,\n    # but we need to know the probability of getting 0 to calculate the next step for getting exactly 1.\n    # However, to be safe and clear, let's track up to 2 states: 0 problems and 1 problem.\n    # If we get 2 or more, we can ignore those states for the final answer since we want exactly 1.\n    \n    # dp[0] = probability of 0 problems\n    # dp[1] = probability of exactly 1 problem\n    dp = [1.0, 0.0]\n\n    max_prob = 0.0\n\n    for prob in p:\n        # We create new_dp based on current dp\n        # New state 0: both previous 0 and new friend fails\n        # New state 1: (previous 0 and new friend succeeds) OR (previous 1 and new friend fails)\n        # New state 2+: (previous 1 and new friend succeeds) -> we don't track this explicitly as it's a failure\n        \n        new_dp_0 = dp[0] * (1.0 - prob)\n        new_dp_1 = dp[0] * prob + dp[1] * (1.0 - prob)\n        \n        # Update dp\n        dp[0] = new_dp_0\n        dp[1] = new_dp_1\n        \n        # Update the maximum probability of getting exactly 1 problem found so far\n        if dp[1] > max_prob:\n            max_prob = dp[1]\n\n    print(f\"{max_prob:.12f}\")\n\nif __name__ == \"__main__\":\n    solve()",
+    "code_hash": "25cf6903b72255a6",
+    "language": "python",
+    "node_id": "n_3_5af294",
+    "revision_id": "rev_n_3_5af294_0",
+    "thought_path_snapshot": [
+      "Use dynamic programming where dp[i][j] represents the probability of getting exactly j problems from the first i friends, then find the max dp[k][1] for all k."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 4
+  },
+  {
+    "candidate_id": "cand_5b541dea15",
+    "problem_id": "apps_3821",
+    "code": "import sys\n\ndef solve():\n    input_data = sys.stdin.read().split()\n    if not input_data:\n        return\n\n    n = int(input_data[0])\n    p = []\n    for i in range(n):\n        p.append(float(input_data[i + 1]))\n\n    p.sort(reverse=True)\n\n    best_prob = 0.0\n    current_zero = 1.0  # Probability of 0 successes so far\n    current_one = 0.0   # Probability of exactly 1 success so far\n\n    for prob in p:\n        # If we add this friend:\n        # New probability of exactly 1 success = \n        # (prob of 0 successes before * prob this friend succeeds) + \n        # (prob of 1 success before * prob this friend fails)\n        new_one = current_zero * prob + current_one * (1.0 - prob)\n        \n        if new_one > best_prob:\n            best_prob = new_one\n            current_zero = current_zero * (1.0 - prob)\n            current_one = new_one\n        else:\n            # Since probabilities are sorted descending, if adding the next best friend\n            # doesn't improve the result, adding subsequent (worse) friends won't either.\n            break\n\n    print(f\"{best_prob:.12f}\")\n\nif __name__ == \"__main__\":\n    solve()",
+    "code_hash": "83572698de7e6b03",
+    "language": "python",
+    "node_id": "n_4_e41e6f",
+    "revision_id": "rev_n_4_e41e6f_0",
+    "thought_path_snapshot": [
+      "The previous greedy approach failed because it incorrectly updated the state by treating the probability of \"exactly one success\" as the new baseline for the next iteration, whereas the correct state must track the probability of \"zero successes\" separately to accurately compute the probability of \"exactly one success\" when adding a new friend. The optimal strategy requires iterating through all possible subsets (or using a specific mathematical property where we sort probabilities and include friends until the marginal gain becomes negative) while correctly maintaining the probability of having exactly zero successes in the current set to calculate the transition to exactly one success.",
+      "Sort the probabilities in descending order and iteratively add friends to the set, calculating the probability of exactly one success at each step, stopping when adding the next friend decreases this probability."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 5
+  },
+  {
+    "candidate_id": "cand_e242f4e4cf",
+    "problem_id": "apps_3821",
+    "code": "import sys\n\ndef solve():\n    input_data = sys.stdin.read().split()\n    if not input_data:\n        return\n\n    n = int(input_data[0])\n    p = []\n    idx = 1\n    for _ in range(n):\n        p.append(float(input_data[idx]))\n        idx += 1\n\n    # Sort probabilities in descending order\n    p.sort(reverse=True)\n\n    best_prob = 0.0\n\n    # We will try all possible prefixes of the sorted list.\n    # The intuition is that if we decide to pick k friends, we should pick the k most reliable ones.\n    # Why? Because replacing a friend with lower probability with one having higher probability\n    # will always increase (or keep same) the probability of getting exactly one success.\n    \n    # Let's verify this by iterating k from 1 to n.\n    # For each k, we calculate the probability of exactly one success using the first k friends.\n    \n    current_zero = 1.0  # Probability of 0 successes with current set\n    current_one = 0.0   # Probability of 1 success with current set\n    \n    # We can compute the probability for each prefix incrementally.\n    # However, since n is small (<= 100), we can also just recompute or update carefully.\n    # Let's do incremental update to be efficient and clean.\n    \n    # Initialize for k=0 (empty set)\n    # zero = 1.0, one = 0.0\n    \n    # We iterate through the sorted friends and maintain the state for the current prefix.\n    # But wait, the optimal set might not be a prefix? \n    # Actually, it is a known property for this specific problem (Codeforces 442B) that the optimal set is always a prefix of the sorted probabilities.\n    # Proof sketch: Suppose the optimal set S has size k and does not include the friend with the k-th highest probability p_k, but includes someone with p_j < p_k.\n    # Swapping p_j with p_k will increase the probability of exactly one success.\n    # Therefore, we only need to check prefixes of the sorted array.\n    \n    # Let's compute for each k from 1 to n.\n    \n    # We can recompute for each k to avoid any state confusion, given n <= 100.\n    # O(n^2) is perfectly fine.\n    \n    for k in range(1, n + 1):\n        # Consider the first k friends (most reliable)\n        # Calculate P(exactly 1 success)\n        prob_one = 0.0\n        for i in range(k):\n            # Friend i succeeds with p[i], others fail\n            # P(i succeeds) = p[i] * product(1 - p[j] for j != i)\n            term = p[i]\n            for j in range(k):\n                if i != j:\n                    term *= (1.0 - p[j])\n            prob_one += term\n        \n        if prob_one > best_prob:\n            best_prob = prob_one\n\n    print(f\"{best_prob:.12f}\")\n\nif __name__ == \"__main__\":\n    solve()",
+    "code_hash": "f8f4056f50455cea",
+    "language": "python",
+    "node_id": "n_5_74de76",
+    "revision_id": "rev_n_5_74de76_0",
+    "thought_path_snapshot": [
+      "The previous greedy approach failed because it incorrectly updated the state by treating the probability of \"exactly one success\" as the new baseline for the next iteration, whereas the correct state must track the probability of \"zero successes\" separately to accurately compute the probability of \"exactly one success\" when adding a new friend. The optimal strategy requires iterating through all possible subsets (or using a specific mathematical property where we sort probabilities and include friends until the marginal gain becomes negative) while correctly maintaining the probability of having exactly zero successes in the current set to calculate the transition to exactly one success.",
+      "Use dynamic programming where dp[i][j] represents the probability of getting exactly j problems from the first i friends, but optimize space to only track the probability of 0 and 1 successes since higher counts are invalid."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 6
+  },
+  {
+    "candidate_id": "cand_f8abe421d4",
+    "problem_id": "apps_3821",
+    "code": "import sys\n\ndef solve():\n    input_data = sys.stdin.read().split()\n    if not input_data:\n        return\n\n    n = int(input_data[0])\n    p = []\n    for i in range(n):\n        p.append(float(input_data[i + 1]))\n\n    p.sort(reverse=True)\n\n    max_prob = 0.0\n    current_prob = 1.0  # Probability that no one in the current set succeeds\n    success_count = 0   # Number of people who succeeded in the current set\n\n    # We will iterate through prefixes of the sorted probabilities\n    # For each prefix, we calculate the probability of exactly one success.\n    # We maintain the state: current_prob = P(no one succeeds in the current set)\n    # But it's easier to recompute or maintain carefully. Let's do a direct simulation per prefix.\n    \n    # Actually, let's maintain:\n    # prob_no_success: probability that none of the currently considered friends succeed\n    # prob_one_success: probability that exactly one of the currently considered friends succeeds\n    \n    # However, adding a new friend changes both.\n    # Let's just recompute for each prefix to avoid state errors, since n <= 100.\n    \n    for i in range(1, n + 1):\n        # Consider the first i friends (sorted descending)\n        current_p = p[:i]\n        \n        prob_one = 0.0\n        for x in current_p:\n            # Probability that friend x succeeds and all others in current_p fail\n            term = x\n            for y in current_p:\n                if y != x:\n                    term *= (1.0 - y)\n            prob_one += term\n        \n        if prob_one > max_prob:\n            max_prob = prob_one\n\n    print(f\"{max_prob:.12f}\")\n\nif __name__ == \"__main__\":\n    solve()",
+    "code_hash": "770880168704fb02",
+    "language": "python",
+    "node_id": "n_7_8751d4",
+    "revision_id": "rev_n_7_8751d4_0",
+    "thought_path_snapshot": [
+      "Since the optimal set must be a prefix of the sorted probabilities, iterate through all possible prefix lengths (from 1 to n), calculate the exact probability of success for each, and return the maximum.",
+      "Sort probabilities in descending order and test every prefix length from 1 to n, calculating the probability of exactly one success for each prefix and taking the maximum."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 7
+  },
+  {
+    "candidate_id": "cand_5e3701060b",
+    "problem_id": "apps_3821",
+    "code": "import sys\n\ndef solve():\n    input_data = sys.stdin.read().split()\n    if not input_data:\n        return\n\n    n = int(input_data[0])\n    p = []\n    for i in range(n):\n        p.append(float(input_data[i + 1]))\n\n    p.sort(reverse=True)\n\n    max_prob = 0.0\n\n    # We will iterate through all possible prefixes of the sorted probabilities.\n    # For each prefix, we calculate the probability of getting exactly one problem.\n    # Let dp0 be the probability that 0 friends have succeeded so far.\n    # Let dp1 be the probability that exactly 1 friend has succeeded so far.\n    # When adding a new friend with probability p_i:\n    # new_dp0 = dp0 * (1 - p_i)\n    # new_dp1 = dp1 * (1 - p_i) + dp0 * p_i\n\n    dp0 = 1.0\n    dp1 = 0.0\n\n    for prob in p:\n        # Update probabilities incrementally\n        new_dp0 = dp0 * (1.0 - prob)\n        new_dp1 = dp1 * (1.0 - prob) + dp0 * prob\n        \n        dp0 = new_dp0\n        dp1 = new_dp1\n\n        if dp1 > max_prob:\n            max_prob = dp1\n\n    print(f\"{max_prob:.12f}\")\n\nif __name__ == \"__main__\":\n    solve()",
+    "code_hash": "9272096f49250169",
+    "language": "python",
+    "node_id": "n_7_8751d4",
+    "revision_id": "rev_n_7_8751d4_1",
+    "thought_path_snapshot": [
+      "Since the optimal set must be a prefix of the sorted probabilities, iterate through all possible prefix lengths (from 1 to n), calculate the exact probability of success for each, and return the maximum.",
+      "Thought-2 is inefficient and prone to floating-point precision errors due to the nested loop calculating the product for every prefix; instead, maintain the probability of exactly one success and the probability of zero successes incrementally as you add each sorted friend to the set, updating these values in O(1) time per friend."
+    ],
+    "origin": "rethink",
+    "generation_record_id": null,
+    "created_sequence": 8
+  },
+  {
+    "candidate_id": "cand_1ed54535fe",
+    "problem_id": "apps_3821",
+    "code": "import sys\n\ndef solve():\n    input_data = sys.stdin.read().split()\n    if not input_data:\n        return\n\n    n = int(input_data[0])\n    p = []\n    for i in range(n):\n        p.append(float(input_data[i + 1]))\n\n    # Sort probabilities in descending order to try adding the most reliable friends first\n    # However, since n is small (up to 100), we can also just try all combinations or use the greedy property correctly.\n    # The correct greedy strategy for this specific problem (Codeforces 442A / similar) is:\n    # Sort probabilities in descending order.\n    # Start with an empty set (prob of 0 successes = 1.0, prob of 1 success = 0.0).\n    # Iterate through sorted probabilities. For each friend, decide whether to include them.\n    # Actually, the optimal set is always a prefix of the sorted probabilities (descending).\n    # Why? Because if you have a set S that is optimal, and there exists a friend f not in S with p_f > p_g where g is in S,\n    # swapping g for f will increase the probability of exactly one success.\n    # So we only need to check prefixes of the sorted array.\n\n    p.sort(reverse=True)\n\n    max_prob = 0.0\n\n    # Check empty set (though problem implies we need to choose some, but technically empty set gives 0 prob of 1 success)\n    # The problem says \"choose people\", usually implies non-empty, but even if empty, prob is 0.\n    # We will iterate through all prefixes from length 1 to n.\n    \n    current_zero_prob = 1.0\n    current_one_prob = 0.0\n\n    # We can simulate adding friends one by one from the sorted list.\n    # At each step, we calculate the probability of exactly one success for the current set.\n    # Then we update the state to include the next friend.\n    \n    # However, simply iterating and updating the state for the prefix gives us the prob for that specific prefix.\n    # We track the maximum over all prefixes.\n    \n    # Let's re-verify the logic:\n    # State: (prob of 0 successes, prob of 1 success)\n    # Initially: (1.0, 0.0)\n    # When adding a friend with probability p:\n    # new_zero = old_zero * (1 - p)\n    # new_one = old_zero * p + old_one * (1 - p)\n    # We record new_one at each step and update max_prob.\n    \n    # Note: We must check the max at each step because the function might peak in the middle.\n    \n    current_zero = 1.0\n    current_one = 0.0\n    \n    # We consider sets of size 1 to n.\n    # The set of size 0 has prob 0, so we start loop.\n    \n    for prob in p:\n        # Calculate probabilities for the new set including 'prob'\n        # New zero successes: previous zero * (1 - prob)\n        # New one success: (previous zero * prob) + (previous one * (1 - prob))\n        \n        next_zero = current_zero * (1.0 - prob)\n        next_one = current_zero * prob + current_one * (1.0 - prob)\n        \n        if next_one > max_prob:\n            max_prob = next_one\n        \n        current_zero = next_zero\n        current_one = next_one\n\n    print(f\"{max_prob:.12f}\")\n\nif __name__ == \"__main__\":\n    solve()",
+    "code_hash": "786d558ca78ecb92",
+    "language": "python",
+    "node_id": "n_6_cf115a",
+    "revision_id": "rev_n_6_cf115a_0",
+    "thought_path_snapshot": [
+      "The previous greedy approach failed because it incorrectly updated the state by treating the probability of \"exactly one success\" as the new baseline for the next iteration, whereas the correct state must track the probability of \"zero successes\" separately to accurately compute the probability of \"exactly one success\" when adding a new friend. The optimal strategy requires iterating through all possible subsets (or using a specific mathematical property where we sort probabilities and include friends until the marginal gain becomes negative) while correctly maintaining the probability of having exactly zero successes in the current set to calculate the transition to exactly one success.",
+      "Since n is small (up to 100), implement a brute-force approach checking all 2^n subsets to find the maximum probability of exactly one success, ensuring correctness without relying on greedy assumptions."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 9
+  },
+  {
+    "candidate_id": "cand_c58538137c",
+    "problem_id": "apps_3821",
+    "code": "import sys\n\ndef solve():\n    input_data = sys.stdin.read().split()\n    if not input_data:\n        return\n\n    n = int(input_data[0])\n    p = []\n    for i in range(n):\n        p.append(float(input_data[i + 1]))\n\n    p.sort(reverse=True)\n\n    best_prob = 0.0\n    current_zero = 1.0  # Probability of 0 successes so far\n    current_one = 0.0   # Probability of exactly 1 success so far\n\n    for prob in p:\n        # If we add this friend:\n        # New probability of exactly 1 success = \n        # (prob of 0 successes before * prob this friend succeeds) + \n        # (prob of 1 success before * prob this friend fails)\n        new_one = current_zero * prob + current_one * (1.0 - prob)\n        \n        if new_one > best_prob:\n            best_prob = new_one\n            current_zero = current_zero * (1.0 - prob)\n            current_one = new_one\n        else:\n            # Since probabilities are sorted descending, if adding the next best friend\n            # doesn't improve the result, adding subsequent (worse) friends won't either.\n            break\n\n    print(f\"{best_prob:.12f}\")\n\nif __name__ == \"__main__\":\n    solve()",
+    "code_hash": "83572698de7e6b03",
+    "language": "python",
+    "node_id": "n_10_302483",
+    "revision_id": "rev_n_10_302483_0",
+    "thought_path_snapshot": [
+      "The previous greedy approach failed because it incorrectly updated the state by treating the probability of \"exactly one success\" as the new baseline for the next iteration, whereas the correct state must track the probability of \"zero successes\" separately to accurately compute the probability of \"exactly one success\" when adding a new friend. The optimal strategy requires iterating through all possible subsets (or using a specific mathematical property where we sort probabilities and include friends until the marginal gain becomes negative) while correctly maintaining the probability of having exactly zero successes in the current set to calculate the transition to exactly one success.",
+      "Sort the probabilities in descending order and iteratively add friends to the set, calculating the probability of exactly one success at each step, stopping when adding the next friend decreases this probability.",
+      "Sort probabilities in descending order and iteratively add friends to the set, tracking the probability of exactly zero successes and exactly one success. Stop adding when the marginal gain in the probability of exactly one success becomes negative."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 10
+  },
+  {
+    "candidate_id": "cand_99b635f0e2",
+    "problem_id": "apps_3821",
+    "code": "import sys\n\ndef solve():\n    input_data = sys.stdin.read().split()\n    if not input_data:\n        return\n\n    n = int(input_data[0])\n    p = []\n    for i in range(n):\n        p.append(float(input_data[i + 1]))\n\n    # Sort probabilities in descending order\n    p.sort(reverse=True)\n\n    best_prob = 0.0\n\n    # Try all possible subsets by adding friends one by one in descending order of probability\n    # We start with an empty set (0 friends) which gives 0 probability of exactly one success.\n    # Then we iteratively add the next best friend and calculate the new probability of exactly one success.\n    # We keep track of the maximum probability found.\n\n    current_zero = 1.0  # Probability of 0 successes with current set\n    current_one = 0.0   # Probability of 1 success with current set\n\n    # We can choose to ask any subset. The optimal strategy is to pick a prefix of the sorted probabilities.\n    # However, we must verify if skipping a high probability friend to pick two lower ones could be better.\n    # Mathematical property: The function f(k) = P(exactly 1 success with top k friends) is unimodal.\n    # It increases then decreases. So we can just iterate k from 1 to n and find the max.\n    \n    # Initialize for k=0\n    # current_zero = 1.0, current_one = 0.0\n    # best_prob = max(best_prob, current_one) -> 0.0\n\n    for i in range(n):\n        prob = p[i]\n        \n        # Update probabilities when adding the i-th friend (0-indexed in sorted list)\n        # New zero successes = old zero * (1 - prob)\n        # New one success = old zero * prob + old one * (1 - prob)\n        \n        new_zero = current_zero * (1.0 - prob)\n        new_one = current_zero * prob + current_one * (1.0 - prob)\n        \n        current_zero = new_zero\n        current_one = new_one\n        \n        if current_one > best_prob:\n            best_prob = current_one\n\n    print(f\"{best_prob:.12f}\")\n\nif __name__ == \"__main__\":\n    solve()",
+    "code_hash": "6371e8d0417d3ac1",
+    "language": "python",
+    "node_id": "n_13_cc7fe9",
+    "revision_id": "rev_n_13_cc7fe9_0",
+    "thought_path_snapshot": [
+      "The previous greedy approach failed because it incorrectly updated the state by treating the probability of \"exactly one success\" as the new baseline for the next iteration, whereas the correct state must track the probability of \"zero successes\" separately to accurately compute the probability of \"exactly one success\" when adding a new friend. The optimal strategy requires iterating through all possible subsets (or using a specific mathematical property where we sort probabilities and include friends until the marginal gain becomes negative) while correctly maintaining the probability of having exactly zero successes in the current set to calculate the transition to exactly one success.",
+      "Use dynamic programming where dp[i][j] represents the probability of getting exactly j problems from the first i friends, but optimize space to only track the probability of 0 and 1 successes since higher counts are invalid.",
+      "Sort the probabilities in descending order and iteratively add friends to the set, updating the probability of exactly one success and zero successes, stopping when adding the next friend decreases the total probability of exactly one success."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 11
+  },
+  {
+    "candidate_id": "cand_a938ad39af",
+    "problem_id": "apps_3821",
+    "code": "import sys\n\ndef solve():\n    input_data = sys.stdin.read().split()\n    if not input_data:\n        return\n\n    n = int(input_data[0])\n    p = []\n    idx = 1\n    for _ in range(n):\n        p.append(float(input_data[idx]))\n        idx += 1\n\n    # Sort probabilities in ascending order\n    p.sort()\n\n    max_prob = 0.0\n\n    # Try all possible prefixes of the sorted probabilities\n    # We start from length 1 to n\n    for length in range(1, n + 1):\n        current_p = p[:length]\n        \n        # Calculate probability of getting exactly one problem\n        # P(exactly 1) = sum( p[i] * product(1-p[j]) for j != i )\n        \n        prob_one = 0.0\n        \n        # First, calculate the product of (1 - p[j]) for all j in the current set\n        product_fail = 1.0\n        for val in current_p:\n            product_fail *= (1.0 - val)\n        \n        # If product_fail is 0 (all friends have p=1), then if we pick more than 1 friend, prob is 0.\n        # But if we pick exactly 1 friend with p=1, prob is 1.\n        # The formula below handles it generally, but let's be careful with floating point.\n        \n        for val in current_p:\n            # Probability that friend i succeeds and all others fail\n            term = val * product_fail\n            # Divide by (1 - val) to remove the factor for friend i from the total product\n            # However, if val is 1.0, (1-val) is 0, so we cannot divide.\n            # In that case, if val is 1.0, then for this term to be non-zero, all other friends must have failed.\n            # But if val is 1.0, then (1-val) is 0, so product_fail is 0 unless the set has only this friend.\n            # Let's handle the division carefully.\n            \n            if abs(1.0 - val) < 1e-12:\n                # val is effectively 1.0\n                # Then product_fail is 0 unless the set size is 1.\n                if len(current_p) == 1:\n                    prob_one = 1.0\n                else:\n                    # If set size > 1 and one friend has p=1, then getting exactly 1 problem is impossible\n                    # because that friend will definitely produce a problem, and others might too.\n                    # Actually, if one friend has p=1, they produce a problem.\n                    # For exactly 1 problem, all others must fail.\n                    # So term = 1.0 * product(fail of others).\n                    # Our product_fail includes (1-1)=0, so product_fail is 0.\n                    # We need to recalculate product_fail excluding the current friend.\n                    pass\n            \n            # Robust calculation:\n            # term = val * (product_fail / (1 - val))\n            # But if 1-val is 0, we handle separately.\n            \n            if abs(1.0 - val) < 1e-12:\n                # val is 1.0\n                # We need product of (1 - other) for all others\n                others_fail = 1.0\n                for other in current_p:\n                    if other == val: # This is the current friend\n                        continue\n                    others_fail *= (1.0 - other)\n                prob_one += 1.0 * others_fail\n            else:\n                prob_one += val * (product_fail / (1.0 - val))\n        \n        if prob_one > max_prob:\n            max_prob = prob_one\n\n    print(f\"{max_prob:.12f}\")\n\nif __name__ == \"__main__\":\n    solve()",
+    "code_hash": "b4bd9ef93b9f72c2",
+    "language": "python",
+    "node_id": "n_8_45a348",
+    "revision_id": "rev_n_8_45a348_0",
+    "thought_path_snapshot": [
+      "Since the optimal set must be a prefix of the sorted probabilities, iterate through all possible prefix lengths (from 1 to n), calculate the exact probability of success for each, and return the maximum.",
+      "Use dynamic programming where dp[i][j] represents the probability of getting exactly j problems from the first i friends, then iterate through all subsets to find the max probability for j=1."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 12
+  },
+  {
+    "candidate_id": "cand_c7cbc1b1a0",
+    "problem_id": "apps_3821",
+    "code": "import sys\n\ndef solve():\n    input_data = sys.stdin.read().split()\n    if not input_data:\n        return\n\n    n = int(input_data[0])\n    p = []\n    for i in range(n):\n        p.append(float(input_data[i + 1]))\n\n    p.sort(reverse=True)\n\n    max_prob = 0.0\n\n    # Try all possible subset sizes from 1 to n\n    # Since we want to maximize the probability of exactly one success,\n    # and the function f(k) = P(exactly 1 success with k friends) is unimodal\n    # when friends are sorted by probability, we can simply try all k from 1 to n\n    # using the k friends with the highest probabilities.\n\n    current_prob = 1.0\n    for k in range(1, n + 1):\n        # Calculate probability of exactly one success with the first k friends\n        prob = 0.0\n        for i in range(k):\n            # Friend i succeeds and others fail\n            prob += p[i]\n            for j in range(k):\n                if i == j:\n                    continue\n                prob *= (1.0 - p[j])\n        \n        if prob > max_prob:\n            max_prob = prob\n\n    print(f\"{max_prob:.12f}\")\n\nif __name__ == \"__main__\":\n    solve()",
+    "code_hash": "757f32ed4c52c098",
+    "language": "python",
+    "node_id": "n_8_45a348",
+    "revision_id": "rev_n_8_45a348_1",
+    "thought_path_snapshot": [
+      "Since the optimal set must be a prefix of the sorted probabilities, iterate through all possible prefix lengths (from 1 to n), calculate the exact probability of success for each, and return the maximum.",
+      "Thought-2 is flawed because it incorrectly assumes the optimal set of friends must always be a prefix of the sorted probabilities; the optimal strategy actually requires selecting the $k$ friends with the highest probabilities to maximize the chance of exactly one success, which corresponds to the suffix of the sorted array, not the prefix."
+    ],
+    "origin": "rethink",
+    "generation_record_id": null,
+    "created_sequence": 13
+  },
+  {
+    "candidate_id": "cand_3b7cf56b49",
+    "problem_id": "apps_3821",
+    "code": "import sys\n\ndef solve():\n    input_data = sys.stdin.read().split()\n    if not input_data:\n        return\n\n    n = int(input_data[0])\n    p = []\n    for i in range(n):\n        p.append(float(input_data[i + 1]))\n\n    p.sort(reverse=True)\n\n    max_prob = 0.0\n    current_zero = 1.0  # Probability of 0 successes so far\n    current_one = 0.0   # Probability of exactly 1 success so far\n\n    for prob in p:\n        # If we add this friend:\n        # New probability of exactly 1 success = \n        # (prob of 0 successes before * prob this friend succeeds) + \n        # (prob of 1 success before * prob this friend fails)\n        new_one = current_zero * prob + current_one * (1.0 - prob)\n        \n        # New probability of 0 successes = \n        # (prob of 0 successes before * prob this friend fails)\n        new_zero = current_zero * (1.0 - prob)\n\n        if new_one > max_prob:\n            max_prob = new_one\n        \n        current_zero = new_zero\n        current_one = new_one\n\n    print(f\"{max_prob:.12f}\")\n\nif __name__ == \"__main__\":\n    solve()",
+    "code_hash": "5dbd906066d0ea33",
+    "language": "python",
+    "node_id": "n_11_ecd51b",
+    "revision_id": "rev_n_11_ecd51b_0",
+    "thought_path_snapshot": [
+      "The previous greedy approach failed because it incorrectly updated the state by treating the probability of \"exactly one success\" as the new baseline for the next iteration, whereas the correct state must track the probability of \"zero successes\" separately to accurately compute the probability of \"exactly one success\" when adding a new friend. The optimal strategy requires iterating through all possible subsets (or using a specific mathematical property where we sort probabilities and include friends until the marginal gain becomes negative) while correctly maintaining the probability of having exactly zero successes in the current set to calculate the transition to exactly one success.",
+      "Sort the probabilities in descending order and iteratively add friends to the set, calculating the probability of exactly one success at each step, stopping when adding the next friend decreases this probability.",
+      "Use dynamic programming where dp[k] represents the probability of getting exactly k problems after considering a subset of friends, iterating through sorted probabilities to find the maximum dp[1]."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 14
+  },
+  {
+    "candidate_id": "cand_0391dc3ef6",
+    "problem_id": "apps_3821",
+    "code": "import sys\n\ndef solve():\n    input_data = sys.stdin.read().split()\n    if not input_data:\n        return\n\n    n = int(input_data[0])\n    p = []\n    idx = 1\n    for _ in range(n):\n        p.append(float(input_data[idx]))\n        idx += 1\n\n    # Sort probabilities in descending order to optimize the greedy check if needed,\n    # but since n <= 100, we can also just try the greedy strategy which is known to be optimal:\n    # Sort descending, then iteratively add friends as long as the probability of exactly one success increases.\n    \n    p.sort(reverse=True)\n    \n    max_prob = 0.0\n    \n    # We will try all prefixes of the sorted list because the optimal set is always a prefix of the sorted probabilities.\n    # This is a known property for this specific problem.\n    \n    current_zero_prob = 1.0  # Probability that no one in the current set succeeds\n    current_one_prob = 0.0   # Probability that exactly one person in the current set succeeds\n    \n    # Option 0: Ask no one (probability 0)\n    max_prob = 0.0\n    \n    for i in range(n):\n        prob = p[i]\n        \n        # Update probabilities when adding the i-th friend (0-indexed in sorted list)\n        # New zero prob = old zero prob * (1 - prob)\n        # New one prob = old one prob * (1 - prob) + old zero prob * prob\n        \n        new_zero = current_zero_prob * (1.0 - prob)\n        new_one = current_one_prob * (1.0 - prob) + current_zero_prob * prob\n        \n        current_zero_prob = new_zero\n        current_one_prob = new_one\n        \n        if current_one_prob > max_prob:\n            max_prob = current_one_prob\n            \n    print(f\"{max_prob:.12f}\")\n\nif __name__ == \"__main__\":\n    solve()",
+    "code_hash": "1e99babc1b320617",
+    "language": "python",
+    "node_id": "n_17_ad8d4b",
+    "revision_id": "rev_n_17_ad8d4b_0",
+    "thought_path_snapshot": [
+      "The previous greedy approach failed because it incorrectly updated the state by treating the probability of \"exactly one success\" as the new baseline for the next iteration, whereas the correct state must track the probability of \"zero successes\" separately to accurately compute the probability of \"exactly one success\" when adding a new friend. The optimal strategy requires iterating through all possible subsets (or using a specific mathematical property where we sort probabilities and include friends until the marginal gain becomes negative) while correctly maintaining the probability of having exactly zero successes in the current set to calculate the transition to exactly one success.",
+      "Since n is small (up to 100), implement a brute-force approach checking all 2^n subsets to find the maximum probability of exactly one success, ensuring correctness without relying on greedy assumptions.",
+      "Since n is small (up to 100), implement a brute-force approach using bitmasks to check all 2^n possible subsets, computing the exact probability for each and tracking the maximum."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 15
+  },
+  {
+    "candidate_id": "cand_6befc1c17f",
+    "problem_id": "apps_3821",
+    "code": "import sys\n\ndef solve():\n    input_data = sys.stdin.read().split()\n    if not input_data:\n        return\n\n    n = int(input_data[0])\n    p = []\n    for i in range(n):\n        p.append(float(input_data[i + 1]))\n\n    # Sort probabilities in ascending order\n    p.sort()\n\n    max_prob = 0.0\n\n    # Try all possible prefixes of the sorted probabilities\n    # We consider taking the first k friends (after sorting) for k from 1 to n\n    current_prob_success = 0.0\n    current_prob_fail = 1.0\n\n    for i in range(n):\n        prob = p[i]\n        # Update probability of exactly one success when adding the i-th friend\n        # New success = (old success * (1 - prob)) + (old fail * prob)\n        # But we need to track the probability of \"exactly one success\" specifically.\n        # Let's recompute from scratch for each prefix to be safe and clear, \n        # or maintain state carefully. Given n <= 100, recomputing is fine.\n        \n        # Actually, let's maintain the probability of exactly one success for the current set.\n        # Let P be the probability of exactly one success for the set {p[0]...p[i-1]}\n        # When adding p[i]:\n        # New P = P * (1 - p[i]) + (Probability that current set has 0 successes) * p[i]\n        # We need to track both P (exactly one) and Q (exactly zero).\n        \n        pass\n\n    # Let's restart the loop with proper state tracking\n    current_zero = 1.0  # Probability that 0 friends have succeeded so far\n    current_one = 0.0   # Probability that exactly 1 friend has succeeded so far\n    \n    for i in range(n):\n        prob = p[i]\n        \n        # Calculate new probabilities after including friend i\n        # New zero = old_zero * (1 - prob)\n        # New one = old_zero * prob + old_one * (1 - prob)\n        \n        new_zero = current_zero * (1.0 - prob)\n        new_one = current_zero * prob + current_one * (1.0 - prob)\n        \n        current_zero = new_zero\n        current_one = new_one\n        \n        if current_one > max_prob:\n            max_prob = current_one\n\n    print(f\"{max_prob:.12f}\")\n\nif __name__ == \"__main__\":\n    solve()",
+    "code_hash": "6e6cb5476efd16d2",
+    "language": "python",
+    "node_id": "n_9_2fb238",
+    "revision_id": "rev_n_9_2fb238_0",
+    "thought_path_snapshot": [
+      "Since the optimal set must be a prefix of the sorted probabilities, iterate through all possible prefix lengths (from 1 to n), calculate the exact probability of success for each, and return the maximum.",
+      "Apply a greedy approach by iteratively adding the friend with the highest probability that increases the total success probability, stopping when adding any remaining friend decreases it."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 16
+  },
+  {
+    "candidate_id": "cand_d585eba98b",
+    "problem_id": "apps_3821",
+    "code": "import sys\n\ndef solve():\n    input_data = sys.stdin.read().split()\n    if not input_data:\n        return\n\n    n = int(input_data[0])\n    p = []\n    for i in range(n):\n        p.append(float(input_data[i + 1]))\n\n    # Sort probabilities in descending order\n    p.sort(reverse=True)\n\n    max_prob = 0.0\n\n    # Try all possible prefixes of the sorted list\n    # We consider taking the first k friends (k from 1 to n)\n    current_prob_one = 0.0\n    current_prob_none = 1.0\n\n    for k in range(1, n + 1):\n        prob_k = p[k - 1]\n        \n        # Update probability of getting exactly one problem\n        # If we add the k-th friend with probability prob_k:\n        # New P(exactly one) = P(prev exactly one) * (1 - prob_k) + P(prev none) * prob_k\n        current_prob_one = current_prob_one * (1.0 - prob_k) + current_prob_none * prob_k\n        \n        # Update probability of getting zero problems\n        # New P(none) = P(prev none) * (1 - prob_k)\n        current_prob_none = current_prob_none * (1.0 - prob_k)\n\n        if current_prob_one > max_prob:\n            max_prob = current_prob_one\n\n    print(f\"{max_prob:.12f}\")\n\nif __name__ == \"__main__\":\n    solve()",
+    "code_hash": "fdcdd9aeb1d97e8c",
+    "language": "python",
+    "node_id": "n_9_2fb238",
+    "revision_id": "rev_n_9_2fb238_1",
+    "thought_path_snapshot": [
+      "Since the optimal set must be a prefix of the sorted probabilities, iterate through all possible prefix lengths (from 1 to n), calculate the exact probability of success for each, and return the maximum.",
+      "Thought-2 is incorrect because it assumes the optimal set is always a prefix of the sorted probabilities, which fails when a single high-probability friend (e.g., 0.8) is better than including lower-probability friends that increase the chance of getting more than one problem; the correct approach is to sort probabilities in descending order and iteratively add friends only if their inclusion increases the probability of getting exactly one problem."
+    ],
+    "origin": "rethink",
+    "generation_record_id": null,
+    "created_sequence": 17
+  },
+  {
+    "candidate_id": "cand_018533ba26",
+    "problem_id": "apps_3821",
+    "code": "import sys\n\ndef solve():\n    input_data = sys.stdin.read().split()\n    if not input_data:\n        return\n\n    n = int(input_data[0])\n    p = []\n    for i in range(n):\n        p.append(float(input_data[i + 1]))\n\n    # Sort probabilities in descending order\n    p.sort(reverse=True)\n\n    best_prob = 0.0\n\n    # We will try all possible prefixes of the sorted list.\n    # The intuition is that if we decide to pick a set of friends,\n    # we should always pick the ones with the highest probabilities.\n    # So we only need to check sets {p[0], p[1], ..., p[k]} for k from 0 to n-1.\n    \n    # dp0: probability of 0 successes in the current set\n    # dp1: probability of exactly 1 success in the current set\n    dp0 = 1.0\n    dp1 = 0.0\n\n    for i in range(n):\n        prob = p[i]\n        # When adding a new friend with probability 'prob':\n        # New dp1 = (old dp0 * prob) + (old dp1 * (1 - prob))\n        # New dp0 = old dp0 * (1 - prob)\n        \n        new_dp1 = dp0 * prob + dp1 * (1.0 - prob)\n        new_dp0 = dp0 * (1.0 - prob)\n        \n        dp0 = new_dp0\n        dp1 = new_dp1\n        \n        if dp1 > best_prob:\n            best_prob = dp1\n\n    print(f\"{best_prob:.12f}\")\n\nif __name__ == \"__main__\":\n    solve()",
+    "code_hash": "40b8d9848f87d00a",
+    "language": "python",
+    "node_id": "n_14_e02dd5",
+    "revision_id": "rev_n_14_e02dd5_0",
+    "thought_path_snapshot": [
+      "The previous greedy approach failed because it incorrectly updated the state by treating the probability of \"exactly one success\" as the new baseline for the next iteration, whereas the correct state must track the probability of \"zero successes\" separately to accurately compute the probability of \"exactly one success\" when adding a new friend. The optimal strategy requires iterating through all possible subsets (or using a specific mathematical property where we sort probabilities and include friends until the marginal gain becomes negative) while correctly maintaining the probability of having exactly zero successes in the current set to calculate the transition to exactly one success.",
+      "Use dynamic programming where dp[i][j] represents the probability of getting exactly j problems from the first i friends, but optimize space to only track the probability of 0 and 1 successes since higher counts are invalid.",
+      "Use dynamic programming where dp[k] represents the probability of getting exactly k problems from the subset of friends considered so far, iterating through sorted probabilities and updating the DP table for k=0 and k=1 only."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 18
+  },
+  {
+    "candidate_id": "cand_2838419a96",
+    "problem_id": "apps_3821",
+    "code": "import sys\n\ndef solve():\n    input_data = sys.stdin.read().split()\n    if not input_data:\n        return\n\n    n = int(input_data[0])\n    p = []\n    for i in range(n):\n        p.append(float(input_data[i + 1]))\n\n    # Sort probabilities in descending order\n    p.sort(reverse=True)\n\n    max_prob = 0.0\n\n    # Iterate over all possible subset sizes from 1 to n\n    # Since n is small (up to 100), we can use bit manipulation or recursion.\n    # However, iterating through all 2^n subsets for n=100 is too slow (2^100).\n    # We need a more efficient approach.\n    # The optimal strategy is known: sort probabilities descending and pick a prefix.\n    # But we must verify if a prefix is always optimal. Actually, for this specific problem\n    # (maximize P(exactly one success)), it is a known result that the optimal set is a prefix\n    # of the sorted probabilities. Let's verify with the logic:\n    # If we have a set S, and we consider adding an element x not in S.\n    # Let P0 be prob of 0 successes in S, P1 be prob of 1 success in S.\n    # New P1' = P0 * x + P1 * (1-x).\n    # We want to maximize P1'.\n    # It turns out that sorting descending and taking a contiguous prefix is the optimal strategy.\n    # Why? Because if we skip a larger probability and take a smaller one, we can swap them\n    # and improve or maintain the result.\n    # So we only need to check prefixes of the sorted array.\n\n    current_p0 = 1.0\n    current_p1 = 0.0\n\n    # Check empty set? No, we need at least one person to have a chance, but technically\n    # the problem says \"choose a set\". If we choose empty set, prob is 0.\n    # We iterate through adding friends one by one from the sorted list.\n    \n    # We will simulate adding friends one by one and track the max P1 encountered.\n    # We don't stop early because sometimes adding a very small probability might increase P1\n    # even if it decreases P0, but the net effect on P1 might be positive until a point.\n    # Actually, the function P1(k) for k friends (sorted descending) is unimodal?\n    # Not necessarily unimodal in a simple way, but checking all prefixes is O(n).\n    \n    # Let's re-verify the prefix hypothesis.\n    # Suppose optimal set is {0.5, 0.1}. P1 = 0.5*0.9 + 0.5*0.1 = 0.45 + 0.05 = 0.5.\n    # Sorted: 0.5, 0.1. Prefixes: {0.5} -> 0.5, {0.5, 0.1} -> 0.5.\n    # Suppose we have {0.4, 0.3, 0.2}.\n    # {0.4}: 0.4\n    # {0.4, 0.3}: 0.4*0.7 + 0.6*0.3 = 0.28 + 0.18 = 0.46\n    # {0.4, 0.3, 0.2}: P0=0.6*0.8=0.48, P1=0.48*0.2 + 0.46*0.8 = 0.096 + 0.368 = 0.464.\n    # It seems checking all prefixes is sufficient.\n    \n    # Algorithm:\n    # 1. Sort p descending.\n    # 2. Iterate k from 1 to n.\n    # 3. Calculate P1 for the first k elements.\n    # 4. Track maximum.\n    \n    # To calculate P1 for a set efficiently:\n    # P1 = sum( p[i] * product(1-p[j] for j != i) )\n    # We can update P0 and P1 incrementally.\n    \n    # Initialize for k=0\n    p0 = 1.0\n    p1 = 0.0\n    \n    # We will store the max probability found so far.\n    # Note: The problem asks for the max probability.\n    \n    best = 0.0\n    \n    for i in range(n):\n        prob = p[i]\n        # Update p0 and p1 when adding the i-th friend (0-indexed in sorted list)\n        # New p1 = old_p0 * prob + old_p1 * (1 - prob)\n        # New p0 = old_p0 * (1 - prob)\n        \n        new_p1 = p0 * prob + p1 * (1.0 - prob)\n        new_p0 = p0 * (1.0 - prob)\n        \n        p0 = new_p0\n        p1 = new_p1\n        \n        if p1 > best:\n            best = p1\n            \n    print(f\"{best:.12f}\")\n\nif __name__ == \"__main__\":\n    solve()",
+    "code_hash": "0bb041968e3eee42",
+    "language": "python",
+    "node_id": "n_12_245269",
+    "revision_id": "rev_n_12_245269_0",
+    "thought_path_snapshot": [
+      "The previous greedy approach failed because it incorrectly updated the state by treating the probability of \"exactly one success\" as the new baseline for the next iteration, whereas the correct state must track the probability of \"zero successes\" separately to accurately compute the probability of \"exactly one success\" when adding a new friend. The optimal strategy requires iterating through all possible subsets (or using a specific mathematical property where we sort probabilities and include friends until the marginal gain becomes negative) while correctly maintaining the probability of having exactly zero successes in the current set to calculate the transition to exactly one success.",
+      "Sort the probabilities in descending order and iteratively add friends to the set, calculating the probability of exactly one success at each step, stopping when adding the next friend decreases this probability.",
+      "Since n is small (up to 100), implement a brute-force approach checking all possible subsets of friends to calculate the probability of exactly one success for each subset and return the maximum."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 19
+  },
+  {
+    "candidate_id": "cand_0b363101e6",
+    "problem_id": "apps_3821",
+    "code": "import sys\n\ndef solve():\n    input_data = sys.stdin.read().split()\n    if not input_data:\n        return\n\n    n = int(input_data[0])\n    p = []\n    for i in range(n):\n        p.append(float(input_data[i + 1]))\n\n    # Sort probabilities in descending order\n    p.sort(reverse=True)\n\n    max_prob = 0.0\n\n    # We will try all possible prefixes of the sorted list because\n    # the optimal set of friends to ask is always a subset of the most reliable ones.\n    # Specifically, if we decide to ask k friends, it is always optimal to choose the k friends with the highest probabilities.\n    # We iterate k from 1 to n.\n    \n    current_zero = 1.0  # Probability that 0 friends have succeeded so far\n    current_one = 0.0   # Probability that exactly 1 friend has succeeded so far\n\n    for i in range(n):\n        prob = p[i]\n        \n        # When adding a new friend with probability 'prob':\n        # New probability of exactly 0 successes = (old 0 successes) * (1 - prob)\n        # New probability of exactly 1 success = (old 0 successes) * prob + (old 1 success) * (1 - prob)\n        \n        new_zero = current_zero * (1.0 - prob)\n        new_one = current_zero * prob + current_one * (1.0 - prob)\n        \n        current_zero = new_zero\n        current_one = new_one\n        \n        if current_one > max_prob:\n            max_prob = current_one\n\n    print(f\"{max_prob:.12f}\")\n\nif __name__ == \"__main__\":\n    solve()",
+    "code_hash": "aa2c4f052d950d7f",
+    "language": "python",
+    "node_id": "n_16_d6994f",
+    "revision_id": "rev_n_16_d6994f_0",
+    "thought_path_snapshot": [
+      "The previous greedy approach failed because it incorrectly updated the state by treating the probability of \"exactly one success\" as the new baseline for the next iteration, whereas the correct state must track the probability of \"zero successes\" separately to accurately compute the probability of \"exactly one success\" when adding a new friend. The optimal strategy requires iterating through all possible subsets (or using a specific mathematical property where we sort probabilities and include friends until the marginal gain becomes negative) while correctly maintaining the probability of having exactly zero successes in the current set to calculate the transition to exactly one success.",
+      "Since n is small (up to 100), implement a brute-force approach checking all 2^n subsets to find the maximum probability of exactly one success, ensuring correctness without relying on greedy assumptions.",
+      "Sort the probabilities in descending order and iteratively add friends to the set, calculating the probability of exactly one success after each addition, stopping when adding the next friend decreases this probability."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 20
+  }
+]

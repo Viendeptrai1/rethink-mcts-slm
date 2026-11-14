@@ -1,0 +1,34 @@
+import sys
+
+def solve():
+    input_data = sys.stdin.read().split()
+    if not input_data:
+        return
+
+    iterator = iter(input_data)
+    try:
+        n = int(next(iterator))
+    except StopIteration:
+        return
+
+    citations = []
+    for _ in range(n):
+        try:
+            citations.append(int(next(iterator)))
+        except StopIteration:
+            break
+
+    citations.sort(reverse=True)
+
+    h_index = 0
+    for i, c in enumerate(citations):
+        # i is 0-based index, so we have (i+1) papers up to this point
+        if c >= i + 1:
+            h_index = i + 1
+        else:
+            break
+
+    print(h_index)
+
+if __name__ == "__main__":
+    solve()

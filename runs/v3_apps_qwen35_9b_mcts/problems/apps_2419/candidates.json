@@ -1,0 +1,259 @@
+[
+  {
+    "candidate_id": "cand_a1a0edd759",
+    "problem_id": "apps_2419",
+    "code": "import sys\n\ndef solve():\n    input_data = sys.stdin.read().split()\n    if not input_data:\n        return\n    \n    iterator = iter(input_data)\n    t = int(next(iterator))\n    \n    results = []\n    \n    for _ in range(t):\n        a = int(next(iterator))\n        b = int(next(iterator))\n        \n        diff = abs(a - b)\n        \n        if diff == 0:\n            results.append(0)\n            continue\n        \n        k = 0\n        total = 0\n        while total < diff:\n            k += 1\n            total += k\n        \n        remainder = total - diff\n        \n        if remainder % 2 == 0:\n            results.append(k)\n        else:\n            results.append(k + 1)\n    \n    print('\\n'.join(map(str, results)))\n\nif __name__ == \"__main__\":\n    solve()",
+    "code_hash": "ca8427ab7b465d38",
+    "language": "python",
+    "node_id": "n_1_15f1d5",
+    "revision_id": "rev_n_1_15f1d5_0",
+    "thought_path_snapshot": [
+      "Calculate the absolute difference $d = |a - b|$. Find the smallest integer $k$ such that the sum of integers from 1 to $k$ (which is $k(k+1)/2$) is at least $d$. If the sum equals $d$, the answer is $k$. If the sum exceeds $d$, check the parity of the difference (sum - $d$). If the difference is even, the answer is $k$; if odd, the answer is $k+1$ because we need to adjust the distribution of the extra value by changing an operation's addend by 1, which requires an even total surplus to maintain parity."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 1
+  },
+  {
+    "candidate_id": "cand_fa44886bc6",
+    "problem_id": "apps_2419",
+    "code": "import sys\n\ndef solve():\n    input_data = sys.stdin.read().split()\n    if not input_data:\n        return\n    \n    iterator = iter(input_data)\n    t = int(next(iterator))\n    \n    results = []\n    \n    for _ in range(t):\n        a = int(next(iterator))\n        b = int(next(iterator))\n        \n        diff = abs(a - b)\n        \n        if diff == 0:\n            results.append(0)\n            continue\n        \n        # We need smallest k such that k*(k+1)/2 >= diff\n        # Using binary search to avoid floating point issues with large numbers\n        low = 1\n        high = 2 * 10**9  # Sufficiently large since diff <= 10^9, k approx sqrt(2*10^9) ~ 45000\n        # Actually, if diff is 10^9, k is around 45000. But let's be safe for edge cases or larger constraints if any.\n        # A safe upper bound: if diff = 10^9, k ~ 45000. If diff was larger, say 10^18, k ~ 1.4*10^9.\n        # Given constraints a,b <= 10^9, diff <= 10^9. So high = 2*10^5 is enough, but let's use 2*10^9 to be generic.\n        # Wait, if a=1, b=10^9, diff=10^9-1. k*(k+1)/2 >= 10^9 => k approx 44721.\n        # So high = 100000 is enough. But let's stick to a safe large number.\n        high = 2000000000 \n        \n        k = high\n        while low <= high:\n            mid = (low + high) // 2\n            s = mid * (mid + 1) // 2\n            if s >= diff:\n                k = mid\n                high = mid - 1\n            else:\n                low = mid + 1\n        \n        # Now check parity\n        s = k * (k + 1) // 2\n        remainder = s - diff\n        \n        if remainder % 2 == 0:\n            results.append(k)\n        else:\n            # If parity is odd, we need one more operation to flip the parity of the sum\n            # (k+1) operations will have sum s + (k+1). \n            # (s + k + 1) - diff = remainder + k + 1.\n            # Since remainder is odd, and k is odd (because sum of 1..k has same parity as k), \n            # remainder + k + 1 = odd + odd + odd = odd? Wait.\n            # Let's re-verify logic.\n            # Sum(1..k) = S. We need S - diff = even.\n            # If S - diff is odd, we try k+1.\n            # Sum(1..k+1) = S + k + 1.\n            # New diff_rem = S + k + 1 - diff = (S - diff) + k + 1.\n            # We know (S - diff) is odd.\n            # We need (S - diff) + k + 1 to be even.\n            # So we need k + 1 to be odd => k must be even.\n            # If k is odd, then k+1 is even, so odd + even = odd. Still bad.\n            # Then we try k+2.\n            # Sum(1..k+2) = S + k + 1 + k + 2 = S + 2k + 3.\n            # New diff_rem = (S - diff) + 2k + 3.\n            # (S-diff) is odd. 2k is even. 3 is odd. odd + even + odd = even. Good.\n            # So if parity doesn't match at k, answer is k+1 if (k+1) has correct parity adjustment?\n            # Actually simpler:\n            # If (S - diff) % 2 != 0:\n            #   Try k+1. New sum diff = (S - diff) + (k+1).\n            #   If this is even, return k+1.\n            #   Else return k+2.\n            # But note: (S-diff) and (k+1) have same parity?\n            # S = k(k+1)/2.\n            # Parity of S depends on k mod 4.\n            # k=1: S=1 (odd). k+1=2 (even). S-(k+1) = -1 (odd).\n            # k=2: S=3 (odd). k+1=3 (odd). S-(k+1) = 0 (even).\n            # k=3: S=6 (even). k+1=4 (even). S-(k+1) = 2 (even).\n            # k=4: S=10 (even). k+1=5 (odd). S-(k+1) = 5 (odd).\n            # Pattern:\n            # If (S-diff) is odd:\n            #   If k is even: k+1 is odd. (S-diff) + (k+1) = odd + odd = even. So k+1 works.\n            #   If k is odd: k+1 is even. (S-diff) + (k+1) = odd + even = odd. So k+1 fails. Try k+2.\n            #   At k+2: sum adds k+1 and k+2. Total added = 2k+3 (odd).\n            #   (S-diff) + (2k+3) = odd + odd = even. So k+2 works.\n            \n            if (k + 1) % 2 == 1:\n                results.append(k + 1)\n            else:\n                results.append(k + 2)\n\n    print('\\n'.join(map(str, results)))\n\nif __name__ == '__main__':\n    solve()",
+    "code_hash": "47d2dcb2e559eb08",
+    "language": "python",
+    "node_id": "n_2_3bbf13",
+    "revision_id": "rev_n_2_3bbf13_0",
+    "thought_path_snapshot": [
+      "Use binary search to find the minimum $k$ where $k(k+1)/2 \\ge |a-b|$. Once $k$ is found, verify the parity condition: if $(k(k+1)/2 - |a-b|) \\% 2 == 0$, return $k$, else return $k+1$. This avoids solving the quadratic equation directly and handles large inputs ($10^9$) efficiently within time limits."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 2
+  },
+  {
+    "candidate_id": "cand_1c15c6df13",
+    "problem_id": "apps_2419",
+    "code": "import sys\nimport math\n\ndef solve():\n    input_data = sys.stdin.read().split()\n    if not input_data:\n        return\n    \n    iterator = iter(input_data)\n    t = int(next(iterator))\n    \n    results = []\n    \n    for _ in range(t):\n        a = int(next(iterator))\n        b = int(next(iterator))\n        \n        if a == b:\n            results.append(0)\n            continue\n        \n        diff = abs(a - b)\n        \n        # We need smallest k such that sum(1..k) >= diff and sum(1..k) % 2 == diff % 2\n        # sum(1..k) = k*(k+1)/2\n        # Solve k^2 + k - 2*diff >= 0\n        # Positive root: (-1 + sqrt(1 + 8*diff)) / 2\n        \n        discriminant = 1 + 8 * diff\n        sqrt_disc = math.isqrt(discriminant)\n        \n        if sqrt_disc * sqrt_disc < discriminant:\n            sqrt_disc += 1\n        \n        k = (sqrt_disc - 1) // 2\n        \n        current_sum = k * (k + 1) // 2\n        \n        while current_sum < diff or (current_sum - diff) % 2 != 0:\n            k += 1\n            current_sum = k * (k + 1) // 2\n        \n        results.append(k)\n    \n    print('\\n'.join(map(str, results)))\n\nif __name__ == \"__main__\":\n    solve()",
+    "code_hash": "f6ade6c8c753ab19",
+    "language": "python",
+    "node_id": "n_3_c6553d",
+    "revision_id": "rev_n_3_c6553d_0",
+    "thought_path_snapshot": [
+      "Solve the quadratic inequality $k^2 + k - 2d \\ge 0$ to estimate $k \\approx \\sqrt{2d}$. Calculate the exact integer $k$ by taking the ceiling of the positive root of $k^2+k-2d=0$. Then apply the same parity check logic: if the remainder of the sum minus $d$ is odd, increment $k$ by 1. This mathematical approach is $O(1)$ per test case."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 3
+  },
+  {
+    "candidate_id": "cand_a7d2c64c0d",
+    "problem_id": "apps_2419",
+    "code": "import sys\n\ndef solve():\n    input_data = sys.stdin.read().split()\n    if not input_data:\n        return\n    \n    iterator = iter(input_data)\n    t = int(next(iterator))\n    \n    results = []\n    \n    for _ in range(t):\n        a = int(next(iterator))\n        b = int(next(iterator))\n        \n        diff = abs(a - b)\n        \n        if diff == 0:\n            results.append(0)\n            continue\n        \n        k = 0\n        total = 0\n        while total < diff:\n            k += 1\n            total += k\n        \n        remainder = total - diff\n        \n        if remainder % 2 == 0:\n            results.append(k)\n        else:\n            results.append(k + 1)\n    \n    print('\\n'.join(map(str, results)))\n\nif __name__ == \"__main__\":\n    solve()",
+    "code_hash": "ca8427ab7b465d38",
+    "language": "python",
+    "node_id": "n_4_ba074f",
+    "revision_id": "rev_n_4_ba074f_0",
+    "thought_path_snapshot": [
+      "Calculate the absolute difference $d = |a - b|$. Find the smallest integer $k$ such that the sum of integers from 1 to $k$ (which is $k(k+1)/2$) is at least $d$. If the sum equals $d$, the answer is $k$. If the sum exceeds $d$, check the parity of the difference (sum - $d$). If the difference is even, the answer is $k$; if odd, the answer is $k+1$ because we need to adjust the distribution of the extra value by changing an operation's addend by 1, which requires an even total surplus to maintain parity.",
+      "Calculate the difference $d = |a - b|$. Find the smallest $k$ where $k(k+1)/2 eq d$. If the sum equals $d$, return $k$. If the sum exceeds $d$, check if the difference between sum and $d$ is even; if so, return $k$, otherwise return $k+1$."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 4
+  },
+  {
+    "candidate_id": "cand_b1bac117e5",
+    "problem_id": "apps_2419",
+    "code": "import sys\n\ndef solve():\n    input_data = sys.stdin.read().split()\n    if not input_data:\n        return\n    \n    iterator = iter(input_data)\n    t = int(next(iterator))\n    \n    results = []\n    \n    for _ in range(t):\n        a = int(next(iterator))\n        b = int(next(iterator))\n        \n        diff = abs(a - b)\n        \n        if diff == 0:\n            results.append(0)\n            continue\n        \n        # Find smallest k such that k*(k+1)/2 >= diff\n        # Using binary search to avoid floating point issues and handle large numbers\n        low = 1\n        high = 2 * 10**9  # Sufficiently large since diff <= 10^9\n        k = high\n        \n        while low <= high:\n            mid = (low + high) // 2\n            total = mid * (mid + 1) // 2\n            if total >= diff:\n                k = mid\n                high = mid - 1\n            else:\n                low = mid + 1\n        \n        # Check parity\n        total_sum = k * (k + 1) // 2\n        remainder = total_sum - diff\n        \n        if remainder % 2 == 0:\n            results.append(k)\n        else:\n            results.append(k + 1)\n    \n    print('\\n'.join(map(str, results)))\n\nif __name__ == '__main__':\n    solve()",
+    "code_hash": "c2eda79b54ffe8e5",
+    "language": "python",
+    "node_id": "n_7_422904",
+    "revision_id": "rev_n_7_422904_0",
+    "thought_path_snapshot": [
+      "Use binary search to find the minimum $k$ where $k(k+1)/2 \\ge |a-b|$. Once $k$ is found, verify the parity condition: if $(k(k+1)/2 - |a-b|) \\% 2 == 0$, return $k$, else return $k+1$. This avoids solving the quadratic equation directly and handles large inputs ($10^9$) efficiently within time limits.",
+      "Calculate the difference $d = |a - b|$. Find the smallest integer $k$ such that the sum of integers from 1 to $k$ (i.e., $k(k+1)/2$) is at least $d$. Then check if the difference between the sum and $d$ is even. If it is, $k$ is the answer; otherwise, $k+1$ is the answer because adding one more operation changes the parity of the total sum."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 5
+  },
+  {
+    "candidate_id": "cand_eb3f328621",
+    "problem_id": "apps_2419",
+    "code": "import sys\nimport math\n\ndef solve():\n    input_data = sys.stdin.read().split()\n    if not input_data:\n        return\n    \n    iterator = iter(input_data)\n    t = int(next(iterator))\n    \n    results = []\n    for _ in range(t):\n        a = int(next(iterator))\n        b = int(next(iterator))\n        \n        d = abs(a - b)\n        if d == 0:\n            results.append(0)\n            continue\n        \n        # Solve k(k+1)/2 >= d\n        # k^2 + k - 2d >= 0\n        # Positive root: (-1 + sqrt(1 + 8d)) / 2\n        k = math.ceil((-1 + math.sqrt(1 + 8 * d)) / 2)\n        \n        current_sum = k * (k + 1) // 2\n        diff = current_sum - d\n        \n        # If diff is odd, we need one more operation to make the parity even\n        if diff % 2 != 0:\n            k += 1\n        \n        results.append(k)\n    \n    print('\\n'.join(map(str, results)))\n\nif __name__ == \"__main__\":\n    solve()",
+    "code_hash": "5a01b089fcab9a4b",
+    "language": "python",
+    "node_id": "n_10_7d4cad",
+    "revision_id": "rev_n_10_7d4cad_0",
+    "thought_path_snapshot": [
+      "Solve the quadratic inequality $k^2 + k - 2d \\ge 0$ to estimate $k \\approx \\sqrt{2d}$. Calculate the exact integer $k$ by taking the ceiling of the positive root of $k^2+k-2d=0$. Then apply the same parity check logic: if the remainder of the sum minus $d$ is odd, increment $k$ by 1. This mathematical approach is $O(1)$ per test case.",
+      "Calculate the absolute difference $d = |a - b|$. Find the smallest integer $k$ such that the sum of integers from 1 to $k$ (which is $k(k+1)/2$) is at least $d$. Then, if the difference between this sum and $d$ is odd, increment $k$ by 1 to make the difference even, ensuring the remaining value can be distributed to balance the numbers."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 6
+  },
+  {
+    "candidate_id": "cand_bdcc23ba00",
+    "problem_id": "apps_2419",
+    "code": "import sys\n\ndef solve():\n    input_data = sys.stdin.read().split()\n    if not input_data:\n        return\n    \n    iterator = iter(input_data)\n    t = int(next(iterator))\n    \n    results = []\n    \n    for _ in range(t):\n        a = int(next(iterator))\n        b = int(next(iterator))\n        \n        diff = abs(a - b)\n        \n        if diff == 0:\n            results.append(0)\n            continue\n        \n        k = 0\n        current_sum = 0\n        \n        # Find smallest k such that k*(k+1)/2 >= diff\n        while current_sum < diff:\n            k += 1\n            current_sum += k\n        \n        # Check parity\n        remainder = current_sum - diff\n        \n        if remainder % 2 == 0:\n            results.append(k)\n        else:\n            results.append(k + 1)\n    \n    print('\\n'.join(map(str, results)))\n\nif __name__ == '__main__':\n    solve()",
+    "code_hash": "8e4d2633606bb50e",
+    "language": "python",
+    "node_id": "n_5_83267d",
+    "revision_id": "rev_n_5_83267d_0",
+    "thought_path_snapshot": [
+      "Calculate the absolute difference $d = |a - b|$. Find the smallest integer $k$ such that the sum of integers from 1 to $k$ (which is $k(k+1)/2$) is at least $d$. If the sum equals $d$, the answer is $k$. If the sum exceeds $d$, check the parity of the difference (sum - $d$). If the difference is even, the answer is $k$; if odd, the answer is $k+1$ because we need to adjust the distribution of the extra value by changing an operation's addend by 1, which requires an even total surplus to maintain parity.",
+      "Iterate starting from $k=0$, accumulating the sum $S = k(k+1)/2$. Stop when $S eq d$. If $S == d$, answer is $k$. If $S > d$, check parity of $(S - d)$. If even, answer is $k$. If odd, answer is $k+1$."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 7
+  },
+  {
+    "candidate_id": "cand_5f2d7be805",
+    "problem_id": "apps_2419",
+    "code": "import sys\n\ndef solve():\n    input_data = sys.stdin.read().split()\n    if not input_data:\n        return\n    \n    iterator = iter(input_data)\n    t = int(next(iterator))\n    \n    results = []\n    \n    for _ in range(t):\n        a = int(next(iterator))\n        b = int(next(iterator))\n        \n        diff = abs(a - b)\n        \n        if diff == 0:\n            results.append(0)\n            continue\n        \n        # We need smallest k such that k*(k+1)/2 >= diff\n        # Approximate k using sqrt: k^2 approx 2*diff => k approx sqrt(2*diff)\n        k = int((2 * diff) ** 0.5)\n        \n        # Adjust k to ensure sum >= diff\n        while k * (k + 1) // 2 < diff:\n            k += 1\n        \n        # Check parity\n        total_sum = k * (k + 1) // 2\n        remainder = total_sum - diff\n        \n        if remainder % 2 == 0:\n            results.append(k)\n        else:\n            # If parity is wrong, try k+1\n            # (k+1) sum will have different parity from k sum because adding (k+1) flips parity if k+1 is odd, \n            # but actually we just need to check if (k+1) makes the remainder even.\n            # Since remainder is odd, we need to add an odd number to the sum to make the new remainder even.\n            # The next term is k+1. If k+1 is odd, then new remainder = old_remainder + (k+1) = odd + odd = even.\n            # If k+1 is even, new remainder = odd + even = odd, so we need k+2.\n            # However, a simpler logic: \n            # If we go to k+1, the new sum is S + (k+1). New diff_rem = (S + k + 1) - diff = rem + k + 1.\n            # We need (rem + k + 1) % 2 == 0. Since rem is odd, we need (k+1) to be odd.\n            # If k+1 is odd, answer is k+1.\n            # If k+1 is even, then k is odd. Then k+2 is odd. Adding k+1 (even) keeps rem odd. Adding k+2 (odd) makes it even.\n            # So if k+1 is even, answer is k+2.\n            if (k + 1) % 2 == 1:\n                results.append(k + 1)\n            else:\n                results.append(k + 2)\n\n    print('\\n'.join(map(str, results)))\n\nif __name__ == '__main__':\n    solve()",
+    "code_hash": "11b6e18fc9fb1803",
+    "language": "python",
+    "node_id": "n_8_56e8c4",
+    "revision_id": "rev_n_8_56e8c4_0",
+    "thought_path_snapshot": [
+      "Use binary search to find the minimum $k$ where $k(k+1)/2 \\ge |a-b|$. Once $k$ is found, verify the parity condition: if $(k(k+1)/2 - |a-b|) \\% 2 == 0$, return $k$, else return $k+1$. This avoids solving the quadratic equation directly and handles large inputs ($10^9$) efficiently within time limits.",
+      "Solve the quadratic inequality $k^2 + k - 2d \\ge 0$ directly using the quadratic formula to find an approximate lower bound for $k$, then adjust $k$ by checking $k$, $k+1$, and $k+2$ to satisfy both the sum magnitude and the parity constraint."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 8
+  },
+  {
+    "candidate_id": "cand_d4989e7c7f",
+    "problem_id": "apps_2419",
+    "code": "import sys\nimport math\n\ndef solve():\n    input_data = sys.stdin.read().split()\n    if not input_data:\n        return\n    \n    iterator = iter(input_data)\n    t = int(next(iterator))\n    \n    results = []\n    \n    for _ in range(t):\n        a = int(next(iterator))\n        b = int(next(iterator))\n        \n        if a == b:\n            results.append(0)\n            continue\n        \n        d = abs(a - b)\n        \n        # We need k such that k*(k+1)/2 >= d\n        # Solve k^2 + k - 2d = 0 -> k = (-1 + sqrt(1 + 8d)) / 2\n        k = math.ceil((-1 + math.sqrt(1 + 8 * d)) / 2)\n        \n        # Check if the sum of 1..k has the same parity as d\n        # sum = k*(k+1)//2\n        # We need (sum - d) to be even, meaning sum and d have same parity\n        # If not, we need k+1 (since adding k+1 changes parity of sum)\n        \n        current_sum = k * (k + 1) // 2\n        if (current_sum - d) % 2 == 0:\n            results.append(k)\n        else:\n            results.append(k + 1)\n    \n    print('\\n'.join(map(str, results)))\n\nif __name__ == '__main__':\n    solve()",
+    "code_hash": "741d15863aed7513",
+    "language": "python",
+    "node_id": "n_11_ebde49",
+    "revision_id": "rev_n_11_ebde49_0",
+    "thought_path_snapshot": [
+      "Solve the quadratic inequality $k^2 + k - 2d \\ge 0$ to estimate $k \\approx \\sqrt{2d}$. Calculate the exact integer $k$ by taking the ceiling of the positive root of $k^2+k-2d=0$. Then apply the same parity check logic: if the remainder of the sum minus $d$ is odd, increment $k$ by 1. This mathematical approach is $O(1)$ per test case.",
+      "Use binary search to find the minimum $k$ where $k(k+1)/2 eq d$. Once a candidate $k$ is found, check the parity of the remainder. If the remainder is odd, the answer is $k+1$; otherwise, it is $k$. This avoids direct square root calculations and floating-point issues."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 9
+  },
+  {
+    "candidate_id": "cand_4b9a977ae9",
+    "problem_id": "apps_2419",
+    "code": "import sys\n\ndef solve():\n    input_data = sys.stdin.read().split()\n    if not input_data:\n        return\n    \n    iterator = iter(input_data)\n    t = int(next(iterator))\n    \n    results = []\n    \n    for _ in range(t):\n        a = int(next(iterator))\n        b = int(next(iterator))\n        \n        diff = abs(a - b)\n        \n        if diff == 0:\n            results.append(0)\n            continue\n        \n        # Binary search for minimum k such that k*(k+1)/2 >= diff\n        low = 1\n        high = 2 * 10**9  # Sufficiently large since diff <= 10^9\n        k = high\n        \n        while low <= high:\n            mid = (low + high) // 2\n            total = mid * (mid + 1) // 2\n            if total >= diff:\n                k = mid\n                high = mid - 1\n            else:\n                low = mid + 1\n        \n        total = k * (k + 1) // 2\n        remainder = total - diff\n        \n        if remainder % 2 == 0:\n            results.append(k)\n        else:\n            results.append(k + 1)\n    \n    for res in results:\n        print(res)\n\nif __name__ == \"__main__\":\n    solve()",
+    "code_hash": "b54d76467638b940",
+    "language": "python",
+    "node_id": "n_6_f55032",
+    "revision_id": "rev_n_6_f55032_0",
+    "thought_path_snapshot": [
+      "Calculate the absolute difference $d = |a - b|$. Find the smallest integer $k$ such that the sum of integers from 1 to $k$ (which is $k(k+1)/2$) is at least $d$. If the sum equals $d$, the answer is $k$. If the sum exceeds $d$, check the parity of the difference (sum - $d$). If the difference is even, the answer is $k$; if odd, the answer is $k+1$ because we need to adjust the distribution of the extra value by changing an operation's addend by 1, which requires an even total surplus to maintain parity.",
+      "Use binary search to find the minimum $k$ such that $k(k+1)/2 eq d$. Once $k$ is found, verify if $k(k+1)/2 == d$. If not, check if $(k(k+1)/2 - d)$ is even. Adjust $k$ accordingly based on parity constraints."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 10
+  },
+  {
+    "candidate_id": "cand_d0dfd21e4d",
+    "problem_id": "apps_2419",
+    "code": "import sys\n\ndef solve():\n    input_data = sys.stdin.read().split()\n    if not input_data:\n        return\n    \n    iterator = iter(input_data)\n    t = int(next(iterator))\n    \n    results = []\n    \n    for _ in range(t):\n        a = int(next(iterator))\n        b = int(next(iterator))\n        \n        diff = abs(a - b)\n        \n        if diff == 0:\n            results.append(0)\n            continue\n        \n        k = int((2 * diff) ** 0.5)\n        \n        while k * (k + 1) // 2 < diff:\n            k += 1\n        \n        s = k * (k + 1) // 2\n        remainder = s - diff\n        \n        if remainder % 2 == 0:\n            results.append(k)\n        else:\n            results.append(k + 1)\n    \n    print('\\n'.join(map(str, results)))\n\nif __name__ == \"__main__\":\n    solve()",
+    "code_hash": "192446a364085cbe",
+    "language": "python",
+    "node_id": "n_9_3f08d0",
+    "revision_id": "rev_n_9_3f08d0_0",
+    "thought_path_snapshot": [
+      "Use binary search to find the minimum $k$ where $k(k+1)/2 \\ge |a-b|$. Once $k$ is found, verify the parity condition: if $(k(k+1)/2 - |a-b|) \\% 2 == 0$, return $k$, else return $k+1$. This avoids solving the quadratic equation directly and handles large inputs ($10^9$) efficiently within time limits.",
+      "Iterate starting from $k=1$, accumulating the sum $S = k(k+1)/2$ and checking if $S \\ge d$ and $(S - d) \\pmod 2 == 0$. Stop immediately when both conditions are met. This is $O(\\sqrt{d})$ which is efficient enough for $d \\le 10^9$."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 11
+  },
+  {
+    "candidate_id": "cand_ec59492252",
+    "problem_id": "apps_2419",
+    "code": "import sys\nimport math\n\ndef solve():\n    input_data = sys.stdin.read().split()\n    if not input_data:\n        return\n    \n    iterator = iter(input_data)\n    t = int(next(iterator))\n    \n    results = []\n    \n    for _ in range(t):\n        a = int(next(iterator))\n        b = int(next(iterator))\n        \n        if a == b:\n            results.append(0)\n            continue\n        \n        d = abs(a - b)\n        \n        # We need smallest k such that k*(k+1)/2 >= d\n        # Solve k^2 + k - 2d = 0 => k = (-1 + sqrt(1 + 8d)) / 2\n        k = int(math.ceil((-1 + math.sqrt(1 + 8 * d)) / 2))\n        \n        # Check if the sum of 1..k has the same parity as d\n        current_sum = k * (k + 1) // 2\n        if (current_sum - d) % 2 != 0:\n            k += 1\n            \n        results.append(k)\n    \n    print('\\n'.join(map(str, results)))\n\nif __name__ == \"__main__\":\n    solve()",
+    "code_hash": "50d16c6feb4c31a4",
+    "language": "python",
+    "node_id": "n_12_56ad72",
+    "revision_id": "rev_n_12_56ad72_0",
+    "thought_path_snapshot": [
+      "Solve the quadratic inequality $k^2 + k - 2d \\ge 0$ to estimate $k \\approx \\sqrt{2d}$. Calculate the exact integer $k$ by taking the ceiling of the positive root of $k^2+k-2d=0$. Then apply the same parity check logic: if the remainder of the sum minus $d$ is odd, increment $k$ by 1. This mathematical approach is $O(1)$ per test case.",
+      "Approximate $k$ using the quadratic formula $k \\approx \\sqrt{2d}$, then verify the exact value by checking $k$ and $k+1$ against the sum condition. Finally, apply the parity adjustment rule: if $(k(k+1)/2 - d) \\% 2 \\neq 0$, add 1 to $k$. This combines mathematical estimation with rigorous verification."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 12
+  },
+  {
+    "candidate_id": "cand_75cc94d348",
+    "problem_id": "apps_2419",
+    "code": "import sys\nimport math\n\ndef solve():\n    input_data = sys.stdin.read().split()\n    if not input_data:\n        return\n    \n    iterator = iter(input_data)\n    t = int(next(iterator))\n    \n    results = []\n    \n    for _ in range(t):\n        a = int(next(iterator))\n        b = int(next(iterator))\n        \n        d = abs(a - b)\n        \n        if d == 0:\n            results.append(0)\n            continue\n        \n        # Find smallest k such that k*(k+1)/2 >= d\n        # Solve k^2 + k - 2d = 0 => k = (-1 + sqrt(1 + 8d)) / 2\n        k = math.ceil((-1 + math.sqrt(1 + 8 * d)) / 2)\n        \n        s = k * (k + 1) // 2\n        diff = s - d\n        \n        if diff % 2 == 0:\n            results.append(k)\n        else:\n            results.append(k + 1)\n    \n    for res in results:\n        print(res)\n\nif __name__ == \"__main__\":\n    solve()",
+    "code_hash": "6903d40f70ef071f",
+    "language": "python",
+    "node_id": "n_13_2826f2",
+    "revision_id": "rev_n_13_2826f2_0",
+    "thought_path_snapshot": [
+      "Calculate the absolute difference $d = |a - b|$. Find the smallest integer $k$ such that the sum of integers from 1 to $k$ (which is $k(k+1)/2$) is at least $d$. If the sum equals $d$, the answer is $k$. If the sum exceeds $d$, check the parity of the difference (sum - $d$). If the difference is even, the answer is $k$; if odd, the answer is $k+1$ because we need to adjust the distribution of the extra value by changing an operation's addend by 1, which requires an even total surplus to maintain parity.",
+      "Calculate the difference $d = |a - b|$. Find the smallest $k$ where $k(k+1)/2 eq d$. If the sum equals $d$, return $k$. If the sum exceeds $d$, check if the difference between sum and $d$ is even; if so, return $k$, otherwise return $k+1$.",
+      "Calculate the absolute difference $d = |a - b|$. Find the smallest integer $k$ such that the sum $S_k = k(k+1)/2$ is greater than or equal to $d$. If $S_k = d$, the answer is $k$. If $S_k > d$, check the parity of the remainder $(S_k - d)$. If the remainder is even, the answer is $k$ (we can flip the sign of some subset of added numbers to reduce the sum by the remainder). If the remainder is odd, the answer is $k+1$ (we need one more operation to adjust the parity)."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 13
+  },
+  {
+    "candidate_id": "cand_026385be8a",
+    "problem_id": "apps_2419",
+    "code": "import sys\n\ndef solve():\n    input_data = sys.stdin.read().split()\n    if not input_data:\n        return\n    \n    iterator = iter(input_data)\n    t = int(next(iterator))\n    \n    results = []\n    \n    for _ in range(t):\n        a = int(next(iterator))\n        b = int(next(iterator))\n        \n        diff = abs(a - b)\n        \n        if diff == 0:\n            results.append(0)\n            continue\n        \n        # Binary search for the smallest k such that k*(k+1)/2 >= diff\n        low = 1\n        high = 2 * 10**9 + 100  # Sufficiently large upper bound\n        k = high\n        \n        while low <= high:\n            mid = (low + high) // 2\n            total = mid * (mid + 1) // 2\n            if total >= diff:\n                k = mid\n                high = mid - 1\n            else:\n                low = mid + 1\n        \n        # Check parity\n        total_sum = k * (k + 1) // 2\n        remainder = total_sum - diff\n        \n        if remainder % 2 == 0:\n            results.append(k)\n        else:\n            results.append(k + 1)\n    \n    print('\\n'.join(map(str, results)))\n\nif __name__ == '__main__':\n    solve()",
+    "code_hash": "021e8c51b1bc8e68",
+    "language": "python",
+    "node_id": "n_17_6c7305",
+    "revision_id": "rev_n_17_6c7305_0",
+    "thought_path_snapshot": [
+      "Use binary search to find the minimum $k$ where $k(k+1)/2 \\ge |a-b|$. Once $k$ is found, verify the parity condition: if $(k(k+1)/2 - |a-b|) \\% 2 == 0$, return $k$, else return $k+1$. This avoids solving the quadratic equation directly and handles large inputs ($10^9$) efficiently within time limits.",
+      "Calculate the difference $d = |a - b|$. Find the smallest integer $k$ such that the sum of integers from 1 to $k$ (i.e., $k(k+1)/2$) is at least $d$. Then check if the difference between the sum and $d$ is even. If it is, $k$ is the answer; otherwise, $k+1$ is the answer because adding one more operation changes the parity of the total sum.",
+      "Use binary search over the range $[0, 2 \\cdot 10^9]$ to find the smallest $k$ satisfying the sum constraint, followed by the parity check, ensuring $O(1)$ time complexity per test case without floating-point precision issues."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 14
+  },
+  {
+    "candidate_id": "cand_d79c64ca3d",
+    "problem_id": "apps_2419",
+    "code": "import sys\nimport math\n\ndef solve():\n    input_data = sys.stdin.read().split()\n    if not input_data:\n        return\n    \n    iterator = iter(input_data)\n    t = int(next(iterator))\n    \n    results = []\n    \n    for _ in range(t):\n        a = int(next(iterator))\n        b = int(next(iterator))\n        \n        d = abs(a - b)\n        \n        if d == 0:\n            results.append(0)\n            continue\n        \n        # Solve k(k+1)/2 >= d\n        # k^2 + k - 2d >= 0\n        # Positive root of k^2 + k - 2d = 0 is (-1 + sqrt(1 + 8d)) / 2\n        k = math.ceil((-1 + math.sqrt(1 + 8 * d)) / 2)\n        \n        current_sum = k * (k + 1) // 2\n        diff = current_sum - d\n        \n        # If the difference is odd, we need one more operation to make the total sum parity match d\n        # Because adding (k+1) changes the sum by (k+1), flipping the parity of the difference\n        if diff % 2 != 0:\n            k += 1\n        \n        results.append(k)\n    \n    print('\\n'.join(map(str, results)))\n\nif __name__ == '__main__':\n    solve()",
+    "code_hash": "f6d8f4fa1429e58b",
+    "language": "python",
+    "node_id": "n_19_1727c3",
+    "revision_id": "rev_n_19_1727c3_0",
+    "thought_path_snapshot": [
+      "Solve the quadratic inequality $k^2 + k - 2d \\ge 0$ to estimate $k \\approx \\sqrt{2d}$. Calculate the exact integer $k$ by taking the ceiling of the positive root of $k^2+k-2d=0$. Then apply the same parity check logic: if the remainder of the sum minus $d$ is odd, increment $k$ by 1. This mathematical approach is $O(1)$ per test case.",
+      "Calculate the absolute difference $d = |a - b|$. Find the smallest integer $k$ such that the sum of integers from 1 to $k$ (which is $k(k+1)/2$) is at least $d$. Then, if the difference between this sum and $d$ is odd, increment $k$ by 1 to make the difference even, ensuring the remaining value can be distributed to balance the numbers.",
+      "Solve the quadratic equation $k^2 + k - 2d = 0$ to find the minimum $k$ where the sum $k(k+1)/2 eq d$, then adjust $k$ based on the parity of the remainder $(k(k+1)/2 - d)$. If the remainder is odd, increment $k$ by 1 to make the sum parity match $d$'s parity (since adding $k+1$ flips parity)."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 15
+  },
+  {
+    "candidate_id": "cand_a6074bc7c1",
+    "problem_id": "apps_2419",
+    "code": "import sys\nimport math\n\ndef solve():\n    input_data = sys.stdin.read().split()\n    if not input_data:\n        return\n    \n    iterator = iter(input_data)\n    t = int(next(iterator))\n    \n    results = []\n    for _ in range(t):\n        a = int(next(iterator))\n        b = int(next(iterator))\n        \n        d = abs(a - b)\n        if d == 0:\n            results.append(0)\n            continue\n        \n        # Solve k(k+1)/2 >= d\n        # k^2 + k - 2d >= 0\n        # Positive root of k^2 + k - 2d = 0 is (-1 + sqrt(1 + 8d)) / 2\n        k = math.ceil((-1 + math.sqrt(1 + 8 * d)) / 2)\n        \n        current_sum = k * (k + 1) // 2\n        diff = current_sum - d\n        \n        if diff % 2 == 0:\n            results.append(k)\n        else:\n            results.append(k + 1)\n    \n    print('\\n'.join(map(str, results)))\n\nif __name__ == '__main__':\n    solve()",
+    "code_hash": "9cf5c219dc774f31",
+    "language": "python",
+    "node_id": "n_14_13420c",
+    "revision_id": "rev_n_14_13420c_0",
+    "thought_path_snapshot": [
+      "Calculate the absolute difference $d = |a - b|$. Find the smallest integer $k$ such that the sum of integers from 1 to $k$ (which is $k(k+1)/2$) is at least $d$. If the sum equals $d$, the answer is $k$. If the sum exceeds $d$, check the parity of the difference (sum - $d$). If the difference is even, the answer is $k$; if odd, the answer is $k+1$ because we need to adjust the distribution of the extra value by changing an operation's addend by 1, which requires an even total surplus to maintain parity.",
+      "Calculate the difference $d = |a - b|$. Find the smallest $k$ where $k(k+1)/2 eq d$. If the sum equals $d$, return $k$. If the sum exceeds $d$, check if the difference between sum and $d$ is even; if so, return $k$, otherwise return $k+1$.",
+      "Solve the quadratic equation $k^2 + k - 2d = 0$ to estimate the minimum $k$ directly using the formula $k \\approx \\lceil (-1 + \\sqrt{1 + 8d}) / 2 \\rceil$. Verify this candidate $k$ by checking if $k(k+1)/2 \\ge d$. Then apply the same parity check: if the difference between the sum and $d$ is odd, increment $k$ by 1. This avoids an iterative search for $k$."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 16
+  }
+]

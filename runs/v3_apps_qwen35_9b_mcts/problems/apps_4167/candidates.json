@@ -1,0 +1,293 @@
+[
+  {
+    "candidate_id": "cand_50e3dd6cbd",
+    "problem_id": "apps_4167",
+    "code": "import sys\n\ndef solve():\n    input_data = sys.stdin.read().split()\n    if not input_data:\n        return\n    N = int(input_data[0])\n    K = int(input_data[1])\n\n    # Count numbers in [1, N] with remainder r modulo K\n    def count_with_remainder(r):\n        if r == 0:\n            # Numbers: K, 2K, 3K, ... <= N\n            return N // K\n        else:\n            # Numbers: r, r+K, r+2K, ... <= N\n            # First term is r, last term is r + m*K <= N => m <= (N - r) / K\n            # Number of terms is m + 1\n            if N < r:\n                return 0\n            return (N - r) // K + 1\n\n    ans = 0\n    if K % 2 == 1:\n        # K is odd: only remainder 0 works for a, b, c\n        c0 = count_with_remainder(0)\n        ans = c0 * c0 * c0\n    else:\n        # K is even: remainders 0 and K/2 work\n        c0 = count_with_remainder(0)\n        c_half = count_with_remainder(K // 2)\n        # Case 1: all three are 0 mod K\n        ans += c0 * c0 * c0\n        # Case 2: all three are K/2 mod K\n        ans += c_half * c_half * c_half\n        # Case 3: two are 0 and one is K/2 (3 permutations)\n        ans += 3 * c0 * c0 * c_half\n        # Case 4: two are K/2 and one is 0 (3 permutations)\n        ans += 3 * c_half * c_half * c0\n\n    print(ans)\n\nif __name__ == \"__main__\":\n    solve()",
+    "code_hash": "4a812a2f80e91cd1",
+    "language": "python",
+    "node_id": "n_1_971abb",
+    "revision_id": "rev_n_1_971abb_0",
+    "thought_path_snapshot": [
+      "Analyze the modular arithmetic conditions: a+b ≡ 0 (mod K), b+c ≡ 0 (mod K), c+a ≡ 0 (mod K). Summing the first two gives a+2b+c ≡ 0, subtracting the third (c+a) yields 2b ≡ 0 (mod K). Similarly, 2a ≡ 0 and 2c ≡ 0. This implies a, b, c must have specific remainders modulo K (either 0 or K/2 if K is even). Count valid remainders and multiply by the count of numbers in [1, N] with those remainders."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 1
+  },
+  {
+    "candidate_id": "cand_ec07f9e1c3",
+    "problem_id": "apps_4167",
+    "code": "import sys\n\ndef solve():\n    input_data = sys.stdin.read().split()\n    if not input_data:\n        return\n    N = int(input_data[0])\n    K = int(input_data[1])\n\n    # Count numbers in [1, N] with remainder r modulo K\n    # For a given remainder r (0 <= r < K), the count is:\n    # (N - r + K) // K if r != 0 else (N + K) // K? \n    # Actually simpler: numbers x in [1, N] such that x % K == r.\n    # If r == 0, we want multiples of K: floor(N / K)\n    # If r != 0, we want numbers congruent to r mod K: floor((N - r) / K) + 1 if N >= r else 0\n    \n    def count_with_remainder(r):\n        if r == 0:\n            return N // K\n        else:\n            if N < r:\n                return 0\n            return (N - r) // K + 1\n\n    total = 0\n    \n    # Case 1: All three numbers have remainder 0 mod K\n    c0 = count_with_remainder(0)\n    total += c0 * c0 * c0\n    \n    # Case 2: K is even, and all three numbers have remainder K/2 mod K\n    if K % 2 == 0:\n        r_half = K // 2\n        c_half = count_with_remainder(r_half)\n        total += c_half * c_half * c_half\n    \n    print(total)\n\nif __name__ == \"__main__\":\n    solve()",
+    "code_hash": "7ba4f32d6b66c3ac",
+    "language": "python",
+    "node_id": "n_1_971abb",
+    "revision_id": "rev_n_1_971abb_1",
+    "thought_path_snapshot": [
+      "The modular conditions $a+b \\equiv 0$, $b+c \\equiv 0$, and $c+a \\equiv 0 \\pmod K$ imply that $a, b, c$ must all share the same remainder modulo $K$, which must be either $0$ or $K/2$ (if $K$ is even). Consequently, mixed combinations of these remainders (e.g., two numbers with remainder $0$ and one with $K/2$) are invalid because their sum would not be divisible by $K$. The correct approach is to count the valid numbers for each allowed remainder and sum the cubes of these counts, excluding any terms involving mixed permutations."
+    ],
+    "origin": "rethink",
+    "generation_record_id": null,
+    "created_sequence": 2
+  },
+  {
+    "candidate_id": "cand_d965804f39",
+    "problem_id": "apps_4167",
+    "code": "import sys\n\ndef solve():\n    input_data = sys.stdin.read().split()\n    if not input_data:\n        return\n    N = int(input_data[0])\n    K = int(input_data[1])\n\n    # We need to find remainders r in [0, K-1] such that:\n    # a % K = r, b % K = r, c % K = r\n    # and a+b, b+c, c+a are multiples of K.\n    # If a, b, c all have remainder r, then:\n    # a+b = 2r (mod K), b+c = 2r (mod K), c+a = 2r (mod K)\n    # So we require 2r ≡ 0 (mod K).\n    \n    # Count how many integers in [1, N] have remainder r modulo K.\n    # The number of such integers is:\n    # count[r] = (N - r + K) // K   if r > 0\n    # count[0] = N // K            if r == 0 (since remainder 0 corresponds to multiples of K)\n    # But a simpler formula for any r in [0, K-1]:\n    # count[r] = (N - r) // K + 1 if r <= N % K else (N - r) // K\n    # Actually, standard way:\n    # Let q = N // K, rem = N % K\n    # For r in [1, rem]: count = q + 1\n    # For r in [rem+1, K-1]: count = q\n    # For r = 0: count = q (since 0 corresponds to K, 2K, ... which are <= N)\n    \n    q = N // K\n    rem = N % K\n    \n    # Valid remainders r are those where 2*r is divisible by K.\n    # We iterate over all possible r from 0 to K-1.\n    \n    total_triples = 0\n    \n    for r in range(K):\n        if (2 * r) % K == 0:\n            # Calculate count of numbers in [1, N] with remainder r\n            if r == 0:\n                count = q\n            else:\n                if r <= rem:\n                    count = q + 1\n                else:\n                    count = q\n            \n            total_triples += count * count * count\n    \n    print(total_triples)\n\nif __name__ == \"__main__\":\n    solve()",
+    "code_hash": "d843c498705d576a",
+    "language": "python",
+    "node_id": "n_3_da8960",
+    "revision_id": "rev_n_3_da8960_0",
+    "thought_path_snapshot": [
+      "Derive the relationship between the remainders of a, b, c modulo K. Show that a, b, c must all share the same remainder r where 2r ≡ 0 (mod K). Calculate the number of integers in [1, N] for each valid remainder r, then compute the total triples as the sum of (count_r)^3 for all valid r."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 3
+  },
+  {
+    "candidate_id": "cand_0cf7a8eebf",
+    "problem_id": "apps_4167",
+    "code": "import sys\n\ndef solve():\n    input_data = sys.stdin.read().split()\n    if not input_data:\n        return\n    N = int(input_data[0])\n    K = int(input_data[1])\n\n    # We need to count triples (a, b, c) in [1, N] such that:\n    # a + b ≡ 0 (mod K)\n    # b + c ≡ 0 (mod K)\n    # c + a ≡ 0 (mod K)\n    #\n    # From the first two: a + b ≡ 0 and b + c ≡ 0 => a ≡ c (mod K)\n    # From a ≡ c (mod K) and c + a ≡ 0 => 2a ≡ 0 (mod K)\n    # So a must satisfy 2a ≡ 0 (mod K), and similarly b and c must satisfy the same.\n    # Also, since a ≡ c (mod K) and a + b ≡ 0, then b ≡ -a (mod K).\n    #\n    # Let r = a mod K. Then:\n    # 2r ≡ 0 (mod K) => r is a solution to 2r = m*K for some integer m.\n    # b mod K = (-r) mod K\n    # c mod K = r\n    #\n    # So for a fixed remainder r that satisfies 2r ≡ 0 (mod K):\n    #   - a can be any number in [1, N] with a % K == r\n    #   - b can be any number in [1, N] with b % K == (K - r) % K\n    #   - c can be any number in [1, N] with c % K == r\n    #\n    # Count how many numbers in [1, N] have remainder r mod K:\n    #   count(r) = (N - r) // K + 1   if r != 0, else (N // K)\n    # But note: if r == 0, then numbers are K, 2K, ..., floor(N/K)*K -> count = N // K\n    # If r != 0, numbers are r, r+K, ..., up to <= N -> count = (N - r) // K + 1\n    #\n    # However, we must be careful: the remainder we use for counting should be in [0, K-1].\n    # But our variables a, b, c are in [1, N]. The condition is on (a+b) % K == 0, etc.\n    # It's easier to work with remainders in [0, K-1].\n    #\n    # Let's define:\n    #   cnt[r] = number of x in [1, N] such that x % K == r\n    # Note: x % K gives values in [0, K-1].\n    #\n    # How to compute cnt[r]:\n    #   The numbers with remainder r are: r, r+K, r+2K, ...\n    #   But if r == 0, the numbers are K, 2K, ... (since 0 is not in [1, N])\n    #   Actually, x % K == 0 means x is a multiple of K.\n    #\n    # General formula for r in [0, K-1]:\n    #   If r == 0:\n    #       count = N // K\n    #   Else:\n    #       count = (N - r) // K + 1   if N >= r, else 0\n    #\n    # Now, find all r in [0, K-1] such that 2*r % K == 0.\n    # For each such r:\n    #   Let A = cnt[r]\n    #   Let B = cnt[(K - r) % K]\n    #   Let C = cnt[r]   (since c must have same remainder as a)\n    #   Then the number of triples with this specific remainder pattern is A * B * C.\n    #\n    # But note: if r == 0, then (K - r) % K = 0, so A = B = C = cnt[0].\n    # If r != 0 and r != K/2 (if K is even), then (K-r) is different from r.\n    # If K is even and r = K/2, then (K - r) % K = r, so A = B = C = cnt[K/2].\n    #\n    # We can iterate r from 0 to K-1, check if 2*r % K == 0, and accumulate.\n    #\n    # However, note: the condition 2r ≡ 0 (mod K) implies r = 0 or r = K/2 (if K is even).\n    # Why? Because 2r = m*K => r = (m*K)/2. For r to be integer, m*K must be even.\n    #   If K is odd, then m must be even, say m=2j, then r = j*K => r ≡ 0 mod K. Since r in [0, K-1], only r=0.\n    #   If K is even, let K=2L, then 2r = m*(2L) => r = m*L. So r can be 0 or L (if m=1) or 2L (which is 0 mod K).\n    #   So r in {0, K/2} if K is even, and {0} if K is odd.\n    #\n    # Therefore, we only need to check r=0 and if K is even, r=K//2.\n    #\n    # Steps:\n    #   1. Compute cnt[0] and if K is even, cnt[K//2].\n    #   2. If K is odd:\n    #        ans = cnt[0] * cnt[0] * cnt[0]\n    #   3. If K is even:\n    #        r1 = 0\n    #        r2 = K//2\n    #        ans = cnt[r1]^3 + cnt[r2]^3\n    #        But wait: are these disjoint? Yes, because r1 != r2 (since K>=2, K//2 >=1, so 0 != K//2).\n    #        However, note: if K=2, then r2=1, and 0 and 1 are distinct.\n    #\n    # But let me double-check with the sample: N=3, K=2.\n    #   cnt[0]: numbers in [1,3] with x%2==0 -> 2 -> count=1\n    #   cnt[1]: numbers in [1,3] with x%2==1 -> 1,3 -> count=2\n    #   Since K is even, we have two cases: r=0 and r=1 (which is K//2=1).\n    #   For r=0: A=cnt[0]=1, B=cnt[(2-0)%2]=cnt[0]=1, C=1 -> 1*1*1=1\n    #   For r=1: A=cnt[1]=2, B=cnt[(2-1)%2]=cnt[1]=2, C=2 -> 2*2*2=8\n    #   Total = 1+8=9 -> matches sample.\n    #\n    # Another check: N=4, K=2.\n    #   cnt[0]: 2,4 -> 2\n    #   cnt[1]: 1,3 -> 2\n    #   r=0: 2*2*2=8\n    #   r=1: 2*2*2=8\n    #   Total=16.\n    #   Let's enumerate: \n    #     a,b,c in {1,2,3,4}\n    #     Conditions: a+b even, b+c even, c+a even -> all same parity.\n    #     So either all even or all odd.\n    #     Even: 2 choices for each -> 2^3=8\n    #     Odd: 2 choices for each -> 2^3=8\n    #     Total=16. Correct.\n    #\n    # What if K is odd? Example: N=3, K=3.\n    #   Conditions: a+b divisible by 3, b+c by 3, c+a by 3.\n    #   Then 2a divisible by 3 => a divisible by 3 (since 2 and 3 coprime). Similarly b and c divisible by 3.\n    #   So a,b,c in {3} (since N=3). Only (3,3,3).\n    #   Using formula: K=3 (odd) -> only r=0.\n    #   cnt[0]: numbers in [1,3] divisible by 3 -> {3} -> count=1.\n    #   ans = 1^3 = 1. Correct.\n    #\n    # Example: N=5, K=3.\n    #   cnt[0]: 3 -> count=1\n    #   ans = 1.\n    #   But wait: are there others? \n    #   a+b ≡0 mod3, b+c≡0, c+a≡0 => a≡c, b≡-a, and 2a≡0 mod3 => a≡0 mod3.\n    #   So only multiples of 3. In [1,5]: only 3. So (3,3,3) is the only one. Correct.\n    #\n    # Example: N=6, K=3.\n    #   cnt[0]: 3,6 -> count=2\n    #   ans = 2^3=8.\n    #   Triples: (3,3,3), (3,3,6), (3,6,3), (3,6,6), (6,3,3), (6,3,6), (6,6,3), (6,6,6). \n    #   Check (3,3,6): 3+3=6 (div3), 3+6=9 (div3), 6+3=9 (div3) -> ok.\n    #   Correct.\n    #\n    # So the logic holds.\n    #\n    # Implementation:\n    #   Compute cnt0 = N // K\n    #   If K is even:\n    #       r = K//2\n    #       if r == 0: # only if K=0, but K>=1, so skip. Actually if K=2, r=1.\n    #           cnt_half = cnt0\n    #       else:\n    #           # numbers with remainder r: r, r+K, ... <= N\n    #           if N < r:\n    #               cnt_half = 0\n    #           else:\n    #               cnt_half = (N - r) // K + 1\n    #       ans = cnt0**3 + cnt_half**3\n    #   Else:\n    #       ans = cnt0**3\n    #\n    # However, note: when K is even, r = K//2 might be 0? Only if K=0, but K>=1. \n    #   If K=2, r=1. If K=4, r=2. So r is never 0 when K is even and K>=2.\n    #   But what if K=1? Then K is odd, so we go to the odd branch. \n    #   For K=1: \n    #       cnt0 = N // 1 = N\n    #       ans = N^3. \n    #       Indeed, for K=1, every triple works because any sum is divisible by 1. Correct.\n    #\n    # One more corner: if K is even and r = K//2, we must compute cnt for r.\n    #   Formula: count = (N - r) // K + 1, provided N >= r.\n    #   Since r = K//2 and K>=2, r>=1. And if N < r, then count=0.\n    #\n    # Let's code accordingly.\n\n    if K % 2 == 1:\n        cnt0 = N // K\n        ans = cnt0 * cnt0 * cnt0\n    else:\n        cnt0 = N // K\n        r = K // 2\n        if N < r:\n            cnt_half = 0\n        else:\n            cnt_half = (N - r) // K + 1\n        ans = cnt0 * cnt0 * cnt0 + cnt_half * cnt_half * cnt_half\n\n    print(ans)\n\nif __name__ == '__main__':\n    solve()",
+    "code_hash": "39b4706891de9832",
+    "language": "python",
+    "node_id": "n_2_45f2a7",
+    "revision_id": "rev_n_2_45f2a7_0",
+    "thought_path_snapshot": [
+      "Implement a direct simulation approach by iterating through all possible values of a, b, c from 1 to N and checking the three divisibility conditions. While this is O(N^3) and will time out for N=2*10^5, it serves as a baseline to verify the logic on small inputs before optimizing."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 4
+  },
+  {
+    "candidate_id": "cand_074aa61d1a",
+    "problem_id": "apps_4167",
+    "code": "import sys\n\ndef solve():\n    input_data = sys.stdin.read().split()\n    if not input_data:\n        return\n    N = int(input_data[0])\n    K = int(input_data[1])\n\n    # Count numbers in [1, N] with remainder 0 mod K\n    count0 = N // K\n\n    # Count numbers in [1, N] with remainder K/2 mod K (only if K is even)\n    count_half = 0\n    if K % 2 == 0:\n        # Numbers are K/2, 3K/2, 5K/2, ...\n        # We need x = m * K + K/2 <= N\n        # m * K <= N - K/2\n        # m <= (N - K/2) / K\n        # Since m starts from 0 (giving K/2), the count is floor((N - K/2)/K) + 1\n        # But simpler: total numbers with remainder r is (N - r) // K + 1 if N >= r else 0\n        r = K // 2\n        if N >= r:\n            count_half = (N - r) // K + 1\n\n    # If K is odd, only remainder 0 is valid.\n    # If K is even, remainders 0 and K/2 are valid, but we cannot mix them.\n    # So total triples = (count0)^3 + (count_half)^3 (if K even)\n    \n    ans = count0 ** 3\n    if K % 2 == 0:\n        ans += count_half ** 3\n\n    print(ans)\n\nif __name__ == \"__main__\":\n    solve()",
+    "code_hash": "450a5416079f7642",
+    "language": "python",
+    "node_id": "n_4_741fd2",
+    "revision_id": "rev_n_4_741fd2_0",
+    "thought_path_snapshot": [
+      "The modular conditions $a+b \\equiv 0$, $b+c \\equiv 0$, and $c+a \\equiv 0 \\pmod K$ imply that $a, b, c$ must all share the same remainder modulo $K$, which must be either $0$ or $K/2$ (if $K$ is even). Consequently, mixed combinations of these remainders (e.g., two numbers with remainder $0$ and one with $K/2$) are invalid because their sum would not be divisible by $K$. The correct approach is to count the valid numbers for each allowed remainder and sum the cubes of these counts, excluding any terms involving mixed permutations.",
+      "Analyze the modular constraints to deduce that a, b, and c must all have the same remainder r modulo K, where 2r is divisible by K. This restricts valid remainders to 0 and K/2 (if K is even)."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 5
+  },
+  {
+    "candidate_id": "cand_be190a3537",
+    "problem_id": "apps_4167",
+    "code": "import sys\n\ndef solve():\n    input_data = sys.stdin.read().split()\n    if not input_data:\n        return\n    N = int(input_data[0])\n    K = int(input_data[1])\n\n    total = 0\n    remainder = 0\n    while remainder * 2 < K:\n        if (remainder * 2) % K == 0:\n            count = N // K + (1 if remainder <= N % K else 0)\n            total += count * count * count\n        remainder += 1\n\n    if K % 2 == 0:\n        mid = K // 2\n        if mid * 2 % K == 0:\n            count = N // K + (1 if mid <= N % K else 0)\n            total += count * count * count\n\n    print(total)\n\nif __name__ == \"__main__\":\n    solve()",
+    "code_hash": "23ad5f164843dbcc",
+    "language": "python",
+    "node_id": "n_9_6f4a6e",
+    "revision_id": "rev_n_9_6f4a6e_0",
+    "thought_path_snapshot": [
+      "Derive the relationship between the remainders of a, b, c modulo K. Show that a, b, c must all share the same remainder r where 2r ≡ 0 (mod K). Calculate the number of integers in [1, N] for each valid remainder r, then compute the total triples as the sum of (count_r)^3 for all valid r.",
+      "Optimize the counting step: instead of iterating up to N, calculate the count of numbers with remainder r directly using integer division and modulo operations (count = N // K + (1 if r <= N % K else 0)), reducing time complexity to O(K)."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 6
+  },
+  {
+    "candidate_id": "cand_dca8b58a67",
+    "problem_id": "apps_4167",
+    "code": "import sys\n\ndef solve():\n    input_data = sys.stdin.read().split()\n    if not input_data:\n        return\n    N = int(input_data[0])\n    K = int(input_data[1])\n\n    # We need to find remainders r such that 2*r is divisible by K.\n    # That means 2*r = m*K for some integer m.\n    # So r = (m*K)/2.\n    # For r to be an integer, m*K must be even.\n    # Case 1: K is even. Then m can be any integer. But r must be in [0, K-1].\n    #   r = (m*K)/2. Since 0 <= r < K, we have 0 <= m*K/2 < K => 0 <= m < 2.\n    #   So m can be 0 or 1.\n    #   m=0 => r=0.\n    #   m=1 => r=K/2.\n    # Case 2: K is odd. Then m*K is even only if m is even. Let m=2j.\n    #   r = (2j*K)/2 = j*K.\n    #   Since 0 <= r < K, j must be 0.\n    #   So r=0 is the only solution.\n\n    valid_remainders = []\n    if K % 2 == 0:\n        valid_remainders.append(0)\n        valid_remainders.append(K // 2)\n    else:\n        valid_remainders.append(0)\n\n    total_triples = 0\n    for r in valid_remainders:\n        # Count numbers in [1, N] with remainder r modulo K.\n        # Numbers are of the form i*K + r, where i >= 0.\n        # We need 1 <= i*K + r <= N.\n        # If r == 0, numbers are K, 2K, 3K... (since positive integers)\n        #   i*K >= 1 => i >= 1 (since K>=1).\n        #   i*K <= N => i <= N//K.\n        #   Count = N // K.\n        # If r > 0, numbers are r, K+r, 2K+r...\n        #   i*K + r >= 1 is always true for i>=0 since r>=1.\n        #   i*K + r <= N => i*K <= N - r => i <= (N - r) // K.\n        #   Since i starts at 0, count = floor((N - r) / K) + 1.\n        \n        if r == 0:\n            count = N // K\n        else:\n            count = (N - r) // K + 1\n        \n        total_triples += count * count * count\n\n    print(total_triples)\n\nif __name__ == '__main__':\n    solve()",
+    "code_hash": "a81ccd82a28ce3a6",
+    "language": "python",
+    "node_id": "n_9_6f4a6e",
+    "revision_id": "rev_n_9_6f4a6e_1",
+    "thought_path_snapshot": [
+      "Derive the relationship between the remainders of a, b, c modulo K. Show that a, b, c must all share the same remainder r where 2r ≡ 0 (mod K). Calculate the number of integers in [1, N] for each valid remainder r, then compute the total triples as the sum of (count_r)^3 for all valid r.",
+      "Thought-2 (corrected): Fix the counting formula to correctly handle the remainder 0 case by using `count = N // K + (1 if remainder > 0 and remainder <= N % K else 0)`, ensuring that multiples of K are counted as `N // K` without an extra increment, while other remainders are counted based on the partial quotient."
+    ],
+    "origin": "rethink",
+    "generation_record_id": null,
+    "created_sequence": 7
+  },
+  {
+    "candidate_id": "cand_d6a1e8cef6",
+    "problem_id": "apps_4167",
+    "code": "import sys\n\ndef solve():\n    input_data = sys.stdin.read().split()\n    if not input_data:\n        return\n    N = int(input_data[0])\n    K = int(input_data[1])\n\n    # Count numbers in [1, N] with remainder 0 modulo K\n    c0 = N // K\n\n    # Count numbers in [1, N] with remainder K/2 modulo K (only if K is even)\n    c1 = 0\n    if K % 2 == 0:\n        half = K // 2\n        # Numbers are half, half+K, half+2K, ...\n        # We need half + m*K <= N => m*K <= N - half => m <= (N - half) // K\n        # m starts from 0, so count is floor((N - half)/K) + 1 if N >= half else 0\n        if N >= half:\n            c1 = (N - half) // K + 1\n\n    # If K is odd, only remainder 0 is valid.\n    # If K is even, remainders 0 and K/2 are valid, but we cannot mix them.\n    # Valid triples must consist entirely of numbers with remainder 0 OR entirely of numbers with remainder K/2.\n    # So total = c0^3 + c1^3\n\n    ans = c0 * c0 * c0\n    if K % 2 == 0:\n        ans += c1 * c1 * c1\n\n    print(ans)\n\nif __name__ == \"__main__\":\n    solve()",
+    "code_hash": "a544623bcccfceb3",
+    "language": "python",
+    "node_id": "n_5_b6a090",
+    "revision_id": "rev_n_5_b6a090_0",
+    "thought_path_snapshot": [
+      "The modular conditions $a+b \\equiv 0$, $b+c \\equiv 0$, and $c+a \\equiv 0 \\pmod K$ imply that $a, b, c$ must all share the same remainder modulo $K$, which must be either $0$ or $K/2$ (if $K$ is even). Consequently, mixed combinations of these remainders (e.g., two numbers with remainder $0$ and one with $K/2$) are invalid because their sum would not be divisible by $K$. The correct approach is to count the valid numbers for each allowed remainder and sum the cubes of these counts, excluding any terms involving mixed permutations.",
+      "Count the number of integers in [1, N] that satisfy the valid remainder conditions (remainder 0 or K/2). Let these counts be C0 and C1."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 8
+  },
+  {
+    "candidate_id": "cand_101cf9dab9",
+    "problem_id": "apps_4167",
+    "code": "import sys\n\ndef solve():\n    input_data = sys.stdin.read().split()\n    if not input_data:\n        return\n    N = int(input_data[0])\n    K = int(input_data[1])\n\n    # Count numbers in [1, N] with remainder 0 mod K\n    c0 = N // K\n\n    # Count numbers in [1, N] with remainder K/2 mod K (only if K is even)\n    c_half = 0\n    if K % 2 == 0:\n        # Numbers are K/2, 3K/2, 5K/2, ...\n        # We need x = m * K + K/2 <= N\n        # m * K <= N - K/2\n        # m <= (N - K/2) / K\n        # Since m starts from 0 (giving K/2), the count is floor((N - K/2)/K) + 1\n        # But simpler: total numbers with remainder r is (N - r) // K + 1 if r <= N else 0\n        r = K // 2\n        if r <= N:\n            c_half = (N - r) // K + 1\n\n    # If K is odd, only remainder 0 is valid.\n    # If K is even, remainders 0 and K/2 are valid, but they must be used consistently within a triple.\n    # Valid triples are formed by taking 3 numbers all with remainder 0, OR all 3 with remainder K/2.\n    # Mixed cases (e.g., two 0s and one K/2) are invalid because sums won't be divisible by K.\n    \n    ans = c0 * c0 * c0\n    if K % 2 == 0:\n        ans += c_half * c_half * c_half\n\n    print(ans)\n\nif __name__ == \"__main__\":\n    solve()",
+    "code_hash": "729ea455c5de6580",
+    "language": "python",
+    "node_id": "n_6_6b03de",
+    "revision_id": "rev_n_6_6b03de_0",
+    "thought_path_snapshot": [
+      "The modular conditions $a+b \\equiv 0$, $b+c \\equiv 0$, and $c+a \\equiv 0 \\pmod K$ imply that $a, b, c$ must all share the same remainder modulo $K$, which must be either $0$ or $K/2$ (if $K$ is even). Consequently, mixed combinations of these remainders (e.g., two numbers with remainder $0$ and one with $K/2$) are invalid because their sum would not be divisible by $K$. The correct approach is to count the valid numbers for each allowed remainder and sum the cubes of these counts, excluding any terms involving mixed permutations.",
+      "Calculate the total number of triples by summing the cubes of the counts for each valid remainder case (C0^3 + C1^3), since all three numbers must share the same remainder."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 9
+  },
+  {
+    "candidate_id": "cand_ce33eec44f",
+    "problem_id": "apps_4167",
+    "code": "import sys\n\ndef solve():\n    input_data = sys.stdin.read().split()\n    if not input_data:\n        return\n    N = int(input_data[0])\n    K = int(input_data[1])\n\n    # We need to find remainders r in [0, K-1] such that 2*r is divisible by K.\n    # Then count how many numbers in [1, N] have remainder r modulo K.\n    # Finally, sum (count[r])^3 for all valid r.\n\n    ans = 0\n    # Iterate over possible remainders r from 0 to K-1\n    for r in range(K):\n        if (2 * r) % K == 0:\n            # Count numbers in [1, N] with x % K == r\n            # The sequence of numbers with remainder r is: r, r+K, r+2K, ...\n            # But we must ensure the number is >= 1.\n            # If r == 0, the numbers are K, 2K, 3K, ...\n            # If r > 0, the numbers are r, r+K, r+2K, ...\n            \n            if r == 0:\n                # Numbers: K, 2K, ..., m*K <= N => m = N // K\n                count = N // K\n            else:\n                # Numbers: r, r+K, ..., r + (m-1)*K <= N\n                # r + (m-1)*K <= N => (m-1)*K <= N - r => m-1 <= (N - r) // K => m = (N - r) // K + 1\n                # However, we must ensure r <= N, otherwise count is 0.\n                if r > N:\n                    count = 0\n                else:\n                    count = (N - r) // K + 1\n            \n            ans += count * count * count\n\n    print(ans)\n\nif __name__ == '__main__':\n    solve()",
+    "code_hash": "cf35e4ca9e0646f1",
+    "language": "python",
+    "node_id": "n_7_619d98",
+    "revision_id": "rev_n_7_619d98_0",
+    "thought_path_snapshot": [
+      "Derive the relationship between the remainders of a, b, c modulo K. Show that a, b, c must all share the same remainder r where 2r ≡ 0 (mod K). Calculate the number of integers in [1, N] for each valid remainder r, then compute the total triples as the sum of (count_r)^3 for all valid r.",
+      "Analyze the modular constraints: a+b, b+c, c+a are multiples of K implies 2(a+b+c) is a multiple of K, and a, b, c must share the same remainder r modulo K where 2r ≡ 0 (mod K). Count valid r values and the frequency of each remainder in [1, N], then sum the cubes of these frequencies."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 10
+  },
+  {
+    "candidate_id": "cand_aeb020fe32",
+    "problem_id": "apps_4167",
+    "code": "import sys\n\ndef solve():\n    input_data = sys.stdin.read().split()\n    if not input_data:\n        return\n    N = int(input_data[0])\n    K = int(input_data[1])\n\n    # Count numbers in [1, N] with remainder 0 modulo K\n    c0 = N // K\n\n    ans = c0 * c0 * c0\n\n    if K % 2 == 0:\n        # Count numbers in [1, N] with remainder K/2 modulo K\n        half = K // 2\n        # Numbers are half, half+K, half+2K, ...\n        # The largest such number <= N is half + m*K <= N => m <= (N - half) / K\n        # Number of terms is floor((N - half) / K) + 1 if N >= half else 0\n        if N >= half:\n            c_half = (N - half) // K + 1\n        else:\n            c_half = 0\n        \n        ans += c_half * c_half * c_half\n\n    print(ans)\n\nif __name__ == \"__main__\":\n    solve()",
+    "code_hash": "8a06412a46d0e64a",
+    "language": "python",
+    "node_id": "n_10_e3e0e5",
+    "revision_id": "rev_n_10_e3e0e5_0",
+    "thought_path_snapshot": [
+      "The modular conditions $a+b \\equiv 0$, $b+c \\equiv 0$, and $c+a \\equiv 0 \\pmod K$ imply that $a, b, c$ must all share the same remainder modulo $K$, which must be either $0$ or $K/2$ (if $K$ is even). Consequently, mixed combinations of these remainders (e.g., two numbers with remainder $0$ and one with $K/2$) are invalid because their sum would not be divisible by $K$. The correct approach is to count the valid numbers for each allowed remainder and sum the cubes of these counts, excluding any terms involving mixed permutations.",
+      "Analyze the modular constraints to deduce that a, b, and c must all have the same remainder r modulo K, where 2r is divisible by K. This restricts valid remainders to 0 and K/2 (if K is even).",
+      "Count the number of integers in [1, N] that have remainder 0 modulo K, and if K is even, count those with remainder K/2. Let these counts be c0 and c_half. The answer is c0^3 + c_half^3 because valid triples must consist entirely of numbers with the same valid remainder."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 11
+  },
+  {
+    "candidate_id": "cand_196768e67c",
+    "problem_id": "apps_4167",
+    "code": "import sys\n\ndef solve():\n    input_data = sys.stdin.read().split()\n    if not input_data:\n        return\n    N = int(input_data[0])\n    K = int(input_data[1])\n\n    total = 0\n    for r in range(K):\n        if (2 * r) % K == 0:\n            # Count numbers in [1, N] with remainder r modulo K\n            # Numbers are r, r+K, r+2K, ... <= N\n            # If r == 0, the numbers are K, 2K, 3K, ... (since positive integers)\n            if r == 0:\n                count = N // K\n            else:\n                # First number is r\n                # Last number is r + m*K <= N => m <= (N - r) / K\n                # m starts from 0, so count = m_max + 1\n                count = (N - r) // K + 1\n            total += count * count * count\n\n    print(total)\n\nif __name__ == \"__main__\":\n    solve()",
+    "code_hash": "cd5926150fe73d38",
+    "language": "python",
+    "node_id": "n_8_d7d402",
+    "revision_id": "rev_n_8_d7d402_0",
+    "thought_path_snapshot": [
+      "Derive the relationship between the remainders of a, b, c modulo K. Show that a, b, c must all share the same remainder r where 2r ≡ 0 (mod K). Calculate the number of integers in [1, N] for each valid remainder r, then compute the total triples as the sum of (count_r)^3 for all valid r.",
+      "Iterate through all possible remainders r from 0 to K-1. For each r, check if 2r is divisible by K. If so, count how many numbers in [1, N] have remainder r. Accumulate the cube of this count to the total answer."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 12
+  },
+  {
+    "candidate_id": "cand_947b2f9a50",
+    "problem_id": "apps_4167",
+    "code": "import sys\n\ndef solve():\n    input_data = sys.stdin.read().split()\n    if not input_data:\n        return\n    N = int(input_data[0])\n    K = int(input_data[1])\n\n    # Count numbers in [1, N] with remainder 0 modulo K\n    c0 = N // K\n\n    # Count numbers in [1, N] with remainder K/2 modulo K (only if K is even)\n    c1 = 0\n    if K % 2 == 0:\n        half = K // 2\n        # Numbers are half, half+K, half+2K, ...\n        # We need half + m*K <= N => m*K <= N - half => m <= (N - half) // K\n        # m starts from 0, so count is floor((N - half)/K) + 1 if N >= half else 0\n        if N >= half:\n            c1 = (N - half) // K + 1\n\n    # Valid triples must have all three numbers with the same remainder\n    # Either all remainder 0 or all remainder K/2\n    ans = c0**3 + c1**3\n    print(ans)\n\nif __name__ == \"__main__\":\n    solve()",
+    "code_hash": "8c1d347d040cf9f9",
+    "language": "python",
+    "node_id": "n_15_13c7b0",
+    "revision_id": "rev_n_15_13c7b0_0",
+    "thought_path_snapshot": [
+      "The modular conditions $a+b \\equiv 0$, $b+c \\equiv 0$, and $c+a \\equiv 0 \\pmod K$ imply that $a, b, c$ must all share the same remainder modulo $K$, which must be either $0$ or $K/2$ (if $K$ is even). Consequently, mixed combinations of these remainders (e.g., two numbers with remainder $0$ and one with $K/2$) are invalid because their sum would not be divisible by $K$. The correct approach is to count the valid numbers for each allowed remainder and sum the cubes of these counts, excluding any terms involving mixed permutations.",
+      "Count the number of integers in [1, N] that satisfy the valid remainder conditions (remainder 0 or K/2). Let these counts be C0 and C1.",
+      "Calculate the total number of valid triples by summing the cubes of the counts derived in the previous step, as the order matters and elements can be identical."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 13
+  },
+  {
+    "candidate_id": "cand_9d4fcf575a",
+    "problem_id": "apps_4167",
+    "code": "import sys\n\ndef solve():\n    input_data = sys.stdin.read().split()\n    if not input_data:\n        return\n    N = int(input_data[0])\n    K = int(input_data[1])\n\n    count = 0\n\n    # Case 1: Remainder r = 0\n    # Numbers in [1, N] divisible by K\n    c0 = N // K\n    count += c0 * c0 * c0\n\n    # Case 2: Remainder r = K/2 (only if K is even)\n    if K % 2 == 0:\n        r = K // 2\n        # Count numbers in [1, N] with remainder r\n        # These are numbers of the form k*K + r\n        # We need 1 <= k*K + r <= N\n        # k*K <= N - r  =>  k <= (N - r) // K\n        # Since k must be >= 0 (as r >= 1 when K >= 2), the number of such k is floor((N - r) / K) + 1\n        # However, if N < r, then count is 0.\n        if N >= r:\n            c_half = (N - r) // K + 1\n            count += c_half * c_half * c_half\n\n    print(count)\n\nif __name__ == \"__main__\":\n    solve()",
+    "code_hash": "544d6a6e2a77964b",
+    "language": "python",
+    "node_id": "n_16_0d56d3",
+    "revision_id": "rev_n_16_0d56d3_0",
+    "thought_path_snapshot": [
+      "Derive the relationship between the remainders of a, b, c modulo K. Show that a, b, c must all share the same remainder r where 2r ≡ 0 (mod K). Calculate the number of integers in [1, N] for each valid remainder r, then compute the total triples as the sum of (count_r)^3 for all valid r.",
+      "Thought-2 (corrected): Fix the counting formula to correctly handle the remainder 0 case by using `count = N // K + (1 if remainder > 0 and remainder <= N % K else 0)`, ensuring that multiples of K are counted as `N // K` without an extra increment, while other remainders are counted based on the partial quotient.",
+      "Analyze the modular constraints: a+b ≡ 0, b+c ≡ 0, c+a ≡ 0 (mod K). Summing the first two gives a+2b+c ≡ 0, subtracting the third (c+a) yields 2b ≡ 0 (mod K). Similarly, 2a ≡ 0 and 2c ≡ 0. This implies a, b, c must all have the same remainder r modulo K, and 2r ≡ 0 (mod K). The valid remainders are r=0 and r=K/2 (if K is even). Count integers in [1, N] for each valid r and sum the cubes of these counts."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 14
+  },
+  {
+    "candidate_id": "cand_a2036db772",
+    "problem_id": "apps_4167",
+    "code": "import sys\n\ndef solve():\n    input_data = sys.stdin.read().split()\n    if not input_data:\n        return\n    N = int(input_data[0])\n    K = int(input_data[1])\n\n    count = 0\n\n    # Case 1: Remainder 0\n    # Numbers in [1, N] divisible by K\n    c0 = N // K\n    count += c0 * c0 * c0\n\n    # Case 2: Remainder K/2 (only if K is even)\n    if K % 2 == 0:\n        half = K // 2\n        # Numbers in [1, N] with remainder half modulo K\n        # These are numbers of the form m*K + half\n        # We need 1 <= m*K + half <= N\n        # m*K <= N - half  => m <= (N - half) // K\n        # Since m starts from 0 (giving half), the count is floor((N - half)/K) + 1\n        if N >= half:\n            c_half = (N - half) // K + 1\n            count += c_half * c_half * c_half\n\n    print(count)\n\nif __name__ == \"__main__\":\n    solve()",
+    "code_hash": "9c6782880604d9bb",
+    "language": "python",
+    "node_id": "n_20_a77000",
+    "revision_id": "rev_n_20_a77000_0",
+    "thought_path_snapshot": [
+      "The modular conditions $a+b \\equiv 0$, $b+c \\equiv 0$, and $c+a \\equiv 0 \\pmod K$ imply that $a, b, c$ must all share the same remainder modulo $K$, which must be either $0$ or $K/2$ (if $K$ is even). Consequently, mixed combinations of these remainders (e.g., two numbers with remainder $0$ and one with $K/2$) are invalid because their sum would not be divisible by $K$. The correct approach is to count the valid numbers for each allowed remainder and sum the cubes of these counts, excluding any terms involving mixed permutations.",
+      "Calculate the total number of triples by summing the cubes of the counts for each valid remainder case (C0^3 + C1^3), since all three numbers must share the same remainder.",
+      "Count the number of integers in [1, N] that satisfy the valid remainder conditions (remainder 0 and potentially K/2)."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 15
+  },
+  {
+    "candidate_id": "cand_81bace7938",
+    "problem_id": "apps_4167",
+    "code": "import sys\n\ndef solve():\n    input_data = sys.stdin.read().split()\n    if not input_data:\n        return\n    N = int(input_data[0])\n    K = int(input_data[1])\n\n    # We need to find remainders r in [0, K-1] such that 2*r is divisible by K.\n    # Then count how many numbers in [1, N] have remainder r modulo K.\n    # The answer is the sum of (count[r])^3 for all valid r.\n\n    ans = 0\n    # Iterate over possible remainders r from 0 to K-1\n    for r in range(K):\n        if (2 * r) % K == 0:\n            # Count numbers in [1, N] with x % K == r\n            # The sequence of numbers with remainder r is: r, r+K, r+2K, ...\n            # But we must ensure the number is >= 1.\n            # If r == 0, the numbers are K, 2K, 3K... (since 0 is not positive)\n            # If r > 0, the numbers are r, r+K, r+2K...\n            \n            if r == 0:\n                # Numbers: K, 2K, ..., m*K <= N => m = N // K\n                count = N // K\n            else:\n                # Numbers: r, r+K, ..., r + (m-1)*K <= N\n                # r + (m-1)*K <= N => (m-1)*K <= N - r => m-1 <= (N - r) // K => m = (N - r) // K + 1\n                # Alternatively, count = (N - r) // K + 1 if N >= r else 0\n                if N < r:\n                    count = 0\n                else:\n                    count = (N - r) // K + 1\n            \n            ans += count * count * count\n\n    print(ans)\n\nif __name__ == '__main__':\n    solve()",
+    "code_hash": "2f086fc4ced8104e",
+    "language": "python",
+    "node_id": "n_22_48e7f5",
+    "revision_id": "rev_n_22_48e7f5_0",
+    "thought_path_snapshot": [
+      "Derive the relationship between the remainders of a, b, c modulo K. Show that a, b, c must all share the same remainder r where 2r ≡ 0 (mod K). Calculate the number of integers in [1, N] for each valid remainder r, then compute the total triples as the sum of (count_r)^3 for all valid r.",
+      "Analyze the modular constraints: a+b, b+c, c+a are multiples of K implies 2(a+b+c) is a multiple of K, and a, b, c must share the same remainder r modulo K where 2r ≡ 0 (mod K). Count valid r values and the frequency of each remainder in [1, N], then sum the cubes of these frequencies.",
+      "Derive that a, b, c must share the same remainder r modulo K where 2r ≡ 0 (mod K), then count valid r values and sum the cubes of their frequencies in [1, N]."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 16
+  },
+  {
+    "candidate_id": "cand_69bea06710",
+    "problem_id": "apps_4167",
+    "code": "import sys\n\ndef solve():\n    input_data = sys.stdin.read().split()\n    if not input_data:\n        return\n    N = int(input_data[0])\n    K = int(input_data[1])\n\n    # Count numbers in [1, N] with remainder 0 modulo K\n    c0 = N // K\n\n    ans = c0 * c0 * c0\n\n    if K % 2 == 0:\n        half = K // 2\n        # Count numbers in [1, N] with remainder half modulo K\n        # These are numbers x such that x = m*K + half, where m >= 0\n        # x <= N => m*K <= N - half => m <= (N - half) // K\n        # Since m starts from 0, the count is floor((N - half)/K) + 1\n        if N >= half:\n            c_half = (N - half) // K + 1\n            ans += c_half * c_half * c_half\n\n    print(ans)\n\nif __name__ == \"__main__\":\n    solve()",
+    "code_hash": "8a6d0da852ecaab1",
+    "language": "python",
+    "node_id": "n_11_b0a3b2",
+    "revision_id": "rev_n_11_b0a3b2_0",
+    "thought_path_snapshot": [
+      "The modular conditions $a+b \\equiv 0$, $b+c \\equiv 0$, and $c+a \\equiv 0 \\pmod K$ imply that $a, b, c$ must all share the same remainder modulo $K$, which must be either $0$ or $K/2$ (if $K$ is even). Consequently, mixed combinations of these remainders (e.g., two numbers with remainder $0$ and one with $K/2$) are invalid because their sum would not be divisible by $K$. The correct approach is to count the valid numbers for each allowed remainder and sum the cubes of these counts, excluding any terms involving mixed permutations.",
+      "Analyze the modular constraints to deduce that a, b, and c must all have the same remainder r modulo K, where 2r is divisible by K. This restricts valid remainders to 0 and K/2 (if K is even).",
+      "Derive the mathematical formula for c0 as floor(N/K) and c_half as floor((N - K/2)/K) + 1 (if K is even and N >= K/2), then compute the sum of cubes directly in O(1) time."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 17
+  },
+  {
+    "candidate_id": "cand_c4c0c30d21",
+    "problem_id": "apps_4167",
+    "code": "import sys\n\ndef solve():\n    input_data = sys.stdin.read().split()\n    if not input_data:\n        return\n    N = int(input_data[0])\n    K = int(input_data[1])\n\n    total = 0\n    # Iterate over all possible remainders r from 0 to K-1\n    for r in range(K):\n        # Check if 2*r is divisible by K\n        if (2 * r) % K == 0:\n            # Count how many integers in [1, N] have remainder r modulo K\n            # The numbers are r, r+K, r+2K, ... <= N\n            # If r == 0, the numbers are K, 2K, ... (since positive integers)\n            # If r > 0, the numbers are r, r+K, ...\n            \n            if r == 0:\n                # Numbers: K, 2K, 3K, ...\n                count = N // K\n            else:\n                # Numbers: r, r+K, r+2K, ...\n                # The largest term is r + m*K <= N => m <= (N - r) / K\n                # Number of terms is m + 1\n                count = (N - r) // K + 1\n            \n            total += count * count * count\n\n    print(total)\n\nif __name__ == \"__main__\":\n    solve()",
+    "code_hash": "94f34e2c7aa3a2f0",
+    "language": "python",
+    "node_id": "n_25_350b6d",
+    "revision_id": "rev_n_25_350b6d_0",
+    "thought_path_snapshot": [
+      "Derive the relationship between the remainders of a, b, c modulo K. Show that a, b, c must all share the same remainder r where 2r ≡ 0 (mod K). Calculate the number of integers in [1, N] for each valid remainder r, then compute the total triples as the sum of (count_r)^3 for all valid r.",
+      "Iterate through all possible remainders r from 0 to K-1. For each r, check if 2r is divisible by K. If so, count how many numbers in [1, N] have remainder r. Accumulate the cube of this count to the total answer.",
+      "Analyze the modular constraints: a+b, b+c, c+a are multiples of K implies 2(a+b+c) is a multiple of K, and specifically a ≡ b ≡ c (mod K) where 2r ≡ 0 (mod K). Count valid remainders r and the frequency of each in [1, N], then sum the cubes of frequencies."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 18
+  }
+]

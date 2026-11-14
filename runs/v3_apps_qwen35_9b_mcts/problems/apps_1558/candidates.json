@@ -1,0 +1,293 @@
+[
+  {
+    "candidate_id": "cand_88fd9dab58",
+    "problem_id": "apps_1558",
+    "code": "import sys\n\ndef solve():\n    input_data = sys.stdin.read().split()\n    if not input_data:\n        return\n\n    iterator = iter(input_data)\n    n = int(next(iterator))\n    r = int(next(iterator))\n    avg = int(next(iterator))\n\n    exams = []\n    current_total = 0\n\n    for _ in range(n):\n        a = int(next(iterator))\n        b = int(next(iterator))\n        exams.append((b, a))\n        current_total += a\n\n    required_total = avg * n\n    deficit = required_total - current_total\n\n    if deficit <= 0:\n        print(0)\n        return\n\n    exams.sort(key=lambda x: x[0])\n\n    essays_needed = 0\n    for b, a in exams:\n        if deficit <= 0:\n            break\n        max_increase = r - a\n        if max_increase <= 0:\n            continue\n        take = min(deficit, max_increase)\n        essays_needed += take * b\n        deficit -= take\n\n    print(essays_needed)\n\nif __name__ == \"__main__\":\n    solve()",
+    "code_hash": "e73c5ed961c43059",
+    "language": "python",
+    "node_id": "n_1_9ed8ca",
+    "revision_id": "rev_n_1_9ed8ca_0",
+    "thought_path_snapshot": [
+      "Calculate the current total score and the required total score. Determine the deficit. Sort the exams by the cost per point (b_i) in ascending order. Greedily increase grades starting from the cheapest exams until the deficit is covered, ensuring no grade exceeds r."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 1
+  },
+  {
+    "candidate_id": "cand_564f73117d",
+    "problem_id": "apps_1558",
+    "code": "import sys\nimport heapq\n\ndef solve():\n    input_data = sys.stdin.read().split()\n    if not input_data:\n        return\n\n    iterator = iter(input_data)\n    n = int(next(iterator))\n    r = int(next(iterator))\n    avg = int(next(iterator))\n\n    current_sum = 0\n    essays_needed = 0\n\n    # We will store tuples of (b_i, a_i) in a min-heap to always pick the exam with the smallest cost first\n    heap = []\n\n    for _ in range(n):\n        a_i = int(next(iterator))\n        b_i = int(next(iterator))\n        current_sum += a_i\n        # Push (cost, current_grade) to heap\n        heapq.heappush(heap, (b_i, a_i))\n\n    target_sum = avg * n\n\n    while current_sum < target_sum:\n        if not heap:\n            # This should not happen if input constraints are valid and target is reachable\n            break\n\n        cost, grade = heapq.heappop(heap)\n\n        if grade == r:\n            # Cannot increase this exam further, but we might have other exams\n            # Since we popped the cheapest, if this one is maxed out, we just continue\n            # However, we need to push it back if there are other items? \n            # Actually, if the cheapest available is maxed out, then all are maxed out or this is the only one.\n            # If all are maxed out and sum < target, it's impossible, but problem guarantees solution exists within constraints.\n            # We just skip this one and try next cheapest.\n            continue\n\n        # Calculate how much we can increase this exam\n        can_increase = r - grade\n        needed_increase = target_sum - current_sum\n\n        if needed_increase <= can_increase:\n            # We only need to increase by needed_increase\n            essays_needed += needed_increase * cost\n            current_sum += needed_increase\n            break\n        else:\n            # Increase by maximum possible for this exam\n            essays_needed += can_increase * cost\n            current_sum += can_increase\n            # Push back the updated grade with same cost\n            heapq.heappush(heap, (cost, r))\n\n    print(essays_needed)\n\nif __name__ == \"__main__\":\n    solve()",
+    "code_hash": "c04fc591cef8ca27",
+    "language": "python",
+    "node_id": "n_2_6ff244",
+    "revision_id": "rev_n_2_6ff244_0",
+    "thought_path_snapshot": [
+      "Use a priority queue to dynamically select the exam with the lowest b_i that hasn't reached the maximum grade r, allowing for a more flexible implementation if the input order changes or if we need to handle updates incrementally, though sorting is sufficient here."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 2
+  },
+  {
+    "candidate_id": "cand_2706afaa1f",
+    "problem_id": "apps_1558",
+    "code": "import sys\n\ndef solve():\n    input_data = sys.stdin.read().split()\n    if not input_data:\n        return\n\n    iterator = iter(input_data)\n    n = int(next(iterator))\n    r = int(next(iterator))\n    avg = int(next(iterator))\n\n    current_sum = 0\n    essays_needed = 0\n\n    for _ in range(n):\n        a = int(next(iterator))\n        b = int(next(iterator))\n        current_sum += a\n\n    target_sum = avg * n\n    if current_sum >= target_sum:\n        print(0)\n        return\n\n    needed = target_sum - current_sum\n\n    # We need to pick the cheapest upgrades first (smallest b_i)\n    # Store (cost_per_point, exam_index) but we only need cost and current grade\n    # Actually we need to know current grade a_i and cost b_i for each exam\n    # Since we read them sequentially, let's store them in a list\n    exams = []\n    idx = 0\n    for _ in range(n):\n        a = int(next(iterator))\n        b = int(next(iterator))\n        exams.append((a, b))\n\n    # Sort by cost b_i ascending\n    exams.sort(key=lambda x: x[1])\n\n    for a, b in exams:\n        if needed <= 0:\n            break\n        # How many points can we gain from this exam?\n        max_gain = r - a\n        take = min(needed, max_gain)\n        essays_needed += take * b\n        needed -= take\n\n    print(essays_needed)\n\nif __name__ == \"__main__\":\n    solve()",
+    "code_hash": "469569ca2f9cb408",
+    "language": "python",
+    "node_id": "n_3_31cbf0",
+    "revision_id": "rev_n_3_31cbf0_0",
+    "thought_path_snapshot": [
+      "Iterate through the exams in the given order, calculating the cost to reach the average, but this might not yield the minimum because it ignores the varying costs b_i, leading to a suboptimal solution."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 3
+  },
+  {
+    "candidate_id": "cand_2fb93488f7",
+    "problem_id": "apps_1558",
+    "code": "import sys\n\ndef solve():\n    input_data = sys.stdin.read().split()\n    if not input_data:\n        return\n\n    iterator = iter(input_data)\n    \n    n = int(next(iterator))\n    r = int(next(iterator))\n    avg = int(next(iterator))\n    \n    current_sum = 0\n    essays_needed = 0\n    \n    # Calculate current total sum of grades\n    for _ in range(n):\n        a = int(next(iterator))\n        b = int(next(iterator))\n        current_sum += a\n    \n    target_sum = avg * n\n    \n    if current_sum >= target_sum:\n        print(0)\n        return\n    \n    needed = target_sum - current_sum\n    \n    # Store pairs of (cost per point, grade) to sort by cost\n    exams = []\n    for _ in range(n):\n        a = int(next(iterator))\n        b = int(next(iterator))\n        if a < r:\n            exams.append((b, r - a))\n    \n    # Sort by cost (essays per point) ascending\n    exams.sort(key=lambda x: x[0])\n    \n    for cost, points_available in exams:\n        if needed <= 0:\n            break\n        take = min(needed, points_available)\n        essays_needed += take * cost\n        needed -= take\n    \n    print(essays_needed)\n\nif __name__ == \"__main__\":\n    solve()",
+    "code_hash": "4ba0c6feccc6c8be",
+    "language": "python",
+    "node_id": "n_3_31cbf0",
+    "revision_id": "rev_n_3_31cbf0_1",
+    "thought_path_snapshot": [
+      "The previous reasoning incorrectly assumed that reading the input twice sequentially would work, failing to account for the fact that the input iterator is exhausted after the first pass; the correct approach is to store the exam data in a list during the initial read to avoid re-parsing the input stream."
+    ],
+    "origin": "rethink",
+    "generation_record_id": null,
+    "created_sequence": 4
+  },
+  {
+    "candidate_id": "cand_ad36751fab",
+    "problem_id": "apps_1558",
+    "code": "import sys\n\ndef solve():\n    input_data = sys.stdin.read().split()\n    if not input_data:\n        return\n\n    iterator = iter(input_data)\n    n = int(next(iterator))\n    r = int(next(iterator))\n    avg = int(next(iterator))\n\n    exams = []\n    current_total = 0\n\n    for _ in range(n):\n        a = int(next(iterator))\n        b = int(next(iterator))\n        exams.append((a, b))\n        current_total += a\n\n    required_total = avg * n\n    deficit = required_total - current_total\n\n    if deficit <= 0:\n        print(0)\n        return\n\n    # Sort by cost per point (b_i) ascending\n    exams.sort(key=lambda x: x[1])\n\n    essays_needed = 0\n    for a, b in exams:\n        if deficit <= 0:\n            break\n        # Maximum points we can add to this exam\n        can_add = r - a\n        if can_add <= 0:\n            continue\n\n        # How many points do we need to take from this exam?\n        take = min(can_add, deficit)\n        essays_needed += take * b\n        deficit -= take\n\n    print(essays_needed)\n\nif __name__ == \"__main__\":\n    solve()",
+    "code_hash": "55845fd4596c9076",
+    "language": "python",
+    "node_id": "n_4_0bd7c8",
+    "revision_id": "rev_n_4_0bd7c8_0",
+    "thought_path_snapshot": [
+      "Calculate the current total score and the required total score. Determine the deficit. Sort the exams by the cost per point (b_i) in ascending order. Greedily increase grades starting from the cheapest exams until the deficit is covered, ensuring no grade exceeds r.",
+      "Calculate the total deficit needed to reach the target average, then sort exams by essay cost (b_i) and greedily upgrade grades from the cheapest options until the deficit is zero, respecting the maximum grade limit r."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 5
+  },
+  {
+    "candidate_id": "cand_9bc2ccd2d4",
+    "problem_id": "apps_1558",
+    "code": "import sys\n\ndef solve():\n    input = sys.stdin.read\n    data = input().split()\n    \n    iterator = iter(data)\n    n = int(next(iterator))\n    r = int(next(iterator))\n    avg = int(next(iterator))\n    \n    exams = []\n    for _ in range(n):\n        a = int(next(iterator))\n        b = int(next(iterator))\n        exams.append((a, b))\n    \n    # Sort exams by cost b_i in ascending order\n    exams.sort(key=lambda x: x[1])\n    \n    current_sum = sum(a for a, b in exams)\n    target_sum = avg * n\n    essays_needed = 0\n    \n    for a, b in exams:\n        if current_sum >= target_sum:\n            break\n        \n        # Calculate how many points we need to gain from this exam\n        needed = target_sum - current_sum\n        max_gain = r - a\n        \n        if max_gain >= needed:\n            essays_needed += needed * b\n            current_sum += needed\n            break\n        else:\n            essays_needed += max_gain * b\n            current_sum += max_gain\n            a = r  # Update grade to max\n    \n    print(essays_needed)\n\nif __name__ == \"__main__\":\n    solve()",
+    "code_hash": "de50eed2311147da",
+    "language": "python",
+    "node_id": "n_7_affa15",
+    "revision_id": "rev_n_7_affa15_0",
+    "thought_path_snapshot": [
+      "Use a priority queue to dynamically select the exam with the lowest b_i that hasn't reached the maximum grade r, allowing for a more flexible implementation if the input order changes or if we need to handle updates incrementally, though sorting is sufficient here.",
+      "Sort the exams by the cost $b_i$ in ascending order. Iterate through the sorted list, increasing the grade of the current exam until either the total average requirement is met or the grade reaches the maximum $r$. This greedy approach ensures we always pick the cheapest way to gain points."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 6
+  },
+  {
+    "candidate_id": "cand_cbefdd5623",
+    "problem_id": "apps_1558",
+    "code": "import sys\n\ndef solve():\n    input_data = sys.stdin.read().split()\n    if not input_data:\n        return\n\n    iterator = iter(input_data)\n    n = int(next(iterator))\n    r = int(next(iterator))\n    avg = int(next(iterator))\n\n    exams = []\n    current_sum = 0\n\n    for _ in range(n):\n        a = int(next(iterator))\n        b = int(next(iterator))\n        exams.append((a, b))\n        current_sum += a\n\n    required_sum = n * avg\n    deficit = required_sum - current_sum\n\n    if deficit <= 0:\n        print(0)\n        return\n\n    # Sort by cost b_i ascending\n    exams.sort(key=lambda x: x[1])\n\n    essays = 0\n    for a, b in exams:\n        if deficit <= 0:\n            break\n        # Maximum points we can add to this exam\n        can_add = r - a\n        if can_add <= 0:\n            continue\n\n        # How many points do we need to take from this exam?\n        take = min(can_add, deficit)\n        essays += take * b\n        deficit -= take\n\n    print(essays)\n\nif __name__ == \"__main__\":\n    solve()",
+    "code_hash": "6b102bcfa6fda8b7",
+    "language": "python",
+    "node_id": "n_5_faab65",
+    "revision_id": "rev_n_5_faab65_0",
+    "thought_path_snapshot": [
+      "Calculate the current total score and the required total score. Determine the deficit. Sort the exams by the cost per point (b_i) in ascending order. Greedily increase grades starting from the cheapest exams until the deficit is covered, ensuring no grade exceeds r.",
+      "Compute the current sum of grades and the required sum (n * avg). Iterate through exams sorted by cost, adding points to the cheapest available exams first until the required sum is met, ensuring no single grade exceeds r."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 7
+  },
+  {
+    "candidate_id": "cand_d1dd15f637",
+    "problem_id": "apps_1558",
+    "code": "import sys\nimport heapq\n\ndef solve():\n    input = sys.stdin.read\n    data = input().split()\n    \n    iterator = iter(data)\n    try:\n        n = int(next(iterator))\n        r = int(next(iterator))\n        avg = int(next(iterator))\n    except StopIteration:\n        return\n\n    # We need total sum of grades to be at least n * avg\n    current_sum = 0\n    exams = []\n    \n    for _ in range(n):\n        a = int(next(iterator))\n        b = int(next(iterator))\n        current_sum += a\n        # Store (cost per point, current grade)\n        exams.append((b, a))\n    \n    target_sum = n * avg\n    \n    if current_sum >= target_sum:\n        print(0)\n        return\n\n    # Sort exams by cost b_i (ascending)\n    exams.sort(key=lambda x: x[0])\n    \n    essays_count = 0\n    current_sum = 0\n    \n    # Recalculate current_sum after sorting (it's the same, but let's be safe with logic flow)\n    # Actually, we can just use the initial sum variable if we didn't modify it.\n    # But let's re-verify the logic: we need to reach target_sum.\n    # We will iterate through sorted exams and increase grades as needed.\n    \n    needed = target_sum - current_sum\n    \n    for b, a in exams:\n        if needed <= 0:\n            break\n        \n        # Maximum points we can add to this exam\n        max_add = r - a\n        \n        if max_add <= 0:\n            continue\n            \n        # How many points do we need from this exam?\n        take = min(needed, max_add)\n        \n        essays_count += take * b\n        needed -= take\n        current_sum += take\n        \n        if needed <= 0:\n            break\n            \n    print(essays_count)\n\nif __name__ == '__main__':\n    solve()",
+    "code_hash": "bada44b50240f8e8",
+    "language": "python",
+    "node_id": "n_8_cb155f",
+    "revision_id": "rev_n_8_cb155f_0",
+    "thought_path_snapshot": [
+      "Use a priority queue to dynamically select the exam with the lowest b_i that hasn't reached the maximum grade r, allowing for a more flexible implementation if the input order changes or if we need to handle updates incrementally, though sorting is sufficient here.",
+      "Use a min-heap (priority queue) to store the pairs $(b_i, a_i)$. Repeatedly extract the element with the smallest $b_i$, increase its grade by 1, add the cost to the total, and push it back if the grade is still below $r$. Stop when the average condition is satisfied. This is functionally equivalent to sorting but uses a dynamic data structure."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 8
+  },
+  {
+    "candidate_id": "cand_f67c9897fc",
+    "problem_id": "apps_1558",
+    "code": "import sys\nimport heapq\n\ndef solve():\n    input_data = sys.stdin.read().split()\n    if not input_data:\n        return\n\n    iterator = iter(input_data)\n    \n    try:\n        n = int(next(iterator))\n        r = int(next(iterator))\n        avg = int(next(iterator))\n    except StopIteration:\n        return\n\n    exams = []\n    current_sum = 0\n\n    for _ in range(n):\n        a = int(next(iterator))\n        b = int(next(iterator))\n        exams.append((b, a))\n        current_sum += a\n\n    target_sum = avg * n\n    if current_sum >= target_sum:\n        print(0)\n        return\n\n    # Min-heap based on cost b_i\n    heapq.heapify(exams)\n\n    essays_needed = 0\n    points_needed = target_sum - current_sum\n\n    while points_needed > 0:\n        b, a = heapq.heappop(exams)\n\n        if a == r:\n            # Cannot increase this exam further\n            continue\n\n        # How many points can we gain from this exam?\n        can_gain = r - a\n        take = min(points_needed, can_gain)\n\n        essays_needed += take * b\n        points_needed -= take\n        a += take\n\n        # Push back if there is still room in this exam\n        if a < r:\n            heapq.heappush(exams, (b, a))\n\n    print(essays_needed)\n\nif __name__ == \"__main__\":\n    solve()",
+    "code_hash": "9d86beb3fd308361",
+    "language": "python",
+    "node_id": "n_8_cb155f",
+    "revision_id": "rev_n_8_cb155f_1",
+    "thought_path_snapshot": [
+      "Use a priority queue to dynamically select the exam with the lowest b_i that hasn't reached the maximum grade r, allowing for a more flexible implementation if the input order changes or if we need to handle updates incrementally, though sorting is sufficient here.",
+      "Thought-2 (replaced): Re-initializing `current_sum` to 0 after calculating the initial total destroys the necessary state to determine how many points are still needed; instead, the code should reuse the pre-calculated `current_sum` or correctly compute the deficit based on the initial grades before sorting."
+    ],
+    "origin": "rethink",
+    "generation_record_id": null,
+    "created_sequence": 9
+  },
+  {
+    "candidate_id": "cand_79a7c6c827",
+    "problem_id": "apps_1558",
+    "code": "import sys\n\ndef solve():\n    input_data = sys.stdin.read().split()\n    if not input_data:\n        return\n\n    iterator = iter(input_data)\n    n = int(next(iterator))\n    r = int(next(iterator))\n    avg = int(next(iterator))\n\n    exams = []\n    current_total = 0\n\n    for _ in range(n):\n        a = int(next(iterator))\n        b = int(next(iterator))\n        exams.append((b, a))\n        current_total += a\n\n    target_total = avg * n\n    deficit = target_total - current_total\n\n    if deficit <= 0:\n        print(0)\n        return\n\n    exams.sort(key=lambda x: x[0])\n\n    essays_needed = 0\n    for b, a in exams:\n        if deficit <= 0:\n            break\n        max_increase = r - a\n        if max_increase <= 0:\n            continue\n        take = min(deficit, max_increase)\n        essays_needed += take * b\n        deficit -= take\n\n    print(essays_needed)\n\nif __name__ == \"__main__\":\n    solve()",
+    "code_hash": "1bd30f9424daebdd",
+    "language": "python",
+    "node_id": "n_6_5596d2",
+    "revision_id": "rev_n_6_5596d2_0",
+    "thought_path_snapshot": [
+      "Calculate the current total score and the required total score. Determine the deficit. Sort the exams by the cost per point (b_i) in ascending order. Greedily increase grades starting from the cheapest exams until the deficit is covered, ensuring no grade exceeds r.",
+      "Determine the gap between current total points and the target total points. Prioritize increasing grades for exams with the lowest b_i values, capping each grade at r, and accumulate the essay count until the gap is closed."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 10
+  },
+  {
+    "candidate_id": "cand_475d1b1675",
+    "problem_id": "apps_1558",
+    "code": "import sys\n\ndef solve():\n    input_data = sys.stdin.read().split()\n    if not input_data:\n        return\n\n    iterator = iter(input_data)\n    n = int(next(iterator))\n    r = int(next(iterator))\n    avg = int(next(iterator))\n\n    exams = []\n    current_sum = 0\n\n    for _ in range(n):\n        a = int(next(iterator))\n        b = int(next(iterator))\n        exams.append((a, b))\n        current_sum += a\n\n    required_sum = n * avg\n    deficit = required_sum - current_sum\n\n    if deficit <= 0:\n        print(0)\n        return\n\n    exams.sort(key=lambda x: x[1])\n\n    essays_count = 0\n    for a, b in exams:\n        if deficit <= 0:\n            break\n        max_increase = r - a\n        if max_increase <= 0:\n            continue\n        take = min(deficit, max_increase)\n        essays_count += take * b\n        deficit -= take\n\n    print(essays_count)\n\nif __name__ == \"__main__\":\n    solve()",
+    "code_hash": "1ae87820874489b6",
+    "language": "python",
+    "node_id": "n_10_6f77ab",
+    "revision_id": "rev_n_10_6f77ab_0",
+    "thought_path_snapshot": [
+      "Calculate the current total score and the required total score. Determine the deficit. Sort the exams by the cost per point (b_i) in ascending order. Greedily increase grades starting from the cheapest exams until the deficit is covered, ensuring no grade exceeds r.",
+      "Calculate the total deficit needed to reach the target average, then sort exams by essay cost (b_i) and greedily upgrade grades from the cheapest options until the deficit is zero, respecting the maximum grade limit r.",
+      "Calculate the total deficit between the required sum (n * avg) and current sum, then sort exams by essay cost b_i and greedily upgrade grades from the cheapest until the deficit is zero, capping each grade at r."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 11
+  },
+  {
+    "candidate_id": "cand_1e4dcf21d4",
+    "problem_id": "apps_1558",
+    "code": "import sys\n\ndef solve():\n    input_data = sys.stdin.read().split()\n    if not input_data:\n        return\n\n    iterator = iter(input_data)\n    \n    try:\n        n = int(next(iterator))\n        r = int(next(iterator))\n        avg = int(next(iterator))\n    except StopIteration:\n        return\n\n    exams = []\n    current_sum = 0\n\n    for _ in range(n):\n        a = int(next(iterator))\n        b = int(next(iterator))\n        exams.append((b, a))\n        current_sum += a\n\n    required_sum = n * avg\n    deficit = required_sum - current_sum\n\n    if deficit <= 0:\n        print(0)\n        return\n\n    exams.sort(key=lambda x: x[0])\n\n    essays_needed = 0\n    i = 0\n    while deficit > 0 and i < n:\n        b, a = exams[i]\n        max_increase = r - a\n        if max_increase <= 0:\n            i += 1\n            continue\n\n        take = min(deficit, max_increase)\n        essays_needed += take * b\n        deficit -= take\n        i += 1\n\n    print(essays_needed)\n\nif __name__ == \"__main__\":\n    solve()",
+    "code_hash": "52a103fec992ec2f",
+    "language": "python",
+    "node_id": "n_13_92bac9",
+    "revision_id": "rev_n_13_92bac9_0",
+    "thought_path_snapshot": [
+      "Calculate the current total score and the required total score. Determine the deficit. Sort the exams by the cost per point (b_i) in ascending order. Greedily increase grades starting from the cheapest exams until the deficit is covered, ensuring no grade exceeds r.",
+      "Compute the current sum of grades and the required sum (n * avg). Iterate through exams sorted by cost, adding points to the cheapest available exams first until the required sum is met, ensuring no single grade exceeds r.",
+      "Calculate the total deficit (n * avg - current_sum) and sort exams by essay cost b_i. Greedily add points to the cheapest exams until the deficit is zero or grades hit the maximum r."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 12
+  },
+  {
+    "candidate_id": "cand_2baf654115",
+    "problem_id": "apps_1558",
+    "code": "import sys\n\ndef solve():\n    input_data = sys.stdin.read().split()\n    if not input_data:\n        return\n\n    iterator = iter(input_data)\n    \n    try:\n        n = int(next(iterator))\n        r = int(next(iterator))\n        avg = int(next(iterator))\n    except StopIteration:\n        return\n\n    exams = []\n    current_sum = 0\n\n    for _ in range(n):\n        a = int(next(iterator))\n        b = int(next(iterator))\n        exams.append((a, b))\n        current_sum += a\n\n    target_sum = avg * n\n    deficit = target_sum - current_sum\n\n    if deficit <= 0:\n        print(0)\n        return\n\n    # Sort exams by cost b_i (ascending)\n    exams.sort(key=lambda x: x[1])\n\n    essays_count = 0\n    i = 0\n    while deficit > 0 and i < n:\n        a, b = exams[i]\n        \n        # How many points can we gain from this exam?\n        can_gain = r - a\n        \n        if can_gain <= 0:\n            i += 1\n            continue\n        \n        if deficit <= can_gain:\n            # We only need 'deficit' points from this exam\n            essays_count += deficit * b\n            deficit = 0\n        else:\n            # Take all possible points from this exam\n            essays_count += can_gain * b\n            deficit -= can_gain\n            i += 1\n\n    print(essays_count)\n\nif __name__ == \"__main__\":\n    solve()",
+    "code_hash": "9dc9566f5af8a977",
+    "language": "python",
+    "node_id": "n_9_d4d1ac",
+    "revision_id": "rev_n_9_d4d1ac_0",
+    "thought_path_snapshot": [
+      "Use a priority queue to dynamically select the exam with the lowest b_i that hasn't reached the maximum grade r, allowing for a more flexible implementation if the input order changes or if we need to handle updates incrementally, though sorting is sufficient here.",
+      "Calculate the total deficit needed to reach the target average. Then, simulate the process of buying points starting from the cheapest $b_i$ options, accumulating costs until the deficit is zero. This avoids full sorting if we only needed a few points, but since we might need many, sorting remains the most efficient deterministic strategy."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 13
+  },
+  {
+    "candidate_id": "cand_46a4872ea2",
+    "problem_id": "apps_1558",
+    "code": "import sys\n\ndef solve():\n    input_data = sys.stdin.read().split()\n    if not input_data:\n        return\n\n    iterator = iter(input_data)\n    \n    try:\n        n = int(next(iterator))\n        r = int(next(iterator))\n        avg = int(next(iterator))\n    except StopIteration:\n        return\n\n    exams = []\n    current_total = 0\n\n    for _ in range(n):\n        a = int(next(iterator))\n        b = int(next(iterator))\n        exams.append((a, b))\n        current_total += a\n\n    target_total = avg * n\n    deficit = target_total - current_total\n\n    if deficit <= 0:\n        print(0)\n        return\n\n    # Sort exams by cost per point (b_i) in ascending order\n    exams.sort(key=lambda x: x[1])\n\n    essays_needed = 0\n\n    for grade, cost in exams:\n        if deficit <= 0:\n            break\n        \n        # Maximum points we can add to this exam\n        can_add = r - grade\n        \n        if can_add == 0:\n            continue\n        \n        # How many points do we need to take from this exam?\n        take = min(can_add, deficit)\n        \n        essays_needed += take * cost\n        deficit -= take\n\n    print(essays_needed)\n\nif __name__ == \"__main__\":\n    solve()",
+    "code_hash": "bc583b314781f5ff",
+    "language": "python",
+    "node_id": "n_16_268307",
+    "revision_id": "rev_n_16_268307_0",
+    "thought_path_snapshot": [
+      "Calculate the current total score and the required total score. Determine the deficit. Sort the exams by the cost per point (b_i) in ascending order. Greedily increase grades starting from the cheapest exams until the deficit is covered, ensuring no grade exceeds r.",
+      "Determine the gap between current total points and the target total points. Prioritize increasing grades for exams with the lowest b_i values, capping each grade at r, and accumulate the essay count until the gap is closed.",
+      "Calculate the total deficit needed to reach the target average. Sort all exams by their essay cost per point (b_i) in ascending order. Iterate through the sorted list, increasing the grade of the current exam by 1 point at a time (up to the maximum grade r) until the deficit is zero, accumulating the total essays required."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 14
+  },
+  {
+    "candidate_id": "cand_d4f390ad57",
+    "problem_id": "apps_1558",
+    "code": "import sys\n\ndef solve():\n    input_data = sys.stdin.read().split()\n    if not input_data:\n        return\n\n    iterator = iter(input_data)\n    n = int(next(iterator))\n    r = int(next(iterator))\n    avg = int(next(iterator))\n\n    exams = []\n    for _ in range(n):\n        a = int(next(iterator))\n        b = int(next(iterator))\n        exams.append((a, b))\n\n    # Calculate current total sum\n    current_sum = sum(a for a, b in exams)\n    target_sum = avg * n\n\n    if current_sum >= target_sum:\n        print(0)\n        return\n\n    # Sort exams by cost b_i ascending\n    exams.sort(key=lambda x: x[1])\n\n    essays_needed = 0\n    for a, b in exams:\n        if current_sum >= target_sum:\n            break\n        # Maximum points we can add to this exam\n        can_add = r - a\n        if can_add == 0:\n            continue\n\n        # How many points do we need to reach the target?\n        needed = target_sum - current_sum\n\n        if needed <= can_add:\n            # We only need 'needed' points from this exam\n            essays_needed += needed * b\n            current_sum += needed\n            break\n        else:\n            # Take all possible points from this exam\n            essays_needed += can_add * b\n            current_sum += can_add\n\n    print(essays_needed)\n\nif __name__ == \"__main__\":\n    solve()",
+    "code_hash": "f3e61a483ad94b68",
+    "language": "python",
+    "node_id": "n_19_051d13",
+    "revision_id": "rev_n_19_051d13_0",
+    "thought_path_snapshot": [
+      "Use a priority queue to dynamically select the exam with the lowest b_i that hasn't reached the maximum grade r, allowing for a more flexible implementation if the input order changes or if we need to handle updates incrementally, though sorting is sufficient here.",
+      "Sort the exams by the cost $b_i$ in ascending order. Iterate through the sorted list, increasing the grade of the current exam until either the total average requirement is met or the grade reaches the maximum $r$. This greedy approach ensures we always pick the cheapest way to gain points.",
+      "Sort exams by essay cost $b_i$ ascending and greedily increase grades until the target average is met, stopping early if the current average is already sufficient."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 15
+  },
+  {
+    "candidate_id": "cand_c15b39e083",
+    "problem_id": "apps_1558",
+    "code": "import sys\n\ndef solve():\n    input_data = sys.stdin.read().split()\n    if not input_data:\n        return\n\n    iterator = iter(input_data)\n    \n    try:\n        n = int(next(iterator))\n        r = int(next(iterator))\n        avg = int(next(iterator))\n    except StopIteration:\n        return\n\n    exams = []\n    current_sum = 0\n\n    for _ in range(n):\n        a = int(next(iterator))\n        b = int(next(iterator))\n        exams.append((a, b))\n        current_sum += a\n\n    target_sum = avg * n\n    deficit = target_sum - current_sum\n\n    if deficit <= 0:\n        print(0)\n        return\n\n    # Sort by cost b_i ascending\n    exams.sort(key=lambda x: x[1])\n\n    essays_needed = 0\n    for a, b in exams:\n        if deficit <= 0:\n            break\n        # Maximum points we can add to this exam\n        can_add = r - a\n        add = min(can_add, deficit)\n        essays_needed += add * b\n        deficit -= add\n\n    print(essays_needed)\n\nif __name__ == \"__main__\":\n    solve()",
+    "code_hash": "4efed77f5ad2b244",
+    "language": "python",
+    "node_id": "n_11_c66fce",
+    "revision_id": "rev_n_11_c66fce_0",
+    "thought_path_snapshot": [
+      "Calculate the current total score and the required total score. Determine the deficit. Sort the exams by the cost per point (b_i) in ascending order. Greedily increase grades starting from the cheapest exams until the deficit is covered, ensuring no grade exceeds r.",
+      "Calculate the total deficit needed to reach the target average, then sort exams by essay cost (b_i) and greedily upgrade grades from the cheapest options until the deficit is zero, respecting the maximum grade limit r.",
+      "Compute the current average, determine how many points are missing to reach the target average, and iteratively select the exam with the lowest b_i to upgrade by 1 point (if a_i < r) until the average condition is met."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 16
+  },
+  {
+    "candidate_id": "cand_b2576bcd4e",
+    "problem_id": "apps_1558",
+    "code": "import sys\n\ndef solve():\n    input_data = sys.stdin.read().split()\n    if not input_data:\n        return\n\n    iterator = iter(input_data)\n    n = int(next(iterator))\n    r = int(next(iterator))\n    avg = int(next(iterator))\n\n    exams = []\n    current_sum = 0\n\n    for _ in range(n):\n        a = int(next(iterator))\n        b = int(next(iterator))\n        exams.append((b, a))\n        current_sum += a\n\n    required_sum = avg * n\n    deficit = required_sum - current_sum\n\n    if deficit <= 0:\n        print(0)\n        return\n\n    exams.sort(key=lambda x: x[0])\n\n    essays_count = 0\n    for b, a in exams:\n        if deficit <= 0:\n            break\n        if a == r:\n            continue\n        can_add = r - a\n        add = min(deficit, can_add)\n        essays_count += add * b\n        deficit -= add\n\n    print(essays_count)\n\nif __name__ == \"__main__\":\n    solve()",
+    "code_hash": "3bd59a57aad7816e",
+    "language": "python",
+    "node_id": "n_22_eef869",
+    "revision_id": "rev_n_22_eef869_0",
+    "thought_path_snapshot": [
+      "Use a priority queue to dynamically select the exam with the lowest b_i that hasn't reached the maximum grade r, allowing for a more flexible implementation if the input order changes or if we need to handle updates incrementally, though sorting is sufficient here.",
+      "Thought-2 (replaced): Re-initializing `current_sum` to 0 after calculating the initial total destroys the necessary state to determine how many points are still needed; instead, the code should reuse the pre-calculated `current_sum` or correctly compute the deficit based on the initial grades before sorting.",
+      "Sort the exams by essay cost b_i in ascending order and greedily increase grades starting from the cheapest option until the total sum meets the required average."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 17
+  },
+  {
+    "candidate_id": "cand_049bee865f",
+    "problem_id": "apps_1558",
+    "code": "import sys\n\ndef solve():\n    input_data = sys.stdin.read().split()\n    if not input_data:\n        return\n\n    iterator = iter(input_data)\n    n = int(next(iterator))\n    r = int(next(iterator))\n    avg = int(next(iterator))\n\n    exams = []\n    for _ in range(n):\n        a = int(next(iterator))\n        b = int(next(iterator))\n        exams.append((a, b))\n\n    current_sum = sum(a for a, b in exams)\n    required_sum = n * avg\n    deficit = required_sum - current_sum\n\n    if deficit <= 0:\n        print(0)\n        return\n\n    # Sort by cost b_i ascending\n    exams.sort(key=lambda x: x[1])\n\n    essays = 0\n    for a, b in exams:\n        if deficit <= 0:\n            break\n        # Maximum points we can add to this exam\n        can_add = r - a\n        if can_add == 0:\n            continue\n\n        add = min(deficit, can_add)\n        essays += add * b\n        deficit -= add\n\n    print(essays)\n\nif __name__ == \"__main__\":\n    solve()",
+    "code_hash": "02dea78126d946a9",
+    "language": "python",
+    "node_id": "n_14_547d36",
+    "revision_id": "rev_n_14_547d36_0",
+    "thought_path_snapshot": [
+      "Calculate the current total score and the required total score. Determine the deficit. Sort the exams by the cost per point (b_i) in ascending order. Greedily increase grades starting from the cheapest exams until the deficit is covered, ensuring no grade exceeds r.",
+      "Compute the current sum of grades and the required sum (n * avg). Iterate through exams sorted by cost, adding points to the cheapest available exams first until the required sum is met, ensuring no single grade exceeds r.",
+      "Compute the required sum of grades, iterate through sorted exams by cost, and increment grades while tracking the remaining deficit, stopping when the target is reached or all grades are maxed out."
+    ],
+    "origin": "initial",
+    "generation_record_id": null,
+    "created_sequence": 18
+  }
+]

@@ -189,10 +189,15 @@ def main():
     result, family = {}, []
     for model in args.models:
         for ds in args.datasets:
-            runs = {m: load_run(f'v3_{ds}_{model}_{m}') for m in METHODS}
+            # A method whose run directory does not exist yet is skipped (partial cell); comparisons
+            # and offline analyses that need it are omitted, and the cell lists what is missing.
+            runs = {m: load_run(f'v3_{ds}_{model}_{m}') for m in METHODS if (ROOT / 'runs' / f'v3_{ds}_{model}_{m}').exists()}
+            if not runs:
+                continue
             ids = sorted(set.intersection(*(set(r[1]) for r in runs.values())))
             meta = load_meta(ds)
-            cell = dict(n=len(ids), methods={}, comparisons={}, by_difficulty={})
+            cell = dict(n=len(ids), methods={}, comparisons={}, by_difficulty={},
+                        missing_methods=[m for m in METHODS if m not in runs])
             for m, (run, recs, summ) in runs.items():
                 k = sum(recs[i].get('all_hidden_passed', False) for i in ids)
                 lo, hi = wilson(k, len(ids))
@@ -201,9 +206,11 @@ def main():
             if ds == 'apps':
                 for d in ['introductory', 'interview', 'competition']:
                     sub = [i for i in ids if meta[i]['metadata']['difficulty'] == d]
-                    cell['by_difficulty'][d] = {m: sum(runs[m][1][i].get('all_hidden_passed', False) for i in sub) for m in METHODS}
+                    cell['by_difficulty'][d] = {m: sum(runs[m][1][i].get('all_hidden_passed', False) for i in sub) for m in runs}
                     cell['by_difficulty'][d]['n'] = len(sub)
             for b, a in COMPARISONS:
+                if a not in runs or b not in runs:
+                    continue
                 A = [runs[a][1][i].get('all_hidden_passed', False) for i in ids]
                 B = [runs[b][1][i].get('all_hidden_passed', False) for i in ids]
                 w, l, p = mcnemar_exact(A, B)
@@ -212,9 +219,10 @@ def main():
                 family.append((model, ds, f'{b}_vs_{a}', p))
             if not args.no_offline:
                 judge = LocalJudge(ds, Path(args.cache).with_name(Path(args.cache).stem + f'_{ds}.json'))
-                om = offline_mcts(runs['mcts'][0], ids, judge)
-                ob = offline_bok(runs['bon16'][0], ids, judge)
+                om = offline_mcts(runs['mcts'][0], ids, judge) if 'mcts' in runs else None
+                ob = offline_bok(runs['bon16'][0], ids, judge) if 'bon16' in runs else None
                 judge.save()
+            if not args.no_offline and om is not None:
                 vm = {i: runs['mcts'][1][i].get('all_hidden_passed', False) for i in ids}
                 cell['offline_mcts'] = dict(
                     first_program=sum(om[i]['first'] for i in ids), no_critic=sum(om[i]['no_critic'] for i in ids),
@@ -223,6 +231,7 @@ def main():
                     critic_vs_no_critic=dict(zip(['wins', 'losses', 'p'], mcnemar_exact([om[i]['no_critic'] for i in ids], [om[i]['selected'] for i in ids]))),
                     search_vs_first_program=dict(zip(['wins', 'losses', 'p'], mcnemar_exact([om[i]['first'] for i in ids], [om[i]['no_critic'] for i in ids]))),
                     problems_with_public_pass=sum(om[i]['any_public_pass'] for i in ids))
+            if not args.no_offline and ob is not None:
                 vb = {i: runs['bon16'][1][i].get('all_hidden_passed', False) for i in ids}
                 cell['best_of_k'] = {k: sum(ob[i][k] for i in ids) for k in range(1, 17)}
                 cell['best_of_k_local_vm_agreement_k16'] = sum(ob[i][16] == vb[i] for i in ids)
@@ -230,6 +239,7 @@ def main():
     adj = holm([p for *_, p in family])
     for (model, ds, comp, p), pa in zip(family, adj):
         result[f'{model}/{ds}']['comparisons'][comp]['p_holm'] = pa
+        result[f'{model}/{ds}']['comparisons'][comp]['holm_family_size'] = len(family)
     if args.json:
         Path(args.json).write_text(json.dumps(result, indent=1))
     print(json.dumps(result, indent=1))

@@ -63,3 +63,9 @@ Người dùng thấy các kết quả cũ không chính xác và gây nhầm l�
 2. **RQ5 chỉ còn ở dạng mô tả:** các lỗi của cài đặt cũ và cách v3 sửa. Không dùng số liệu v1. Bỏ phụ lục A và mục tham khảo 14B/7B trong khung báo cáo.
 3. **Bỏ E7 (14B theo v3).** Ba model 7–9B là phạm vi duy nhất.
 4. **MCTS APPS của Qwen3.5-9B chạy tiếp trên Colab** từ bản lưu 116/300 khi Colab ổn định, thay vì chạy lại từ đầu trên Modal. Các run Qwen3.5 khác chạy trên Modal (D-008, ledger mục 12).
+
+## D-010: Giữ kết quả Qwen3.5-9B APPS dù output bị cắt (14/11/2026)
+
+Bối cảnh: trên APPS, `qwen35_9b` (tắt thinking) có khoảng 26–29% lời gọi `code` bị cắt ở giới hạn 4.096 token ở cả ba phương pháp. Riêng MCTS có 17 bài không có candidate vì expansion ở gốc bị cắt ở 1.024 token ([BENCHMARK_LEDGER.md](../results/BENCHMARK_LEDGER.md), mục 6.1).
+
+Quyết định (người dùng, 14/11/2026): **giữ nguyên protocol v3.1 và kết quả hiện có, không chạy lại.** Lý do: kết quả nhìn chung hợp lý, và cả ba phương pháp dùng cùng giới hạn token nên so sánh ghép cặp trong model vẫn cùng cấu hình. Việc output bị cắt (và việc chỉ MCTS mất trắng bài khi expansion bị cắt) được ghi vào threats to validity của báo cáo, cùng với việc ô APPS chạy trên hai nền tảng (Modal và Colab).
