@@ -32,6 +32,16 @@ make clean    # xóa file trung gian
 Hình kết quả không chép vào đây: `\graphicspath` trỏ thẳng tới `../docs/report/figures/v3/`
 (sinh bằng `scripts/make_figures_v3.py`), nên hình trong báo cáo luôn khớp với artifact.
 
+Biểu đồ tách từ Bảng 4.1: chạy `python scripts/make_benchmark_panels_v3.py` từ thư mục gốc.
+Script đọc artifact đã lưu, không gọi model hoặc chấm lại code, rồi xuất ba nhóm hình
+APPS Pass Rate, APPS Pass@1 và HumanEval Pass@1 (mỗi nhóm ba ô theo model) vào
+`docs/report/figures/v3/table41/`, định dạng PNG 300 dpi và PDF vector.
+Có cả bố cục ngang và bố cục dọc (`*_portrait`) cho trang A4.
+Hình chỉ giữ tên phương pháp trong chú giải, không in nhãn `(offline)` hoặc ghi chú dưới hình.
+Dữ liệu đối chiếu nằm trong `docs/results/v3/benchmark_panels_v3.json`; Test-only là chọn lại offline,
+không phải một run tắt critic độc lập. Bố cục dọc được chèn ngay sau Bảng 4.1 trong chương 4,
+mỗi nhóm hình một trang.
+
 ## Quy cách đã cài đặt (theo file mẫu, mục 3)
 
 | Yêu cầu | Cách làm trong `tlcn.sty` |
