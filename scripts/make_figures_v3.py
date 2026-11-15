@@ -84,29 +84,51 @@ def role_tokens(run):
 
 # ---------------------------------------------------------------------------------------------- H1
 def h1_pass_at_1(A):
-    fig, axes = plt.subplots(1, 2, figsize=(7.2, 3.0))
-    off = {'direct': 0.22, 'bon16': 0.0, 'mcts': -0.22}
+    """Pass@1 and Wilson 95% intervals; one common percentage scale across datasets."""
+    style = {
+        'direct': ('Direct', '#767676', 's'),
+        'bon16': ('Best-of-16', '#B64342', 'o'),
+        'mcts': ('MCTS Dual', '#0F4D92', 'D'),
+    }
+    offsets = {'direct': 0.24, 'bon16': 0.0, 'mcts': -0.24}
+    fig, axes = plt.subplots(1, 2, figsize=(7.2, 4.2), sharex=True, sharey=True)
     for ax, (ds, dsl) in zip(axes, DATASETS):
-        for i, (mk, ml) in enumerate(MODELS):
-            y0 = len(MODELS) - 1 - i
-            for m, _ in METHODS:
-                r = A[f'{mk}/{ds}']['methods'][m]
-                lo, hi = (100 * v for v in r['wilson95'])
-                ax.plot([lo, hi], [y0 + off[m]] * 2, color=COLOR[m], linewidth=1.6, solid_capstyle='round')
-                ax.plot(100 * r['rate'], y0 + off[m], marker=MARKER[m], color=COLOR[m], markersize=6,
-                        markeredgecolor=SURFACE, markeredgewidth=1.0, linestyle='')
-        ax.set_yticks(range(len(MODELS)))
-        ax.set_yticklabels([ml for _, ml in MODELS][::-1] if ax is axes[0] else [])
-        ax.set_ylim(-0.6, len(MODELS) - 0.4)
+        for row, (model_key, model_label) in enumerate(MODELS):
+            y = len(MODELS) - 1 - row
+            for method, (method_label, color, marker) in style.items():
+                result = A[f'{model_key}/{ds}']['methods'][method]
+                point = 100 * result['rate']
+                low, high = (100 * value for value in result['wilson95'])
+                y_pos = y + offsets[method]
+                ax.errorbar(
+                    point, y_pos, xerr=[[point - low], [high - point]], fmt=marker,
+                    color=color, ecolor=color, elinewidth=1.8, capsize=3.5,
+                    markersize=8, markeredgecolor=SURFACE, markeredgewidth=1.0, zorder=3,
+                )
+                label_offset = 8 if method != 'mcts' else -11
+                ax.annotate(
+                    f'{point:.1f}', (point, y_pos), xytext=(0, label_offset), textcoords='offset points',
+                    fontsize=8.5, color=color, ha='center',
+                    va='bottom' if label_offset > 0 else 'top',
+                )
+        ax.set_title(f'{dsl} (n={A[f"{MODELS[0][0]}/{ds}"]["n"]})', loc='left', pad=10, fontsize=12, fontweight='bold')
+        ax.set_xlim(0, 100)
+        ax.set_xticks(range(0, 101, 20))
+        ax.set_xlabel('Pass@1 (%)', fontsize=11)
         ax.grid(axis='y', visible=False)
-        ax.set_title(dsl, loc='left')
-        ax.set_xlabel('Pass@1 trên hidden test (%)')
-    axes[0].set_xlim(0, 80)
-    axes[1].set_xlim(70, 100)
-    method_legend(fig, loc='upper center', ncol=3, bbox_to_anchor=(0.5, 1.06))
-    fig.tight_layout()
-    save(fig, 'H1_pass_at_1', 'analysis_v3_3models.json (methods.*.rate, wilson95)',
-         'Thanh ngang: khoảng tin cậy Wilson 95%. Trục x của hai khung khác nhau.')
+        ax.spines['bottom'].set_linewidth(1.1)
+        ax.spines['left'].set_linewidth(1.1)
+    axes[0].set_yticks(range(len(MODELS)))
+    axes[0].set_yticklabels([label for _, label in MODELS][::-1], fontsize=10)
+    axes[0].set_ylim(-0.68, len(MODELS) - 0.32)
+    handles = [
+        Line2D([], [], color=color, marker=marker, linewidth=1.8, markersize=7.5,
+               label=label, markeredgecolor=SURFACE, markeredgewidth=1.0)
+        for label, color, marker in style.values()
+    ]
+    fig.legend(handles=handles, loc='upper center', ncol=3, bbox_to_anchor=(0.5, 1.03), fontsize=10)
+    fig.tight_layout(rect=(0, 0, 1, 0.91), pad=1.0)
+    save(fig, 'H1_pass_at_1', 'analysis_v3_3models.json (methods.*.rate, wilson95)')
 
 
 # ---------------------------------------------------------------------------------------------- H2

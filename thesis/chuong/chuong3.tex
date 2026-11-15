@@ -85,50 +85,119 @@ Các lần chạy được thực hiện trên hai nền tảng thuê GPU theo g
 
 Việc ô APPS của Qwen3.5-9B chạy trên hai nền tảng là một sai lệch so với quy tắc ban đầu (mọi phương pháp của một mô hình chạy trên cùng nền tảng), và được ghi nhận ở Mục~\ref{sec:hople}.
 
-\section{CẤU HÌNH THUẬT TOÁN}
+\section{CẤU HÌNH VÀ PROMPT DÙNG CHUNG}
 \label{sec:cauhinh}
+Các cấu hình dưới đây áp dụng cho Qwen2.5-Coder-7B, Seed-Coder-8B và Qwen3.5-9B trên cả APPS-300 và HumanEval-164. Qwen3.5-9B tắt thinking như đã nêu ở Mục~\ref{sec:mohinh}.
 
-Bảng~\ref{tab:cauhinh} liệt kê các tham số của RethinkMCTS dùng trong mọi lần chạy. Ý nghĩa của từng tham số được trình bày ở Chương~\ref{chap:lythuyet}.
+% Nguồn: prompts/native_v3/generate_code.jinja, _interface.jinja;
+% src/rethink_mcts/adapters/llm/http_gateway.py (messages chỉ có user).
+Mỗi lần sinh mã dùng prompt \texttt{native\_v3} với đề bài, giao diện thực thi và đường đi thought. Bản cài đặt gửi nội dung này dưới dạng một user message, không tách riêng system prompt như cấu hình cũ.
 
-\begin{table}[htbp]
-  \caption{Cấu hình RethinkMCTS}
-  \label{tab:cauhinh}
-  % Nguồn: configs/v3_7b/apps_mcts.yaml, configs/v3_7b/README.md, docs/research/PROTOCOL.md mục 8.
-  \begin{tabularx}{\linewidth}{>{\raggedright\arraybackslash}p{5cm}>{\raggedright\arraybackslash}X}
-    \toprule
-    Tham số & Giá trị \\
-    \midrule
-    Ngân sách tìm kiếm & 16 rollout; lượt rethink không tính vào ngân sách \\
-    Độ rộng mở rộng & 3 thought con mỗi node \\
-    Số lần rethink mỗi node & 1 \\
-    Chọn node & P-UCB, $c = 4$, $c_{\text{base}} = 10$ \\
-    Lan truyền giá trị & Max \\
-    Phần thưởng & $0{,}8\,v_{\text{test}} + 0{,}2\,v_{\text{llm}}$; critic cho điểm trong $[-1, 1]$, chỉ được gọi khi chương trình pass toàn bộ public test \\
-    Phản hồi khi chương trình sai & Phản hồi mức block (phân tích theo từng khối lệnh) \\
-    Dừng sớm & Không; phương án dừng sớm được tính lại offline \\
-    Chọn kết quả & Chương trình có phần thưởng lớn nhất \\
-    Temperature & 0 \\
-    Giới hạn an toàn mỗi bài & 4 triệu token, 400 lời gọi, 3.600 giây \\
-    \bottomrule
-  \end{tabularx}
-\end{table}
+\begin{center}
+  \fbox{\parbox{\dimexpr\linewidth-2\fboxsep-2\fboxrule\relax}{%
+    \small\raggedright
+    You are an expert Python programmer.\par
+    Problem statement: \textit{<nội dung đề bài>}\par
+    \textit{<giao diện thực thi và starter code, nếu có>}\par
+    Reasoning path: \textit{<chuỗi thought; (none) với Direct và Best-of-16>}\par
+    Return only the complete Python solution. Include imports and the required function signature when the task is call-based. Do not explain the solution and do not use Markdown fences.
+  }}
+\end{center}
 
-Mỗi vai trò gọi mô hình có giới hạn số token đầu ra riêng: sinh thought (expansion) 1.024, sinh mã 4.096, rethink 512, critic 256 và phân tích block 3.072. Các giới hạn này được đặt sau khi lần chạy thử đầu tiên với giới hạn nhỏ hơn cho thấy 5,9\% lời gọi của Qwen3.5-9B bị cắt giữa chừng, và được áp dụng chung cho cả ba mô hình.
+Với APPS dạng stdin/stdout, prompt yêu cầu đọc stdin, gọi hàm giải và in kết quả ra stdout. Nếu có starter code thì chèn vào mục \texttt{Starter code}. Với HumanEval, prompt chỉ rõ hàm hoặc phương thức mà bộ chấm gọi, yêu cầu trả kết quả thay vì in ra màn hình.
+
+Giới hạn output theo vai trò là: expansion 1.024, code 4.096, rethink 512, critic 256 và block analysis 3.072 token. Các giới hạn này được cố định theo protocol v3.1 và dùng chung cho ba mô hình.
 
 \section{CÁC PHƯƠNG PHÁP SO SÁNH}
 \label{sec:phuongphap}
 
-Ba phương pháp được chạy trên mỗi mô hình và mỗi bộ dữ liệu, tổng cộng $3 \times 3 \times 2 = 18$ lần chạy. Cả ba dùng chung prompt sinh mã.
+Ba phương pháp Direct, Best-of-16 và MCTS Dual được chạy trên mỗi model và dataset, tạo thành 18 run. MCTS Test-only là cấu hình chọn lại offline từ các run Dual, không phải một nhóm run độc lập.
 
-\begin{description}[style=nextline,leftmargin=1cm]
-  \item[Direct] Sinh một chương trình duy nhất với temperature 0. Đây là mức năng lực của mô hình khi không có tìm kiếm.
-  \item[Best-of-16] Sinh 16 chương trình độc lập với temperature 0,8 và top-p 0,95, chạy cả 16 trên public test, chọn chương trình có tỷ lệ pass public cao nhất; nếu bằng nhau thì lấy chương trình sinh trước. Đây là baseline lấy mẫu với cùng số lần sinh mã ban đầu như RethinkMCTS (16 rollout).
-  \item[RethinkMCTS] Thuật toán tìm kiếm với cấu hình ở Bảng~\ref{tab:cauhinh}.
-\end{description}
+\subsection{Direct}
+Direct đo khả năng sinh mã trực tiếp, không có cây tìm kiếm, feedback hay rethink. Mỗi bài sinh một chương trình; chương trình này được chọn để chấm hidden. Baseline không gọi critic.
 
-Best-of-16 và RethinkMCTS có cùng số rollout nhưng không cùng chi phí: RethinkMCTS còn gọi mô hình cho các bước sinh thought, rethink, phân tích block và critic. Vì vậy, tiểu luận báo cáo chi phí (token và số lời gọi) song song với độ chính xác, và so sánh thêm với Best-of-$k$ ($k = 1, \ldots, 16$) tính lại từ 16 mẫu đã sinh (Chương~\ref{chap:ketqua}).
+\begin{table}[htbp]
+  \caption{Cấu hình Direct}
+  % Nguồn: configs/v3_7b/{apps_baseline,humaneval_baseline}.yaml; DirectBaseline.
+  \begin{tabular*}{\linewidth}{@{\extracolsep{\fill}}cccc@{}}
+    \toprule
+    Temperature & Top-p & Max output tokens & Candidates \\
+    \midrule
+    0 & 1,0 & 4.096 & 1 \\
+    \bottomrule
+  \end{tabular*}
+\end{table}
 
-Hai thí nghiệm ablation trên Qwen2.5-Coder-7B (tắt rethink; chỉ dùng thông tin thực thi thay vì phản hồi mức block) đã được lên kế hoạch nhưng chưa được thực hiện trong phạm vi tiểu luận vì giới hạn kinh phí GPU. Riêng vai trò của critic và của việc dừng sớm được phân tích offline từ các lần chạy RethinkMCTS sẵn có, không cần chạy thêm.
+\subsection{Best-of-16}
+Best-of-16 sinh 16 chương trình độc lập từ cùng đề bài, không dùng phản hồi của lần trước. Mỗi chương trình được chấm public; chọn tỷ lệ pass cao nhất, hòa thì lấy chương trình sinh trước. Không dùng critic và không dừng ngay khi đã có chương trình pass hết public.
+
+\begin{table}[htbp]
+  \caption{Cấu hình Best-of-16}
+  % Nguồn: configs/v3_7b/README.md; apps_baseline.yaml; BestOfNPublicBaseline.
+  \begin{tabular*}{\linewidth}{@{\extracolsep{\fill}}cccc@{}}
+    \toprule
+    Temperature & Top-p & Max output tokens & Candidates \\
+    \midrule
+    0,8 & 0,95 & 4.096 & 16 \\
+    \bottomrule
+  \end{tabular*}
+\end{table}
+
+\subsection{MCTS Dual}
+MCTS Dual tìm kiếm trên chuỗi thought, sinh code và chạy public test tại node được chọn. Khi code sai, hệ thống dùng phản hồi mức block để rethink. Critic chỉ được gọi khi code vượt toàn bộ public test, với reward:
+\[
+  r =
+  \begin{cases}
+    v_{\mathrm{test}}, & 0 \le v_{\mathrm{test}} < 1,\\
+    0{,}8\,v_{\mathrm{test}} + 0{,}2\,v_{\mathrm{llm}}, & v_{\mathrm{test}}=1,
+  \end{cases}
+  \qquad v_{\mathrm{llm}}\in[-1,1].
+\]
+
+\begin{table}[htbp]
+  \caption{Cấu hình MCTS Dual}
+  \label{tab:cauhinh}
+  % Nguồn: configs/v3_7b/{apps_mcts,humaneval_mcts}.yaml.
+  \begin{tabularx}{\linewidth}{>{\raggedright\arraybackslash}p{5cm}>{\raggedright\arraybackslash}X}
+    \toprule
+    Parameter & Value \\
+    \midrule
+    Temperature / top-p & 0 / 1,0 cho mọi vai trò \\
+    Rollouts / width & 16 / 3 \\
+    Max rethink per node & 1; không tính vào số rollout \\
+    P-UCB & $c_{\mathrm{base}}=10$, $c=4$ \\
+    Backup / feedback & Max / block \\
+    Early stopping & Không dừng khi pass public \\
+    Final selection & Max reward; hòa lấy chương trình sinh trước \\
+    Safety limits per problem & 4 triệu token, 400 lời gọi, 3.600 giây \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+16 rollout không tương đương chi phí của 16 mẫu Best-of-16: MCTS còn gọi model để expansion, rethink, block analysis và critic. Vì vậy cần đối chiếu cả token và số lời gọi thực dùng.
+
+\subsection{MCTS Test-only}
+Test-only dùng lại các candidate của MCTS Dual, bỏ điểm critic khi chọn cuối: $r_{\mathrm{select}}=v_{\mathrm{test}}$. Chọn code đầu tiên pass hết public; nếu không có thì giữ lựa chọn theo public pass rate. Sau đó chấm hidden cho code được chọn lại.
+
+\begin{table}[htbp]
+  \caption{Cấu hình chọn lại MCTS Test-only}
+  % Nguồn: scripts/analyze_v3.py/offline_mcts; BENCHMARK_LEDGER.md mục 8.
+  \begin{tabularx}{\linewidth}{>{\raggedright\arraybackslash}p{5cm}>{\raggedright\arraybackslash}X}
+    \toprule
+    Parameter & Value \\
+    \midrule
+    Candidate source & Run MCTS Dual tương ứng \\
+    Selection score & Public pass rate, không dùng điểm critic \\
+    Tie-break & Chương trình sinh trước \\
+    Additional LLM calls & 0; không sinh thêm code hay xây lại cây \\
+    Hidden evaluation & Chấm lại offline cho candidate được chọn \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+Đối chứng Dual--Test-only dùng hidden verdict local cho cả hai phía. Trong bảng tổng hợp, PR Test-only giữ verdict run gốc nếu candidate ID trùng Dual, nếu khác dùng cache local; không coi đây là chi phí hoặc hành vi của một run mới tắt critic từ đầu.
+
+Các kết quả của bốn cấu hình được tổng hợp ở Chương~\ref{chap:ketqua}. Ablation tắt rethink và \texttt{facts\_only} chưa chạy; dừng sớm và Best-of-$k$ được phân tích offline từ run sẵn có.
 
 \section{ĐỘ ĐO VÀ KIỂM ĐỊNH}
 \label{sec:dodo}
