@@ -7,6 +7,7 @@ usage: python3 scripts/make_figures_v3.py
 """
 import glob
 import json
+import tarfile
 from pathlib import Path
 
 import matplotlib
@@ -29,19 +30,18 @@ ROLES = [('expansion', 'Expansion'), ('code', 'Sinh code'), ('rethink', 'Rethink
          ('block_analysis', 'Block analysis'), ('critic', 'Critic')]
 
 # Palette (validated with the dataviz skill's validate_palette.js on the light surface).
-INK, INK2, MUTED, GRID, AXIS, SURFACE = '#0b0b0b', '#52514e', '#898781', '#e1e0d9', '#c3c2b7', '#ffffff'
-COLOR = {'direct': '#898781', 'bon16': '#2a78d6', 'mcts': '#eb6834'}
+INK, INK2, MUTED, GRID, AXIS, SURFACE = '#0b0b0b', '#52514e', '#898781', '#e1e0d9', '#000000', '#ffffff'
+COLOR = {'direct': '#898781', 'bon16': '#B64342', 'mcts': '#0F4D92'}
 MARKER = {'direct': 's', 'bon16': 'o', 'mcts': 'D'}
-ROLE_COLOR = dict(zip([r for r, _ in ROLES], ['#1baf7a', '#eda100', '#6250d6', '#e87ba4', '#008300']))
-STAGE_COLOR = ['#ef8c64', '#d4541f', '#94390f']  # ordinal ramp of the MCTS hue
+ROLE_COLOR = dict(zip([r for r, _ in ROLES], ['#42949E', '#3775BA', '#9A4D8E', '#E9A6A1', '#578B55']))
 
 plt.rcParams.update({
     'font.family': 'Arial', 'font.size': 9, 'axes.titlesize': 10, 'axes.labelsize': 9,
-    'axes.edgecolor': AXIS, 'axes.linewidth': 0.8, 'axes.labelcolor': INK2, 'axes.titlecolor': INK,
+    'axes.edgecolor': AXIS, 'axes.linewidth': 1.2, 'axes.labelcolor': INK2, 'axes.titlecolor': INK,
     'xtick.color': INK2, 'ytick.color': INK2, 'xtick.major.size': 0, 'ytick.major.size': 0,
     'axes.grid': True, 'grid.color': GRID, 'grid.linewidth': 0.6, 'axes.axisbelow': True,
     'axes.spines.top': False, 'axes.spines.right': False, 'legend.frameon': False,
-    'figure.facecolor': SURFACE, 'axes.facecolor': SURFACE, 'savefig.dpi': 200, 'pdf.fonttype': 42,
+    'figure.facecolor': SURFACE, 'axes.facecolor': SURFACE, 'savefig.dpi': 300, 'pdf.fonttype': 42,
 })
 
 
@@ -69,250 +69,319 @@ def method_legend(ax_or_fig, **kw):
 
 
 def role_tokens(run):
-    """Mean tokens per problem by role and kind, summed from the per-request log (usage.json keeps a null
-    role total when one call of that role lacks a count; the request log still has the other calls)."""
-    probs = glob.glob(str(ROOT / 'runs' / run / 'problems/*/requests.json'))
-    acc = {}
-    for f in probs:
-        for q in json.loads(Path(f).read_text()):
-            r = (q.get('response') or {})
+    """Mean recorded tokens per problem and role; use archived request logs when traces are compressed."""
+    paths = [Path(f) for f in glob.glob(str(ROOT / 'runs' / run / 'problems/*/requests.json'))]
+    archive = ROOT / 'runs' / 'v3_raw_archives' / f'{run}.heavy.tar.gz'
+    records = []
+    if paths:
+        records = (json.loads(path.read_text()) for path in paths)
+    elif archive.exists():
+        def archived_records():
+            with tarfile.open(archive, 'r:gz') as tf:
+                for member in tf:
+                    if member.name.endswith('/requests.json'):
+                        yield json.load(tf.extractfile(member))
+        records = archived_records()
+    else:
+        raise FileNotFoundError(f'No request logs or archive found for {run}')
+    acc, count = {}, 0
+    for requests in records:
+        count += 1
+        for q in requests:
+            response = q.get('response') or {}
             role = q['request']['role']
-            acc[(role, 'input')] = acc.get((role, 'input'), 0) + (r.get('prompt_tokens') or 0)
-            acc[(role, 'output')] = acc.get((role, 'output'), 0) + (r.get('completion_tokens') or 0)
-    return {k: v / len(probs) for k, v in acc.items()}
+            acc[(role, 'input')] = acc.get((role, 'input'), 0) + (response.get('prompt_tokens') or 0)
+            acc[(role, 'output')] = acc.get((role, 'output'), 0) + (response.get('completion_tokens') or 0)
+    if not count:
+        raise ValueError(f'No request records found for {run}')
+    return {key: value / count for key, value in acc.items()}
 
 
 # ---------------------------------------------------------------------------------------------- H1
-def h1_pass_at_1(A):
-    """Pass@1 and Wilson 95% intervals; one common percentage scale across datasets."""
+def h1_pass_at_1_panel(A, dataset, dataset_label, xlim, filename, *, show_legend):
+    """One publication-style forest plot per dataset, with its own meaningful scale."""
     style = {
         'direct': ('Direct', '#767676', 's'),
         'bon16': ('Best-of-16', '#B64342', 'o'),
         'mcts': ('MCTS Dual', '#0F4D92', 'D'),
     }
     offsets = {'direct': 0.24, 'bon16': 0.0, 'mcts': -0.24}
-    fig, axes = plt.subplots(1, 2, figsize=(7.2, 4.2), sharex=True, sharey=True)
-    for ax, (ds, dsl) in zip(axes, DATASETS):
-        for row, (model_key, model_label) in enumerate(MODELS):
-            y = len(MODELS) - 1 - row
-            for method, (method_label, color, marker) in style.items():
-                result = A[f'{model_key}/{ds}']['methods'][method]
-                point = 100 * result['rate']
-                low, high = (100 * value for value in result['wilson95'])
-                y_pos = y + offsets[method]
-                ax.errorbar(
-                    point, y_pos, xerr=[[point - low], [high - point]], fmt=marker,
-                    color=color, ecolor=color, elinewidth=1.8, capsize=3.5,
-                    markersize=8, markeredgecolor=SURFACE, markeredgewidth=1.0, zorder=3,
-                )
-                label_offset = 8 if method != 'mcts' else -11
-                ax.annotate(
-                    f'{point:.1f}', (point, y_pos), xytext=(0, label_offset), textcoords='offset points',
-                    fontsize=8.5, color=color, ha='center',
-                    va='bottom' if label_offset > 0 else 'top',
-                )
-        ax.set_title(f'{dsl} (n={A[f"{MODELS[0][0]}/{ds}"]["n"]})', loc='left', pad=10, fontsize=12, fontweight='bold')
-        ax.set_xlim(0, 100)
-        ax.set_xticks(range(0, 101, 20))
-        ax.set_xlabel('Pass@1 (%)', fontsize=11)
-        ax.grid(axis='y', visible=False)
-        ax.spines['bottom'].set_linewidth(1.1)
-        ax.spines['left'].set_linewidth(1.1)
-    axes[0].set_yticks(range(len(MODELS)))
-    axes[0].set_yticklabels([label for _, label in MODELS][::-1], fontsize=10)
-    axes[0].set_ylim(-0.68, len(MODELS) - 0.32)
-    handles = [
-        Line2D([], [], color=color, marker=marker, linewidth=1.8, markersize=7.5,
-               label=label, markeredgecolor=SURFACE, markeredgewidth=1.0)
-        for label, color, marker in style.values()
-    ]
-    fig.legend(handles=handles, loc='upper center', ncol=3, bbox_to_anchor=(0.5, 1.03), fontsize=10)
-    fig.tight_layout(rect=(0, 0, 1, 0.91), pad=1.0)
-    save(fig, 'H1_pass_at_1', 'analysis_v3_3models.json (methods.*.rate, wilson95)')
+    fig, ax = plt.subplots(figsize=(7.2, 3.15))
+    for row, (model_key, _) in enumerate(MODELS):
+        y = len(MODELS) - 1 - row
+        for method, (method_label, color, marker) in style.items():
+            result = A[f'{model_key}/{dataset}']['methods'][method]
+            point = 100 * result['rate']
+            low, high = (100 * value for value in result['wilson95'])
+            y_pos = y + offsets[method]
+            ax.errorbar(
+                point, y_pos, xerr=[[point - low], [high - point]], fmt=marker,
+                color=color, ecolor=color, elinewidth=2.0, capsize=4,
+                markersize=8, markeredgecolor=SURFACE, markeredgewidth=1.0, zorder=3,
+            )
+            label_offset = 8 if method != 'mcts' else -11
+            ax.annotate(
+                f'{point:.1f}', (point, y_pos), xytext=(0, label_offset), textcoords='offset points',
+                fontsize=8.5, color=color, ha='center',
+                va='bottom' if label_offset > 0 else 'top',
+            )
+    n = A[f'{MODELS[0][0]}/{dataset}']['n']
+    ax.set_title(f'{dataset_label} (n={n})', loc='left', pad=10, fontsize=13, fontweight='bold')
+    ax.set_xlim(*xlim)
+    ax.set_xlabel('Pass@1 (%)', fontsize=11)
+    ax.set_yticks(range(len(MODELS)))
+    ax.set_yticklabels([label for _, label in MODELS][::-1], fontsize=10)
+    ax.set_ylim(-0.68, len(MODELS) - 0.32)
+    ax.grid(axis='y', visible=False)
+    if show_legend:
+        handles = [
+            Line2D([], [], color=color, marker=marker, linewidth=1.8, markersize=7.5,
+                   label=label, markeredgecolor=SURFACE, markeredgewidth=1.0)
+            for label, color, marker in style.values()
+        ]
+        fig.legend(handles=handles, loc='upper center', ncol=3, bbox_to_anchor=(0.62, 1.04), fontsize=10)
+        fig.tight_layout(rect=(0, 0, 1, 0.88), pad=1.0)
+    else:
+        fig.tight_layout(pad=1.0)
+    save(fig, filename, 'analysis_v3_3models.json (methods.*.rate, wilson95)')
+
+
+def h1_pass_at_1(A):
+    h1_pass_at_1_panel(A, 'apps', 'APPS-300', (8, 78), 'H1_apps_pass_at_1', show_legend=True)
+    h1_pass_at_1_panel(A, 'humaneval', 'HumanEval-164', (68, 100), 'H1_humaneval_pass_at_1', show_legend=False)
 
 
 # ---------------------------------------------------------------------------------------------- H2
 def h2_forest(A):
+    """Paired bootstrap forest plots, separated vertically for report-scale reading."""
     rows = [(mk, ml, ds, dsl) for ds, dsl in DATASETS for mk, ml in MODELS]
-    fig, axes = plt.subplots(1, 3, figsize=(7.6, 3.4), sharey=True)
-    for ax, (ck, cl) in zip(axes, COMPARISONS):
-        for j, (mk, ml, ds, dsl) in enumerate(rows):
-            y = len(rows) - 1 - j + (0.5 if ds == 'apps' else 0)
-            c = A[f'{mk}/{ds}']['comparisons'][ck]
-            lo, hi = (100 * v for v in c['boot95'])
-            sig = c['p_holm'] < 0.05
-            ax.plot([lo, hi], [y, y], color=INK2, linewidth=1.4, solid_capstyle='round')
-            ax.plot(100 * c['diff'], y, marker='o', markersize=6.5, linestyle='',
-                    markerfacecolor=INK if sig else SURFACE, markeredgecolor=INK, markeredgewidth=1.2)
-            ax.annotate(f"{c['wins']}/{c['losses']}", (1.0, y), xycoords=('axes fraction', 'data'),
-                        xytext=(4, 0), textcoords='offset points', fontsize=7, color=INK2, va='center')
-        ax.axvline(0, color=INK2, linewidth=0.9)
-        ax.set_title(cl, loc='left', fontsize=9)
-        ax.set_xlabel('Chênh lệch Pass@1 (điểm %)')
+    comparisons = (
+        ('mcts_vs_direct', 'MCTS Dual so với Direct', '#0F4D92'),
+        ('mcts_vs_bon16', 'MCTS Dual so với Best-of-16', '#0F4D92'),
+        ('bon16_vs_direct', 'Best-of-16 so với Direct', '#B64342'),
+    )
+    fig, axes = plt.subplots(3, 1, figsize=(7.2, 7.5), sharex=True)
+    ys = list(reversed(range(len(rows))))
+    x_min, x_max = -10, 31
+    for ax, (comparison, title, color) in zip(axes, comparisons):
+        for y, (mk, ml, ds, dsl) in zip(ys, rows):
+            result = A[f'{mk}/{ds}']['comparisons'][comparison]
+            point = 100 * result['diff']
+            low, high = (100 * value for value in result['boot95'])
+            significant = result['p_holm'] < 0.05
+            ax.errorbar(
+                point, y, xerr=[[point - low], [high - point]], fmt='o',
+                color=color, ecolor=color, elinewidth=2.0, capsize=4,
+                markersize=8.5, markerfacecolor=color if significant else SURFACE,
+                markeredgecolor=color, markeredgewidth=1.7, zorder=3,
+            )
+            sign = '+' if point > 0 else '−' if point < 0 else ''
+            ax.annotate(
+                f'{sign}{abs(point):.1f}', (point, y), xytext=(0, 9),
+                textcoords='offset points', ha='center', va='bottom',
+                fontsize=8.5, color=color, fontweight='bold' if significant else 'normal',
+            )
+            ax.text(
+                1.02, y, f"{result['wins']}/{result['losses']}",
+                transform=ax.get_yaxis_transform(), ha='left', va='center',
+                fontsize=8.5, color=INK2, clip_on=False,
+            )
+        ax.axvline(0, color=INK2, linewidth=1.1, zorder=1)
+        ax.axhline(2.5, color=GRID, linewidth=0.8, zorder=1)
+        ax.set_title(title, loc='left', fontsize=12, fontweight='bold', pad=8, color=color)
+        ax.text(1.02, 1.05, 'thắng/thua', transform=ax.transAxes, ha='left', va='bottom',
+                fontsize=8, color=MUTED, clip_on=False)
+        ax.set_xlim(x_min, x_max)
+        ax.set_ylim(-0.65, len(rows) - 0.35)
+        ax.set_yticks(ys)
+        ax.set_yticklabels([f'{ml} · {dsl.split("-")[0]}' for _, ml, _, dsl in rows], fontsize=9)
         ax.grid(axis='y', visible=False)
-        ax.axhline(len(rows) / 2 - 0.25, color=GRID, linewidth=0.6)
-        ax.set_ylim(-0.6, len(rows) + 1.0)
-        ax.annotate('thắng/thua', (1.0, len(rows) + 0.35), xycoords=('axes fraction', 'data'), xytext=(4, 0),
-                    textcoords='offset points', fontsize=7, color=MUTED, va='center')
-    ys = [len(rows) - 1 - j + (0.5 if ds == 'apps' else 0) for j, (_, _, ds, _) in enumerate(rows)]
-    axes[0].set_yticks(ys)
-    axes[0].set_yticklabels([f'{ml} · {dsl.split("-")[0]}' for _, ml, _, dsl in rows])
-    lo = min(min(ax.get_xlim()[0] for ax in axes), -8)
-    hi = max(ax.get_xlim()[1] for ax in axes)
-    for ax in axes:
-        ax.set_xlim(lo, hi)
-    handles = [Line2D([], [], marker='o', linestyle='', markerfacecolor=INK, markeredgecolor=INK, label='Có ý nghĩa sau Holm (p < 0,05)'),
-               Line2D([], [], marker='o', linestyle='', markerfacecolor=SURFACE, markeredgecolor=INK, label='Không có ý nghĩa sau Holm')]
-    fig.legend(handles=handles, loc='upper center', ncol=2, bbox_to_anchor=(0.5, 1.07))
-    fig.tight_layout()
-    fig.subplots_adjust(wspace=0.42)
+    axes[-1].set_xlabel('Chênh lệch Pass@1 ghép cặp (điểm %)', fontsize=11)
+    handles = [
+        Line2D([], [], marker='o', linestyle='', markerfacecolor=INK, markeredgecolor=INK,
+               markersize=8, label='Có ý nghĩa sau Holm (p < 0,05)'),
+        Line2D([], [], marker='o', linestyle='', markerfacecolor=SURFACE, markeredgecolor=INK,
+               markeredgewidth=1.5, markersize=8, label='Không có ý nghĩa sau Holm'),
+    ]
+    fig.legend(handles=handles, loc='upper center', ncol=2, bbox_to_anchor=(0.5, 1.015), fontsize=10)
+    fig.tight_layout(rect=(0, 0, 0.89, 0.965), h_pad=1.25)
     save(fig, 'H2_paired_forest', 'analysis_v3_3models.json (comparisons)',
          'Thanh ngang: CI bootstrap 95% ghép cặp. Cột số bên phải mỗi khung: số bài thắng/thua (phương pháp thứ nhất/thứ hai). Holm trên 18 so sánh.')
 
 
 # ---------------------------------------------------------------------------------------------- H3
+def h3_budget_panel(A, model_key, model_label, dataset, dataset_label):
+    """Readable two-track budget trajectories with one linear token axis per method."""
+    styles = {
+        'direct': ('Direct', '#898781', 's'),
+        'bon16': ('Best-of-$k$', '#B64342', 'o'),
+        'mcts': ('MCTS after $k$ rollouts', '#0F4D92', 'D'),
+    }
+    cell = A[f'{model_key}/{dataset}']
+    n = cell['n']
+    cost = {
+        method: cell['methods'][method]['cost']['input_tokens'] + cell['methods'][method]['cost']['output_tokens']
+        for method in ('direct', 'bon16', 'mcts')
+    }
+    ks = sorted(int(k) for k in cell['best_of_k'])
+    bok_x = [cost['bon16'] * k / 16 for k in ks]
+    bok_y = [100 * cell['best_of_k'][str(k)] / n for k in ks]
+    mcts = cell['mcts_at_k']
+    mcts_x = [mcts[str(k)]['mean_tokens'] for k in ks]
+    mcts_y = [100 * mcts[str(k)]['passed'] / n for k in ks]
+    direct_y = 100 * cell['methods']['direct']['rate']
+
+    fig, axes = plt.subplots(2, 1, figsize=(7.2, 6.4))
+    tracks = (
+        (axes[0], 'bon16', bok_x, bok_y, 'Direct and Best-of-$k$'),
+        (axes[1], 'mcts', mcts_x, mcts_y, 'MCTS after $k$ rollouts'),
+    )
+    for ax, method, xs, ys, title in tracks:
+        label, color, marker = styles[method]
+        ax.plot(xs, ys, color=color, linewidth=2.5, solid_capstyle='round', zorder=2)
+        ax.scatter(xs, ys, s=52, marker=marker, color=color, edgecolor=SURFACE, linewidth=1.0, zorder=3)
+        for index, (k, x, y) in enumerate(zip(ks, xs, ys)):
+            first_bok = method == 'bon16' and k == 1
+            dx, dy = (-12, 0) if first_bok else (0, 9 if index % 2 == 0 else -14)
+            ax.annotate(str(k), (x, y), xytext=(dx, dy), textcoords='offset points',
+                        ha='center', va='center' if first_bok else ('bottom' if dy > 0 else 'top'),
+                        fontsize=8, color=color, fontweight='bold' if k in (1, 16) else 'normal')
+        if method == 'bon16':
+            _, direct_color, direct_marker = styles['direct']
+            ax.scatter(cost['direct'], direct_y, s=68, marker=direct_marker, color=direct_color,
+                       edgecolor=SURFACE, linewidth=1.0, zorder=4)
+            ax.annotate('Direct', (cost['direct'], direct_y), xytext=(0, 8), textcoords='offset points',
+                        ha='center', va='bottom', fontsize=9, color=direct_color)
+            all_y = ys + [direct_y]
+        else:
+            all_y = ys
+        margin = max(3, (max(all_y) - min(all_y)) * 0.22)
+        ax.set_ylim(max(0, min(all_y) - margin), min(100, max(all_y) + margin))
+        ax.set_xlim(0, max(xs) * 1.08)
+        ax.set_title(title, loc='left', fontsize=11, fontweight='bold', color=color, pad=8)
+        ax.set_ylabel('Pass@1 (%)', fontsize=11)
+        ax.set_xlabel('Tokens / problem (linear scale)', fontsize=10)
+        ax.xaxis.set_major_formatter(matplotlib.ticker.FuncFormatter(
+            lambda value, _: f'{value / 1000:g}k' if value >= 1000 else f'{value:g}'))
+        ax.grid(False)
+        ax.tick_params(labelsize=9)
+    handles = [
+        Line2D([], [], marker=marker, color=color, linewidth=2.0, markersize=7,
+               markeredgecolor=SURFACE, markeredgewidth=0.9, label=label)
+        for label, color, marker in styles.values()
+    ]
+    fig.suptitle(f'{model_label} · {dataset_label}', y=0.99, fontsize=16, fontweight='bold')
+    fig.legend(handles=handles, loc='upper center', ncol=3, bbox_to_anchor=(0.5, 0.955),
+               fontsize=10.5, columnspacing=1.7)
+    fig.text(0.99, 0.01, 'Number on each colored marker = $k$ (1–16); the two tracks have independent linear token axes.',
+             ha='right', va='bottom', fontsize=8, color=MUTED)
+    fig.tight_layout(rect=(0, 0.04, 1, 0.88), h_pad=1.65)
+    save(fig, f'H3_budget_{model_key}_{dataset}', 'analysis_v3_3models.json (best_of_k, mcts_at_k, methods)')
+
+
 def h3_cost_curve(A):
-    fig, axes = plt.subplots(2, 3, figsize=(7.6, 4.9))
-    for r, (ds, dsl) in enumerate(DATASETS):
-        for c, (mk, ml) in enumerate(MODELS):
-            ax = axes[r][c]
-            cell = A[f'{mk}/{ds}']
-            n = cell['n']
-            t = {m: cell['methods'][m]['cost']['input_tokens'] + cell['methods'][m]['cost']['output_tokens'] for m, _ in METHODS}
-            ks = sorted(int(k) for k in cell['best_of_k'])
-            # Samples are i.i.d., so the expected cost of the first k samples is k/16 of the Best-of-16 cost.
-            xs = [t['bon16'] * k / 16 for k in ks]
-            ys = [100 * cell['best_of_k'][str(k)] / n for k in ks]
-            ax.plot(xs, ys, color=COLOR['bon16'], linewidth=1.8)
-            mk_idx = [k - 1 for k in (1, 2, 4, 8, 16)]
-            ax.plot([xs[i] for i in mk_idx], [ys[i] for i in mk_idx], color=COLOR['bon16'], marker='o', markersize=4,
-                    markeredgecolor=SURFACE, markeredgewidth=0.8, linestyle='')
-            # Only k=1 is labelled: the right end of each curve is k=16 (stated in the legend).
-            ax.annotate('k=1', (xs[0], ys[0]), xytext=(6, -10), textcoords='offset points', fontsize=7, color=INK2)
-            # MCTS@k: the run truncated after k rollouts (offline, analysis_v3.py), local re-judge.
-            at = cell.get('mcts_at_k')
-            if at:
-                mx = [at[str(k)]['mean_tokens'] for k in ks]
-                my = [100 * at[str(k)]['passed'] / n for k in ks]
-                ax.plot(mx, my, color=COLOR['mcts'], linewidth=1.8)
-                ax.plot([mx[i] for i in mk_idx], [my[i] for i in mk_idx], color=COLOR['mcts'], marker='D', markersize=3.6,
-                        markeredgecolor=SURFACE, markeredgewidth=0.8, linestyle='')
-                ax.annotate('k=1', (mx[0], my[0]), xytext=(6, -10), textcoords='offset points', fontsize=7, color=INK2)
-            for m in ('direct', 'mcts'):
-                ax.plot(t[m], 100 * cell['methods'][m]['rate'], marker=MARKER[m], color=COLOR[m], markersize=7,
-                        markeredgecolor=SURFACE, markeredgewidth=1.0, linestyle='')
-            ratio = t['mcts'] / t['bon16']
-            ax.annotate(f'×{vn(ratio)} token\nso với BoN16', (t['mcts'], 100 * cell['methods']['mcts']['rate']),
-                        xytext=(0, -24), textcoords='offset points', fontsize=7, color=INK2, ha='center')
-            ax.set_xscale('log')
-            ax.set_title(f'{ml} · {dsl.split("-")[0]}', loc='left', fontsize=9)
-            if c == 0:
-                ax.set_ylabel('Pass@1 (%)')
-            if r == 1:
-                ax.set_xlabel('Token trung bình mỗi bài (thang log)')
-            ax.xaxis.set_major_formatter(matplotlib.ticker.FuncFormatter(
-                lambda v, _: f'{int(v / 1000)}k' if v >= 1000 else f'{int(v)}'))
-            ax.xaxis.set_minor_formatter(matplotlib.ticker.NullFormatter())
-            ax.set_xlim(min(t['direct'], at['1']['mean_tokens'] if at else t['direct']) / 1.8, t['mcts'] * 1.8)
-    for r in range(2):
-        lo = min(axes[r][c].get_ylim()[0] for c in range(3))
-        hi = max(axes[r][c].get_ylim()[1] for c in range(3))
-        for c in range(3):
-            axes[r][c].set_ylim(lo - 5, hi + 3)
-    handles = [Line2D([], [], color=COLOR['direct'], marker=MARKER['direct'], linestyle='', markersize=6, label='Direct'),
-               Line2D([], [], color=COLOR['bon16'], marker='o', markersize=3.5, linewidth=1.8, label='Best-of-k (k = 1…16)'),
-               Line2D([], [], color=COLOR['mcts'], marker='D', markersize=3.5, linewidth=1.8, label='RethinkMCTS sau k rollout'),
-               Line2D([], [], color=COLOR['mcts'], marker=MARKER['mcts'], linestyle='', markersize=6, label='RethinkMCTS (16 rollout)')]
-    fig.legend(handles=handles, loc='upper center', ncol=2, bbox_to_anchor=(0.5, 1.07))
-    fig.tight_layout()
-    save(fig, 'H3_cost_vs_pass', 'analysis_v3_3models.json (best_of_k, methods); runs/v3_*/problems/*/completed.json (usage)',
-         'Best-of-k: chọn theo public test trong k mẫu đầu; token = k/16 token của Best-of-16. RethinkMCTS sau k rollout: '
-         'cắt lần chạy sau rollout thứ k, chọn như lần chạy đầy đủ.\nCác đường chấm lại hidden trên máy local; hai điểm Direct '
-         'và RethinkMCTS (16 rollout) là kết quả chính thức. Token = input + output trung bình mỗi bài.')
+    for dataset, dataset_label in DATASETS:
+        for model_key, model_label in MODELS:
+            h3_budget_panel(A, model_key, model_label, dataset, dataset_label)
 
 
-# ---------------------------------------------------------------------------------------------- H4
-def h4_difficulty(A):
-    fig, axes = plt.subplots(1, 3, figsize=(7.4, 2.9), sharey=True)
-    x = range(len(DIFFICULTIES))
-    for ax, (mk, ml) in zip(axes, MODELS):
-        bd = A[f'{mk}/apps']['by_difficulty']
-        for m, _ in METHODS:
-            ys = [100 * bd[d][m] / bd[d]['n'] for d, _ in DIFFICULTIES]
-            ax.plot(x, ys, color=COLOR[m], marker=MARKER[m], markersize=6, linewidth=1.8,
-                    markeredgecolor=SURFACE, markeredgewidth=1.0)
-        ax.set_xticks(list(x))
-        ax.set_xticklabels([l for _, l in DIFFICULTIES])
-        ax.set_xlim(-0.3, len(DIFFICULTIES) - 0.7)
-        ax.set_title(ml, loc='left')
-        ax.grid(axis='x', visible=False)
-    axes[0].set_ylabel('Pass@1 (%), 100 bài mỗi mức')
-    axes[0].set_ylim(0, 90)
-    fig.tight_layout()
-    method_legend(fig, loc='upper center', ncol=3, bbox_to_anchor=(0.5, 1.08))
-    save(fig, 'H4_apps_by_difficulty', 'analysis_v3_3models.json (by_difficulty)')
 
 
 # ---------------------------------------------------------------------------------------------- H5
 def h5_search_stages(A):
-    stages = [('first_program', 'Chương trình đầu tiên'), ('no_critic', 'Sau search, chọn theo test'),
-              ('selected_local', 'Sau search, chọn theo test + critic')]
-    fig, axes = plt.subplots(1, 2, figsize=(7.4, 3.0), gridspec_kw={'width_ratios': [1, 1]})
-    w = 0.26
-    for ax, (ds, dsl) in zip(axes, DATASETS):
-        for i, (mk, ml) in enumerate(MODELS):
-            cell = A[f'{mk}/{ds}']
-            om, n = cell['offline_mcts'], cell['n']
-            for s, (sk, _) in enumerate(stages):
-                ax.bar(i + (s - 1) * (w + 0.02), 100 * om[sk] / n, width=w, color=STAGE_COLOR[s], linewidth=0)
-            sv = om['search_vs_first_program']
-            cv = om['critic_vs_no_critic']
-            top = max(100 * om[sk] / n for sk, _ in stages)
-            ax.annotate(f"search: +{sv['wins']}/−{sv['losses']}\ncritic: +{cv['wins']}/−{cv['losses']}", (i, top),
-                        xytext=(0, 4), textcoords='offset points', fontsize=7, color=INK2, ha='center', va='bottom')
-        ax.set_xticks(range(len(MODELS)))
-        ax.set_xticklabels([ml for _, ml in MODELS], fontsize=8)
-        ax.set_title(dsl, loc='left')
-        ax.grid(axis='x', visible=False)
-        ax.set_ylim(0, 114 if ds == 'humaneval' else 85)
-        ax.set_yticks(range(0, 101 if ds == 'humaneval' else 81, 20))
-    axes[0].set_ylabel('Pass@1 (%)')
-    handles = [plt.Rectangle((0, 0), 1, 1, color=STAGE_COLOR[s], label=l) for s, (_, l) in enumerate(stages)]
-    fig.legend(handles=handles, loc='upper center', ncol=3, bbox_to_anchor=(0.5, 1.07), fontsize=8)
-    fig.tight_layout()
+    """Offline selection trajectories on the same MCTS Dual candidate trees."""
+    stages = (
+        ('first_program', 'Ứng viên đầu tiên', '#767676'),
+        ('no_critic', 'Sau search', '#0F4D92'),
+        ('selected_local', 'Sau critic', '#9A4D8E'),
+    )
+    fig, axes = plt.subplots(2, 3, figsize=(7.4, 5.2), sharex=True, sharey='row')
+    x = [0, 1, 2]
+    for row, (ds, dataset_label) in enumerate(DATASETS):
+        for column, (model_key, model_label) in enumerate(MODELS):
+            ax = axes[row][column]
+            result = A[f'{model_key}/{ds}']
+            offline, n = result['offline_mcts'], result['n']
+            values = [100 * offline[key] / n for key, _, _ in stages]
+            ax.plot(x, values, color=INK2, linewidth=1.8, zorder=1)
+            for index, ((_, _, color), value) in enumerate(zip(stages, values)):
+                ax.scatter(index, value, s=58, color=color, edgecolor=SURFACE, linewidth=1.0, zorder=3)
+                ax.annotate(f'{value:.1f}', (index, value), xytext=(0, 7), textcoords='offset points',
+                            ha='center', va='bottom', fontsize=8, color=color, fontweight='bold')
+            search = offline['search_vs_first_program']
+            critic = offline['critic_vs_no_critic']
+            ax.text(
+                0.5, 0.045, f"S +{search['wins']}/−{search['losses']}   C +{critic['wins']}/−{critic['losses']}",
+                transform=ax.transAxes, ha='center', va='bottom', fontsize=7.2, color=INK2,
+                bbox=dict(boxstyle='round,pad=0.23', facecolor=SURFACE, edgecolor=GRID, linewidth=0.6),
+            )
+            ax.set_title(model_label, loc='left', fontsize=10, fontweight='bold', pad=7)
+            ax.set_xticks(x)
+            ax.set_xticklabels(['Ứng viên\nđầu', 'Sau\nsearch', 'Sau\ncritic'], fontsize=7.5)
+            ax.grid(axis='x', visible=False)
+            ax.set_xlim(-0.25, 2.25)
+            ax.set_ylim((0, 75) if ds == 'apps' else (70, 100))
+            ax.set_yticks(range(0, 76, 20) if ds == 'apps' else range(70, 101, 10))
+            if column == 0:
+                ax.set_ylabel(f'{dataset_label}\nPass@1 (%)', fontsize=9.5)
+    handles = [
+        Line2D([], [], color=INK2, marker='o', markerfacecolor=color, markeredgecolor=SURFACE,
+               markeredgewidth=1.0, linewidth=1.8, markersize=7, label=label.replace('\n', ' '))
+        for _, label, color in stages
+    ]
+    fig.legend(handles=handles, loc='upper center', ncol=3, bbox_to_anchor=(0.5, 1.025), fontsize=9.5)
+    fig.text(0.5, 0.005, 'S/C: số bài thắng/thua ghép cặp của search/critic so với bước liền trước',
+             ha='center', va='bottom', fontsize=7.5, color=MUTED)
+    fig.tight_layout(rect=(0, 0.045, 1, 0.94), w_pad=1.0, h_pad=1.35)
     save(fig, 'H5_mcts_stages', 'analysis_v3_3models.json (offline_mcts)',
-         'Chọn lại offline trên cây MCTS, chấm hidden trên máy local. Chú thích trên cột: số bài thắng/thua của bước so với bước trước.')
+         'Ba bước dùng cùng candidate tree của MCTS Dual và cùng local hidden judge; đây là chọn lại offline, không phải ba run độc lập.')
 
 
 # ---------------------------------------------------------------------------------------------- H6
 def h6_tokens_by_role():
-    fig, axes = plt.subplots(1, 2, figsize=(7.6, 2.9), sharey=True)
-    labels = []
-    for ax, (ds, dsl) in zip(axes, DATASETS):
-        for i, (mk, ml) in enumerate(MODELS):
-            rt = role_tokens(f'v3_{ds}_{mk}_mcts')
-            for j, kind in enumerate(('input', 'output')):
-                y = (len(MODELS) - 1 - i) * 2.6 + (0.55 if kind == 'input' else -0.55)
+    fig, axes = plt.subplots(2, 3, figsize=(7.4, 5.1), sharey=True, sharex='row')
+    role_hatch = dict(zip((role for role, _ in ROLES), ('///', '', '\\\\\\', 'xx', '..')))
+    role_data = {
+        (ds, mk): role_tokens(f'v3_{ds}_{mk}_mcts')
+        for ds, _ in DATASETS for mk, _ in MODELS
+    }
+    for row, (ds, dataset_label) in enumerate(DATASETS):
+        row_max = max(
+            sum(role_data[(ds, mk)].get((role, kind), 0) for role, _ in ROLES)
+            for mk, _ in MODELS for kind in ('input', 'output')
+        ) / 1000
+        for col, (model_key, model_label) in enumerate(MODELS):
+            ax = axes[row, col]
+            tokens = role_data[(ds, model_key)]
+            for y, kind in ((1, 'input'), (0, 'output')):
                 left = 0
                 for role, _ in ROLES:
-                    v = rt.get((role, kind), 0) / 1000
-                    if v > 0:
-                        ax.barh(y, v, left=left, height=0.9, color=ROLE_COLOR[role], edgecolor=SURFACE, linewidth=1.0)
-                    left += v
-                ax.annotate(f'{vn(left, 0)}k', (left, y), xytext=(3, 0), textcoords='offset points',
-                            fontsize=7, color=INK2, va='center')
-                if ax is axes[0]:
-                    labels.append((y, f'{ml} · {"input" if kind == "input" else "output"}'))
-        ax.set_title(f'{dsl}: RethinkMCTS', loc='left')
-        ax.set_xlabel('Nghìn token trung bình mỗi bài')
-        ax.grid(axis='y', visible=False)
-        ax.set_xlim(0, ax.get_xlim()[1] * 1.12)
-    axes[0].set_yticks([y for y, _ in labels])
-    axes[0].set_yticklabels([l for _, l in labels], fontsize=8)
-    handles = [plt.Rectangle((0, 0), 1, 1, color=ROLE_COLOR[r], label=l) for r, l in ROLES]
-    fig.legend(handles=handles, loc='upper center', ncol=5, bbox_to_anchor=(0.5, 1.07), fontsize=8)
-    fig.tight_layout()
-    save(fig, 'H6_mcts_tokens_by_role', 'runs/v3_*_mcts/problems/*/requests.json (tokens per request, by role)')
+                    value = tokens.get((role, kind), 0) / 1000
+                    if value:
+                        ax.barh(y, value, left=left, height=0.56, color=ROLE_COLOR[role],
+                                edgecolor=INK, linewidth=0.65, hatch=role_hatch[role])
+                    left += value
+                ax.annotate(f'{vn(left, 1)}k', (left, y), xytext=(3, 0), textcoords='offset points',
+                            fontsize=8.2, color=INK2, va='center', fontweight='bold')
+            ax.set_xlim(0, row_max * 1.19)
+            ax.set_yticks((1, 0), ('Input', 'Output'))
+            ax.set_title(model_label, loc='left', fontsize=10, fontweight='bold', pad=7)
+            ax.grid(axis='y', visible=False)
+            ax.tick_params(labelsize=8.5)
+            if col == 0:
+                ax.set_ylabel(dataset_label, fontsize=10, fontweight='bold', color=INK2)
+            ax.set_xlabel('Nghìn token / bài', fontsize=9)
+    handles = [
+        plt.Rectangle((0, 0), 1, 1, facecolor=ROLE_COLOR[role], edgecolor=INK,
+                      linewidth=0.65, hatch=role_hatch[role], label=label)
+        for role, label in ROLES
+    ]
+    fig.legend(handles=handles, loc='upper center', ncol=5, bbox_to_anchor=(0.5, 1.005),
+               fontsize=9, columnspacing=1.1, handlelength=2, handleheight=1.1)
+    fig.text(0.5, 0.012, 'Giá trị cuối mỗi thanh là tổng token trung bình; màu và họa tiết phân biệt vai trò request LLM.',
+             ha='center', va='bottom', fontsize=7.7, color=MUTED)
+    fig.tight_layout(rect=(0, 0.06, 1, 0.91), w_pad=1.1, h_pad=1.55)
+    save(fig, 'H6_mcts_tokens_by_role', 'runs/v3_raw_archives/v3_*_mcts.heavy.tar.gz (requests.json)')
 
 
 def main():
@@ -320,7 +389,6 @@ def main():
     h1_pass_at_1(A)
     h2_forest(A)
     h3_cost_curve(A)
-    h4_difficulty(A)
     h5_search_stages(A)
     h6_tokens_by_role()
 

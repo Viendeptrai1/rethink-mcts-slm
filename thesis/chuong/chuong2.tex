@@ -1,21 +1,143 @@
-\chapter{THIẾT KẾ VÀ CÀI ĐẶT HỆ THỐNG}
+\chapter{CÁC PHƯƠNG PHÁP CẢI THIỆN KHẢ NĂNG SUY LUẬN TRONG SINH MÃ NGUỒN}
 \label{chap:caidat}
-
-\section{YÊU CẦU VÀ NGUYÊN TẮC THIẾT KẾ}
-\lipsumtodo{Tái hiện đúng bài báo, chống rò rỉ hidden test, mọi run có thể kiểm tra lại (manifest, hash).}
 
 \section{KIẾN TRÚC TỔNG THỂ}
 \lipsumtodo{Ports \& adapters: domain, policies, ports, adapters, application; bootstrap là nơi duy nhất nối các thành phần. Sơ đồ thành phần/lớp (UML).}
 
-\section{CÁC THÀNH PHẦN CHÍNH}
-\subsection{Bộ máy tìm kiếm MCTS}
-\lipsumtodo{}
-\subsection{Đánh giá ứng viên và phản hồi}
-\lipsumtodo{CandidateEvaluator, FeedbackService, phân tích block bằng CFG và trace.}
-\subsection{Thực thi mã và chấm điểm}
-\lipsumtodo{Executor, HiddenJudge, sandbox.}
-\subsection{Lưu vết và tiếp tục chạy}
-\lipsumtodo{Artifact schema 2, manifest, resume theo từng bài.}
+\section{CHI TIẾT CÁC PHƯƠNG PHÁP}
+\subsection{Direct}
+\subsection{Best-of-16}
+\subsection{MCTS Dual}
+\label{sec:mcts-dual-thuat-toan}
+% Tài liệu người viết cung cấp, đã đối chiếu cùng mã nguồn v3.1:
+% https://app.notion.com/p/C-i-thi-n-kh-n-ng-suy-lu-n-c-a-LLM-trong-sinh-m-ngu-n-b-ng-Monte-Carlo-Tree-Search-v-i-ph-n-h-i-t--3cb237ee8daa8116af1bc868548550cd?source=copy_link
+% https://app.notion.com/p/Huy-s-RethinkMCTS-3d1237ee8daa80b4b835dae68d257a59?source=copy_link
+% Nguồn thuật toán: src/rethink_mcts/application/search.py, domain/tree.py,
+% policies/{selection,prior,reward,backup}.py và configs/v3_7b/*_mcts.yaml.
+MCTS Dual tổ chức tìm kiếm theo chuỗi thought, kế thừa RethinkMCTS~\cite{li2024rethinkmcts}. Mỗi bài được xử lý bằng một cây tìm kiếm; chương trình sinh ra được kiểm tra bằng public test trong quá trình tìm kiếm và chỉ chương trình cuối cùng được chấm bằng hidden test.
 
-\section{TRIỂN KHAI TRÊN GPU}
-\lipsumtodo{vLLM, Colab A100 và Modal; quy trình đóng băng commit.}
+\subsubsection{Định nghĩa State và Action}
+Với đề bài $P$, trạng thái và hành động tại node đang xét được biểu diễn:
+\[
+  \begin{aligned}
+    S &= (P,z_1,z_2,\ldots,z_t),\\
+    a &= z_{t+1}.
+  \end{aligned}
+\]
+Trong đó:
+\begin{itemize}
+  \item $P$: nội dung đề bài (\emph{problem description}).
+  \item $z_1,\ldots,z_t$: chuỗi thought đã tích lũy từ gốc đến node hiện tại.
+  \item $a=z_{t+1}$: một thought mới được thêm vào đường đi.
+\end{itemize}
+
+Việc lưu chuỗi thought giữ lại các bước lập luận dẫn đến chương trình, thay vì chỉ giữ mã nguồn đã sinh. Ý tưởng lập kế hoạch trước khi viết code cũng được nghiên cứu trong phương pháp Self-planning Code Generation~\cite{jiang2023selfplanning}. Tuy nhiên, một chuỗi thought hợp lý không bảo đảm chương trình sinh ra luôn đúng; chương trình vẫn cần được kiểm thử.
+
+\subsubsection{Selection}
+\textbf{Mục tiêu:} chọn nhánh để tiếp tục tìm kiếm, cân bằng giữa hai yêu cầu:
+\begin{itemize}
+  \item \textbf{Exploitation:} ưu tiên nhánh đã đạt giá trị tốt dựa trên các lần đánh giá trước.
+  \item \textbf{Exploration:} khảo sát những nhánh ít được thăm để không bỏ qua các hướng giải khác.
+\end{itemize}
+
+Với node cha $s$, action $a$ và node con tương ứng $s'$, điểm P-UCB được tính:
+\begin{align}
+  \operatorname{P\!-\!UCB}(s,a)
+  &= Q(s,a)+\beta(s)\cdot p(a\mid s)\cdot
+     \frac{\sqrt{\log(N(s))}}{1+N(s')},\\
+  \beta(s)
+  &= \log\left(\frac{N(s)+c_{\mathrm{base}}+1}{c_{\mathrm{base}}}\right)+c.
+\end{align}
+\begin{center}
+\renewcommand{\arraystretch}{1.35}
+\begin{tabularx}{\linewidth}{|>{\centering\arraybackslash}p{3cm}|X|}
+  \hline
+  Ký hiệu & Ý nghĩa \\
+  \hline
+  $Q(s,a)$ & Giá trị nhánh được cập nhật theo Max backup. \\
+  \hline
+  $N(s)$ & Số lần node cha $s$ đã được thăm. \\
+  \hline
+  $N(s')$ & Số lần node con $s'$ tương ứng với action $a$ đã được thăm. \\
+  \hline
+  $p(a\mid s)$ & Trọng số tiên nghiệm của thought $a$ do LLM đề xuất tại bước expansion. \\
+  \hline
+  $c_{\mathrm{base}},c$ & Các hệ số P-UCB; cấu hình dùng $c_{\mathrm{base}}=10$ và $c=4$. \\
+  \hline
+\end{tabularx}
+\end{center}
+
+Thành phần $Q(s,a)$ phản ánh giá trị tốt nhất đã được giữ lại qua Max backup, còn thành phần thứ hai điều chỉnh mức ưu tiên khám phá theo prior và số lượt thăm. Giá trị prior lớn cho thấy LLM đánh giá thought đó hợp lý hơn trong tập đề xuất, nhưng không bảo đảm thought đó đúng. Hàm $\beta(s)$ tăng theo số lượt thăm của node cha và điều chỉnh trọng số khám phá; tác dụng thực tế của nó còn phụ thuộc prior và số lần thăm node con.
+
+Ở mỗi tầng, hệ thống bỏ qua các node con đã đóng. Nếu còn node con chưa được thăm, node có prior lớn nhất được ưu tiên; sau khi các node con hợp lệ đã được thăm, hệ thống dùng điểm P-UCB để chọn nhánh tiếp theo. Quá trình duyệt tiếp tục đến node cần đánh giá hoặc mở rộng.
+
+\subsubsection{Expansion}
+\textbf{Mục tiêu:} từ trạng thái hiện tại, sinh một tập hữu hạn các thought ứng viên trong không gian ý tưởng mở. Mỗi thought $z^i$ đi kèm điểm hợp lý $e^i$ do LLM trả về. Gọi $f$ là phản hồi từ lần đánh giá gần nhất của node cha.
+
+\textbf{Kịch bản A — Có phản hồi lỗi:} nếu chương trình tại node cha chưa vượt toàn bộ public test và có feedback, LLM nhận thêm $f$ khi đề xuất các thought:
+\begin{equation}
+  [(z^1,e^1),\ldots,(z^k,e^k)]
+  \sim p\!\left((z,e)^{(1\ldots k)}\mid s,f\right).
+  \tag{A}
+\end{equation}
+
+\textbf{Kịch bản B — Không có phản hồi lỗi:} khi không có feedback lỗi, chẳng hạn node cha đã vượt public test hoặc đang xét node gốc, LLM đề xuất thought từ trạng thái $s$:
+\begin{equation}
+  [(z^1,e^1),\ldots,(z^k,e^k)]
+  \sim p\!\left((z,e)^{(1\ldots k)}\mid s\right).
+  \tag{B}
+\end{equation}
+
+Sau khi lọc các đề xuất rỗng, gộp thought trùng và chuẩn hóa điểm hợp lý, hệ thống dùng điểm đã chuẩn hóa làm prior $p(a\mid s)$ cho selection. Cấu hình v3.1 yêu cầu tối đa $k=3$ thought. Với thought $z^i$, trạng thái của node con được cập nhật:
+\[
+  S_{\mathrm{new}}
+  = \operatorname{CONCAT}(s,z^i)
+  = (P,z_1,z_2,\ldots,z_t,z^i).
+\]
+Như vậy, node con giữ chuỗi thought từ gốc và bổ sung ý tưởng mới, thay vì chỉ giữ thought vừa sinh.
+
+\subsubsection{Evaluation}
+\textbf{Mục tiêu:} ước lượng chất lượng của node bằng cách sinh một chương trình hoàn chỉnh từ chuỗi thought hiện tại và đánh giá trực tiếp chương trình đó trên public test. Reward được dùng làm tín hiệu cho tìm kiếm; nó không phải xác suất thống kê bảo đảm chương trình sẽ đúng.
+
+Công thức Dual Evaluation:
+\[
+  \operatorname{reward}=
+  \begin{cases}
+    v_{\mathrm{test}}, & \text{nếu } 0\le v_{\mathrm{test}}<1,\\
+    a\times v_{\mathrm{test}}+b\times v_{\mathrm{llm}},
+      & \text{nếu } v_{\mathrm{test}}=1.
+  \end{cases}
+\]
+\[
+  v_{\mathrm{test}}
+  =\frac{\text{số public test đạt}}{\text{tổng số public test}}.
+\]
+Trong đó, $v_{\mathrm{llm}}$ là điểm do LLM critic đánh giá; $a=0{,}8$ và $b=0{,}2$ là trọng số trong cấu hình thực nghiệm, với $v_{\mathrm{llm}}\in[-1,1]$.
+
+Nếu chương trình chưa vượt toàn bộ public test, reward chỉ dựa trên tỷ lệ test đạt. Nếu vượt toàn bộ public test, critic được gọi để cung cấp thêm tín hiệu đánh giá. Public test chỉ bao phủ một phần trường hợp, vì vậy điểm critic có thể giúp phân biệt các ứng viên cùng vượt public test, nhưng không chứng minh chương trình đúng trên mọi đầu vào. Nếu không có điểm critic hợp lệ, hệ thống dùng $v_{\mathrm{test}}$ làm reward; hidden test chỉ dùng để chấm kết quả cuối.
+
+\subsubsection{Backpropagation}
+Với mỗi evaluation có reward hợp lệ, hệ thống truyền reward $r$ từ node vừa đánh giá ngược lên các node tổ tiên đến gốc. Với Max backup, giá trị mỗi node trên đường đi được cập nhật:
+\[
+  Q(s,a)\leftarrow\max\!\left(Q(s,a)_{\mathrm{cũ}},r\right).
+\]
+Đồng thời, số lượt thăm của các node trên đường đi tăng thêm một. Khác với phép lấy trung bình, Max backup giữ giá trị lớn nhất đã được cập nhật kể từ trạng thái khởi tạo của node. Node mới bắt đầu với $Q=0$; khi thought ở node lá được sửa, thống kê của node lá được đặt lại cho revision mới.
+
+\subsubsection{Rethink}
+Khi chương trình không vượt toàn bộ public test, hệ thống có thể dùng phản hồi kiểm thử để sửa thought ở node lá. Theo ký hiệu của phương pháp, thought mới được sinh từ trạng thái $s$, feedback $f$ và thought cũ:
+\[
+  z_{\mathrm{new}}\sim p\!\left(z\mid s,f,z_{\mathrm{old}}\right).
+\]
+Trong cài đặt, prompt còn nhận mã nguồn vừa sinh và thông tin giao diện thực thi. Phản hồi được tạo từ kết quả public test và thông tin thực thi; cấu hình \texttt{block} có thể sử dụng phân tích các block đã chạy để hỗ trợ xác định lỗi.
+
+Thought đang hoạt động được cập nhật $z_{\mathrm{old}}\rightarrow z_{\mathrm{new}}$ tại cùng node lá, không tạo node hay nhánh mới. Phiên bản thought cũ vẫn được lưu để truy vết. Sau khi sửa, hệ thống sinh lại toàn bộ chương trình, chạy public test và backup reward hợp lệ.
+
+\begin{minipage}{\linewidth}
+\textbf{Điều kiện kích hoạt:} chương trình chưa vượt toàn bộ public test là điều kiện để xét rethink:
+\[
+  \text{Xét rethink} \Longleftarrow v_{\mathrm{test}}\ne 1.
+\]
+Trong cài đặt, rethink chỉ thực sự được gọi khi còn đủ ngân sách và chưa vượt số lần cho phép; vì vậy không phải mọi trường hợp $v_{\mathrm{test}}\ne1$ đều hoàn tất rethink. Cấu hình cho phép tối đa một lần rethink mỗi node. Lần sinh lại không tính là một rollout mới, nhưng vẫn tiêu thụ lời gọi model và token. Rethink không bảo đảm chương trình sau sửa đã đúng.
+\end{minipage}
+
+\subsection{MCTS Test-only}

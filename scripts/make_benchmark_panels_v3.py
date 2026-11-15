@@ -27,10 +27,10 @@ MODELS = [
 ]
 # Palette figures4papers; hatch giúp phân biệt Test-only khi in đen trắng.
 METHODS = [
-    ("direct", "Direct", "#CFCECE", ""),
+    ("direct", "Direct", "#898781", ""),
     ("bon16", "Best-of-16", "#B64342", ""),
     ("mcts", "MCTS Dual", "#0F4D92", ""),
-    ("test_only", "MCTS Test-only", "#8BCF8B", "//"),
+    ("test_only", "MCTS Test-only", "#7ABD85", "//"),
 ]
 LEVELS = ["introductory", "interview", "competition"]
 
@@ -136,19 +136,21 @@ def build_data():
 
 def plot_panels(data, metric, title, ylabel, filename, *, portrait):
     if portrait:
-        fig, axes = plt.subplots(3, 1, figsize=(7.2, 10), sharey=True)
-        fig.subplots_adjust(left=0.12, right=0.98, bottom=0.06, top=0.84, hspace=0.45)
+        fig, axes = plt.subplots(3, 1, figsize=(7.8, 11), sharey=True)
+        fig.subplots_adjust(left=0.13, right=0.98, bottom=0.055, top=0.85, hspace=0.55)
     else:
-        fig, axes = plt.subplots(1, 3, figsize=(16, 5.8), sharey=True)
-        fig.subplots_adjust(left=0.065, right=0.99, bottom=0.12, top=0.75, wspace=0.10)
+        fig, axes = plt.subplots(1, 3, figsize=(16, 6), sharey=True)
+        fig.subplots_adjust(left=0.065, right=0.99, bottom=0.13, top=0.75, wspace=0.12)
     fig.suptitle(title, y=0.98, fontsize=20, fontweight="bold")
-    handles = [Patch(facecolor=color, edgecolor="#333333", hatch=hatch, label=label)
+    handles = [Patch(facecolor=color, edgecolor="#333333", linewidth=0.8,
+                     hatch=hatch, label=label)
                for _, label, color, hatch in METHODS]
     fig.legend(handles=handles, loc="upper center",
-               bbox_to_anchor=(0.53, 0.94 if portrait else 0.91),
+               bbox_to_anchor=(0.5, 0.945 if portrait else 0.91),
                ncol=2 if portrait else 4, frameon=False,
-               fontsize=11 if portrait else 13, handlelength=1.6)
+               fontsize=12 if portrait else 13, handlelength=1.5, columnspacing=1.2)
     is_he = metric == "humaneval_pass_at_1"
+    portrait_labels = []
     for ax, (model, label) in zip(axes, MODELS):
         for index, (method, _, color, hatch) in enumerate(METHODS):
             if is_he:
@@ -160,14 +162,17 @@ def plot_panels(data, metric, title, ylabel, filename, *, portrait):
                 values = data[model][method][metric]
                 width = 0.18
             bars = ax.bar(positions, values, width=width, color=color, edgecolor="#333333",
-                          linewidth=0.7, hatch=hatch, zorder=3)
-            ax.bar_label(bars, labels=[f"{v:.2f}" for v in values], padding=3,
-                         fontsize=11 if is_he else 9, rotation=0 if is_he else 90)
-        ax.set_title(label, fontsize=15, pad=12)
+                          linewidth=0.8, hatch=hatch, zorder=3)
+            labels = ax.bar_label(bars, labels=[f"{v:.2f}" for v in values], padding=3,
+                                  fontsize=12 if is_he else 9,
+                                  rotation=0 if portrait or is_he else 90)
+            if portrait and not is_he:
+                portrait_labels.extend(labels)
+        ax.set_title(label, fontsize=15, pad=10, fontweight="semibold")
         # Cột bắt đầu từ 0; cùng thang đo cho cả ba model, không phóng đại chênh lệch.
-        ax.set_ylim(0, 115)
+        ax.set_ylim(0, 125)
         ax.set_yticks(np.arange(0, 101, 20))
-        ax.grid(axis="y", color="#D6D6D6", linewidth=0.6, zorder=0)
+        ax.grid(axis="y", color="#E2E2E2", linewidth=0.6, zorder=0)
         ax.tick_params(axis="both", length=0, labelsize=12, pad=7)
         if is_he:
             ax.set_xticks(range(4), ["Direct", "Best-of-16", "MCTS\nDual", "MCTS\nTest-only"])
@@ -175,8 +180,28 @@ def plot_panels(data, metric, title, ylabel, filename, *, portrait):
             ax.set_xticks(range(4), ["Intro", "Inter", "Comp", "Average" if metric == "apps_pr" else "Overall"])
         ax.spines[["top", "right"]].set_visible(False)
         ax.spines[["left", "bottom"]].set_linewidth(1.2)
+        ax.spines[["left", "bottom"]].set_color("#000000")
     for ax in axes if portrait else axes[:1]:
         ax.set_ylabel(ylabel, fontsize=14)
+    # Ưu tiên nhãn ngang; chỉ xoay nhãn bị chồng sau khi bố trí toàn hình.
+    if portrait_labels:
+        rotated = set()
+        while True:
+            fig.canvas.draw()
+            renderer = fig.canvas.get_renderer()
+            bounds = [label.get_window_extent(renderer).expanded(1.05, 1.05)
+                      for label in portrait_labels]
+            overlapping = set()
+            for index, box in enumerate(bounds):
+                for other in range(index + 1, len(bounds)):
+                    if box.overlaps(bounds[other]):
+                        overlapping.update((index, other))
+            overlapping -= rotated
+            if not overlapping:
+                break
+            for index in overlapping:
+                portrait_labels[index].set_rotation(90)
+            rotated.update(overlapping)
     for ext in ("png", "pdf"):
         path = OUT / f"{filename}{'_portrait' if portrait else ''}.{ext}"
         fig.savefig(path, dpi=300, facecolor="white")
@@ -186,8 +211,9 @@ def plot_panels(data, metric, title, ylabel, filename, *, portrait):
 
 def main():
     plt.rcParams.update({
-        "font.family": ["Arial", "DejaVu Sans", "sans-serif"],
+        "font.family": "sans-serif", "font.sans-serif": ["Arial", "DejaVu Sans"],
         "font.size": 14, "legend.frameon": False, "pdf.fonttype": 42, "ps.fonttype": 42,
+        "svg.fonttype": "none",
     })
     data = build_data()
     OUT.mkdir(parents=True, exist_ok=True)
